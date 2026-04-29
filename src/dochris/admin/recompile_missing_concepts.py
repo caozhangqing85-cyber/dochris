@@ -367,9 +367,10 @@ async def run_recompile(logger, stats: CompileStats, max_files: int = 0) -> None
     try:
         from openai import AsyncOpenAI
 
-        api_key = os.environ.get(
-            "OPENAI_API_KEY", "d6b65d8e39b146b2b82a1eb5d6095e02.IPCWy25wniuIC5yC"
-        )
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            logger.error("OPENAI_API_KEY 环境变量未设置")
+            return None
         base_url = _settings.api_base
         async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
     except (ImportError, OSError, ValueError) as e:
