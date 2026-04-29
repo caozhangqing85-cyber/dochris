@@ -1,0 +1,105 @@
+# ============================================================
+# Knowledge Base - Docker Compose 配置
+# ============================================================
+# 使用方法:
+#   启动: docker-compose up -d
+#   停止: docker-compose down
+#   查看日志: docker-compose logs -f
+#   执行命令: docker-compose exec knowledge-base python scripts/phase2_compilation.py
+
+version: "3.8"
+
+services:
+  # ============================================================
+  # 主服务：知识库编译系统
+  # ============================================================
+  knowledge-base:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DEBIAN_FRONTEND: noninteractive
+    image: knowledge-base:latest
+    container_name: knowledge-base
+
+    # 环境变量从 .env 文件加载
+    env_file:
+      - .env
+
+    # 环境变量覆盖（Docker 特定）
+    environment:
+      # 工作区路径（容器内）
+      - WORKSPACE=/app
+
+      # 日志级别
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    # 挂载卷
+    volumes:
+      # 数据持久化
+      - ./data:/app/data
+      - ./raw:/app/raw
+      - ./outputs:/app/outputs
+      - ./wiki:/app/wiki
+      - ./curated:/app/curated
+      - ./logs:/app/logs
+      - ./manifests:/app/manifests
+
+      # 源文件挂载（可选，用于 Phase 1）
+      # - /path/to/your/materials:/materials:ro
+
+      # Obsidian vault 挂载（可选）
+      # - ~/Documents/Obsidian-Sync:/obsidian:ro
+
+    # GPU 支持（需要 nvidia-docker）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+    # 重启策略
+    restart: unless-stopped
+
+    # 网络模式
+    network_mode: bridge
+
+    # 默认命令（保持容器运行）
+    command: ["tail", "-f", "/dev/null"]
+
+  # ============================================================
+  # 可选：ChromaDB 独立服务
+  # ============================================================
+  # chromadb:
+  #   image: chromadb/chroma:latest
+  #   container_name: knowledge-base-chroma
+  #
+  #   volumes:
+  #     - ./data/chroma:/chroma/chroma
+  #
+  #   ports:
+  #     - "8000:8000"
+  #
+  #   environment:
+  #     - CHROMA_SERVER_HOST=0.0.0.0
+  #     - CHROMA_SERVER_HTTP_PORT=8000
+  #     - ALLOW_RESET=TRUE
+  #
+  #   restart: unless-stopped
+
+# ============================================================
+# 注: 使用绑定挂载而非命名卷，便于直接访问数据
+# 如需使用命名卷，可将上方 volumes 部分修改为命名卷格式
+# ============================================================

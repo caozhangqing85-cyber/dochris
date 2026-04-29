@@ -1,0 +1,102 @@
+# ============================================================
+# Docker 构建忽略文件
+# ============================================================
+# 排除不必要的文件以减小镜像体积和构建时间
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+*.venv
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 数据目录（挂载卷）
+data/
+raw/
+outputs/
+wiki/
+curated/
+logs/
+manifests/
+*.sqlite3
+*.db
+
+# 环境变量（敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 测试和覆盖率
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+
+# 文档和示例
+docs/
+examples/
+*.md
+!README.md
+
+# 备份文件
+*.bak
+*.backup
+*.backup-*
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 进度文件
+progress.json
+*.json.backup*
+
+# Docker 相关
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# 其他
+.editorconfig
+.claude/
+.flask/
