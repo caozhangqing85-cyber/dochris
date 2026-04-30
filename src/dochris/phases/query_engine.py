@@ -27,6 +27,47 @@ MODEL = _settings.query_model
 # 全局缓存
 _llm_client_cache: openai.OpenAI | None = None
 _chromadb_client_cache: object | None = None
+_vector_store_cache: object | None = None
+
+
+# ============================================================
+# 向量存储工厂（新增，支持抽象层）
+# ============================================================
+
+
+def get_vector_store() -> object:
+    """获取向量存储实例（支持配置切换）
+
+    根据 settings.vector_store 配置返回对应的向量存储实例：
+    - "chromadb" (默认): ChromaDBStore
+    - "faiss": FAISSStore
+
+    Returns:
+        向量存储实例（BaseVectorStore 子类）
+
+    Examples:
+        >>> store = get_vector_store()
+        >>> results = store.query("my_collection", "search query", n_results=5)
+    """
+    global _vector_store_cache
+    if _vector_store_cache is not None:
+        return _vector_store_cache
+
+    from dochris.settings import get_settings
+    from dochris.vector import get_store as get_store_cls
+
+    settings = get_settings()
+    store_cls = get_store_cls(settings.vector_store)
+
+    # 创建存储实例
+    if settings.vector_store == "chromadb":
+        # ChromaDB 使用 data_dir 作为持久化目录
+        _vector_store_cache = store_cls(persist_directory=str(DATA_PATH))
+    else:
+        # 其他存储使用默认配置
+        _vector_store_cache = store_cls()
+
+    return _vector_store_cache
 
 
 # ============================================================
@@ -116,7 +157,11 @@ def search_all(query: str, top_k: int = 5) -> dict:
 
 
 def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list[dict]:
-    """使用 ChromaDB 进行向量检索
+    """使用向量存储进行检索（支持配置切换）
+
+    根据 settings.vector_store 配置选择后端：
+    - "chromadb" (默认): 使用原有的 ChromaDB 逻辑
+    - "faiss": 使用 FAISSStore 抽象层
 
     Args:
         query: 搜索查询字符串
@@ -126,6 +171,15 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
     Returns:
         检索结果列表，每个结果包含 text、source、score 等字段
     """
+    from dochris.settings import get_settings
+
+    settings = get_settings()
+
+    # 使用抽象层（非 chromadb 配置）
+    if settings.vector_store != "chromadb":
+        return _vector_search_with_store(query, top_k, logger)
+
+    # chromadb 使用原有逻辑（保持向后兼容）
     global _chromadb_client_cache
     try:
         import chromadb
@@ -169,6 +223,66 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
     except ImportError:
         if logger:
             logger.warning("chromadb not installed")
+        return []
+    except (OSError, RuntimeError) as e:
+        if logger:
+            logger.error(f"Vector search failed: {e}")
+        return []
+
+
+def _vector_search_with_store(
+    query: str, top_k: int = 5, logger: logging.Logger | None = None
+) -> list[dict]:
+    """使用抽象层进行向量检索
+
+    遍历所有 collection，合并结果后按距离排序。
+
+    Args:
+        query: 搜索查询字符串
+        top_k: 返回结果数量
+        logger: 日志记录器
+
+    Returns:
+        检索结果列表，每个结果包含 text、source、score 等字段
+    """
+    try:
+        store = get_vector_store()
+        collections = store.list_collections()
+
+        if not collections:
+            if logger:
+                logger.debug("No vector store collections found")
+            return []
+
+        all_results: list[dict] = []
+        for collection in collections:
+            try:
+                results = store.query(
+                    collection=collection,
+                    query_text=query,
+                    n_results=top_k,
+                )
+                for r in results:
+                    metadata = r.get("metadata", {})
+                    all_results.append(
+                        {
+                            "text": r.get("document", "")[:500],
+                            "source": metadata.get("source", metadata.get("file", "unknown")),
+                            "score": r.get("distance", 0),
+                            "type": "vector",
+                            "manifest_id": metadata.get("manifest_id"),
+                        }
+                    )
+            except Exception as e:
+                if logger:
+                    logger.warning(f"Vector store query error on {collection}: {e}")
+
+        all_results.sort(key=lambda x: x["score"])
+        return all_results[:top_k]
+
+    except ImportError as e:
+        if logger:
+            logger.warning(f"Vector store dependency not installed: {e}")
         return []
     except (OSError, RuntimeError) as e:
         if logger:

@@ -3,6 +3,7 @@
 LLM 客户端模块
 
 提供与 LLM API 交互的异步客户端核心功能，支持：
+- 多提供商支持（OpenAI 兼容 API、Ollama）
 - 结构化摘要生成
 - 自动重试机制（429、连接错误、超时）
 - 速率限制
@@ -78,8 +79,13 @@ class LLMClient:
 
     提供基础 API 客户端功能，摘要生成功能委托给 SummaryGenerator。
 
+    支持多种 LLM 提供商（通过 provider 配置）：
+    - openai_compat: OpenAI 兼容 API（智谱、DeepSeek、OpenAI 等）
+    - ollama: Ollama 本地模型
+
     Attributes:
-        client: AsyncOpenAI 客户端实例
+        client: AsyncOpenAI 客户端实例（向后兼容）
+        provider: LLM 提供商实例
         model: 模型名称
         max_tokens: 最大 token 数
         temperature: 温度参数（0.1 保证稳定输出）
@@ -96,6 +102,7 @@ class LLMClient:
         max_tokens: int = 40000,
         temperature: float = 0.1,
         request_delay: float = 5.0,
+        provider: str | None = None,
     ) -> None:
         """初始化 LLM 客户端
 
@@ -106,25 +113,51 @@ class LLMClient:
             max_tokens: 最大生成 token 数（默认 40000）
             temperature: 采样温度（默认 0.1，较低温度保证稳定输出）
             request_delay: 请求间隔秒数（默认 5.0，用于速率限制）
+            provider: LLM 提供商类型（None 表示自动检测或使用默认）
 
         Raises:
             ImportError: openai 包未安装时抛出
         """
-        if AsyncOpenAI is None:
-            raise ImportError("openai package not installed")
+        # 确定 provider 类型
+        if provider is None:
+            # 默认使用 openai_compat
+            provider = "openai_compat"
 
-        import httpx
+        # 创建提供商实例
+        from dochris.llm import get_provider
 
-        self.client = AsyncOpenAI(
+        provider_class = get_provider(provider)
+        self.provider = provider_class(
             api_key=api_key,
-            base_url=base_url,
-            timeout=120.0,  # 2分钟超时
-            http_client=httpx.AsyncClient(
-                limits=httpx.Limits(max_connections=1),
-                timeout=120.0,
-            ),
-            max_retries=0,  # 禁用 openai 库内置重试，由 LLMClient 自行处理
+            api_base=base_url,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=120,
         )
+
+        # 向后兼容：对于 openai_compat，暴露底层的 AsyncOpenAI 客户端
+        if provider == "openai_compat" and hasattr(self.provider, "client"):
+            self.client = self.provider.client
+        else:
+            # 对于其他提供商，创建一个兼容的 client 属性
+            # 注意：这不会完全兼容所有用法，但能防止 AttributeError
+            if AsyncOpenAI is None:
+                raise ImportError("openai package not installed")
+
+            import httpx
+
+            self.client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=120.0,
+                http_client=httpx.AsyncClient(
+                    limits=httpx.Limits(max_connections=1),
+                    timeout=120.0,
+                ),
+                max_retries=0,
+            )
+
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
@@ -161,7 +194,7 @@ class LLMClient:
     async def close(self) -> None:
         """关闭 LLM 客户端并释放资源
 
-        关闭底层的 httpx.AsyncClient，释放网络连接。
+        关闭底层的 provider 和 httpx.AsyncClient，释放网络连接。
         建议在使用完毕后或程序退出前调用此方法。
 
         Example:
@@ -171,9 +204,15 @@ class LLMClient:
             finally:
                 await client.close()
         """
+        # 关闭 provider
+        if hasattr(self, "provider") and self.provider is not None:
+            await self.provider.close()
+
+        # 关闭 client（向后兼容）
         if hasattr(self, "client") and self.client is not None:
             await self.client.close()
-            logger.debug("LLMClient 已关闭")
+
+        logger.debug("LLMClient 已关闭")
 
     async def __aenter__(self) -> "LLMClient":
         """异步上下文管理器入口

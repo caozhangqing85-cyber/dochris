@@ -80,11 +80,23 @@ class Settings:
     model: str = field(default_factory=lambda: os.environ.get("MODEL", "glm-5.1"))
     """默认 LLM 模型"""
 
+    llm_provider: str = field(default_factory=lambda: os.environ.get("LLM_PROVIDER", "openai_compat"))
+    """LLM 提供商类型 (openai_compat, ollama)"""
+
     query_model: str = "glm-4-flash"
     """Phase 3 查询专用模型"""
 
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
     """向量嵌入模型"""
+
+    # ============================================================
+    # 向量配置
+    # ============================================================
+
+    vector_store: str = field(
+        default_factory=lambda: os.environ.get("VECTOR_STORE", "chromadb")
+    )
+    """向量数据库类型 (chromadb, faiss)"""
 
     # OpenRouter 备用配置
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
@@ -258,8 +270,10 @@ class Settings:
             api_key=api_key,
             api_base=api_base,
             model=model,
+            llm_provider=os.environ.get("LLM_PROVIDER", "openai_compat"),
             query_model=os.environ.get("QUERY_MODEL", "glm-4-flash"),
             embedding_model=os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"),
+            vector_store=os.environ.get("VECTOR_STORE", "chromadb"),
             max_concurrency=int(os.environ.get("MAX_CONCURRENCY", "3")),
             min_quality_score=int(os.environ.get("MIN_QUALITY_SCORE", "85")),
             max_content_chars=int(os.environ.get("MAX_CONTENT_CHARS", "20000")),

@@ -55,6 +55,9 @@ from dochris.exceptions import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
+
+# 导入日志配置
+from dochris.log_config import setup_logging
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -249,35 +252,17 @@ complete -c kb -n "__fish_seen_subcommand_from ingest" -l dry-run
 """
 
 
-def _setup_logging(settings) -> None:
+def _setup_logging(settings, log_format: str = "text") -> None:
     """配置统一的日志格式和级别
 
     Args:
         settings: Settings 实例
+        log_format: 日志格式 ("text" 或 "json")
     """
-    # 获取日志级别
-    log_level_str = settings.log_level.upper()
-    log_level = getattr(logging, log_level_str, logging.INFO)
-
-    # 设置根日志记录器
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-
-    # 清除现有处理器
-    root_logger.handlers.clear()
-
-    # 创建控制台处理器
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(log_level)
-
-    # 设置格式
-    formatter = logging.Formatter(
-        settings.log_format,
-        datefmt=settings.log_date_format,
+    setup_logging(
+        level=settings.log_level,
+        log_format=log_format,
     )
-    handler.setFormatter(formatter)
-
-    root_logger.addHandler(handler)
 
 
 def main() -> int:
@@ -294,8 +279,18 @@ def main() -> int:
     # 获取配置
     settings = get_settings()
 
+    # 临时解析器：只解析 --log-format 参数（在完整解析之前需要配置日志）
+    temp_parser = argparse.ArgumentParser(add_help=False)
+    temp_parser.add_argument(
+        "--log-format",
+        choices=["text", "json"],
+        default="text",
+    )
+    temp_args, _ = temp_parser.parse_known_args()
+    log_format = temp_args.log_format
+
     # 配置日志
-    _setup_logging(settings)
+    _setup_logging(settings, log_format=log_format)
 
     # 验证配置
     try:
@@ -331,6 +326,12 @@ def main() -> int:
 
     parser.add_argument("--verbose", "-v", action="store_true", help="显示详细输出")
     parser.add_argument("--quiet", "-q", action="store_true", help="静默模式，仅输出错误信息")
+    parser.add_argument(
+        "--log-format",
+        choices=["text", "json"],
+        default="text",
+        help="日志格式（默认: text，json 便于 ELK/Datadog 集成）",
+    )
     parser.add_argument("--version", action="store_true", help="显示版本信息")
     parser.add_argument(
         "--completion",
