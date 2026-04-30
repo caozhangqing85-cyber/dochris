@@ -25,11 +25,11 @@
 - [x] P0-4: CLI 错误体验改进（1 小时）
 
 ### P1：本月规划（~10 小时）
-- [ ] P1-1: 完善 CI 流水线（30 分钟）
-- [ ] P1-2: CLI 命令补全（2 小时）
-- [ ] P1-3: 创建 types.py + protocols.py（2 小时）
-- [ ] P1-4: 创建 constants.py（1.5 小时）
-- [ ] P1-5: README Badges + 架构图（1 小时）
+- [x] P1-1: 完善 CI 流水线（30 分钟）
+- [x] P1-2: CLI 命令补全（2 小时）
+- [x] P1-3: 创建 types.py + protocols.py（2 小时）
+- [x] P1-4: 创建 constants.py（1.5 小时）
+- [x] P1-5: README Badges + 架构图（1 小时）
 
 ### P2：V2.0 路线图（~40 小时）
 - [ ] P2-1: 插件/扩展机制（15 小时）
