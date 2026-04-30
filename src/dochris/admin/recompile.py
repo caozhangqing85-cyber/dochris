@@ -55,7 +55,7 @@ def setup_logging(mode: str = "recompile") -> logging.Logger:
 
 def get_recoverable_failed_docs(
     workspace: Path, mode: str = "all", error_filter: str | None = None
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """获取可恢复的失败文档
 
     Args:

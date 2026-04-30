@@ -31,4 +31,27 @@ __author__ = "caozhangqing85-cyber"
 __all__ = [
     "__version__",
     "__author__",
+    "get_settings",
+    "Settings",
+    "LLMClient",
 ]
+
+
+def __getattr__(name: str):
+    """延迟导入，避免循环依赖
+
+    当访问 LLMClient、Settings 等类型时，仅在需要时导入对应模块。
+    """
+    if name == "LLMClient":
+        from dochris.core.llm_client import LLMClient
+
+        return LLMClient
+    elif name == "Settings":
+        from dochris.settings import Settings
+
+        return Settings
+    elif name == "get_settings":
+        from dochris.settings import get_settings
+
+        return get_settings
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

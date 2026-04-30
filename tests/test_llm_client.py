@@ -28,12 +28,14 @@ class TestLLMClient(unittest.TestCase):
         self.assertEqual(client.model, "test_model")
         # LLMClient 没有公开 api_key 属性，只检查 model
 
-    def test_build_messages(self):
-        """测试消息构建"""
+    def test_summary_generator_build_messages(self):
+        """测试 SummaryGenerator 消息构建"""
         from dochris.core.llm_client import LLMClient
+        from dochris.core.summary_generator import SummaryGenerator
 
         client = LLMClient(api_key="test", base_url="https://test.com")
-        messages = client._build_messages("test content", "Test Title")
+        generator = SummaryGenerator(client)
+        messages = generator._build_messages("test content", "Test Title")
 
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["role"], "system")

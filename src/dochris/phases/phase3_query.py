@@ -19,6 +19,7 @@ import time
 
 # 确保 scripts 包可导入
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -128,8 +129,8 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger = None) -> 
 
 
 def query(
-    query_str: str, mode: str = "combined", top_k: int = 5, logger: logging.Logger = None
-) -> dict:
+    query_str: str, mode: str = "combined", top_k: int = 5, logger: logging.Logger | None = None
+) -> dict[str, Any]:
     """
     执行查询
 

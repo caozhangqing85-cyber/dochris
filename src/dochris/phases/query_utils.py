@@ -11,6 +11,7 @@ import sys
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import openai
 
@@ -162,7 +163,7 @@ def _keyword_search(
     top_k: int,
     extract_fn: Callable[[Path, str], dict],
     source_label: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """通用关键词搜索
 
     Args:

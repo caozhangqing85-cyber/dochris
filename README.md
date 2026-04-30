@@ -124,8 +124,15 @@ OPENAI_API_KEY=your_api_key_here
 OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
 MODEL=glm-5.1
 
+# 查询专用模型（可选，默认 glm-4-flash）
+QUERY_MODEL=glm-4-flash
+
 # 工作区路径（可选，默认 ~/.knowledge-base）
 WORKSPACE=~/.knowledge-base
+
+# 本地 LLM 配置（可选，用于兜底）
+LOCAL_LLM_BASE_URL=http://localhost:11434/v1
+LOCAL_LLM_MODEL=qwen:14b
 ```
 
 ### 使用流程
@@ -174,21 +181,48 @@ cat ~/test-kb/outputs/summaries/SRC-0001.md
 
 ```
 knowledge-base/
-├── src/dochris/        # 主包
-│   ├── cli/                # CLI 命令
-│   ├── core/               # 核心模块
-│   ├── parsers/            # 文件解析器
-│   ├── phases/             # 流水线阶段
-│   ├── workers/            # 工作进程
-│   └── ...
-├── tests/                  # 测试文件
-├── docs/                   # 文档
-├── manifests/              # Manifest 存储
-├── raw/                    # 原始文件（符号链接）
-├── outputs/                # Layer 0: LLM 产物
-├── wiki/                   # Layer 1: 经审核
-├── curated/                # Layer 2: 人工精选
-└── logs/                   # 编译日志
+├── src/dochris/              # 主包
+│   ├── cli/                      # CLI 命令
+│   ├── core/                     # 核心模块
+│   │   ├── llm_client.py         # LLM 异步客户端
+│   │   ├── summary_generator.py  # 基础摘要生成器
+│   │   ├── hierarchical_summarizer.py  # 分层摘要器（Map-Reduce）
+│   │   ├── quality_scorer.py     # 质量评分
+│   │   ├── text_chunker.py       # 文本分块
+│   │   ├── cache.py              # 缓存管理
+│   │   └── utils.py              # 通用工具
+│   ├── parsers/                  # 文件解析器
+│   │   ├── pdf_parser.py         # PDF 解析
+│   │   ├── doc_parser.py         # 文档解析
+│   │   └── code_parser.py        # 代码解析
+│   ├── phases/                   # 流水线阶段
+│   │   ├── phase1_ingestion.py   # 摄入阶段
+│   │   ├── phase2_compilation.py # 编译阶段
+│   │   ├── phase3_query.py       # 查询阶段
+│   │   ├── query_engine.py       # 查询引擎
+│   │   └── query_utils.py        # 查询工具
+│   ├── workers/                  # 工作进程
+│   │   ├── compiler_worker.py    # 编译 worker
+│   │   └── monitor_worker.py     # 监控 worker
+│   ├── quality/                  # 质量管理
+│   │   ├── quality_gate.py       # 质量门禁
+│   │   └── quality_monitor.py    # 质量监控
+│   ├── compensate/               # 失败补偿
+│   ├── admin/                    # 管理工具
+│   ├── vault/                    # Obsidian 集成
+│   ├── settings.py               # 配置管理
+│   ├── exceptions.py             # 异常定义
+│   ├── manifest.py               # Manifest 管理
+│   ├── promote.py                # 晋升机制
+│   └── log.py                    # 日志工具
+├── tests/                        # 测试文件
+├── docs/                         # 文档
+├── manifests/                    # Manifest 存储
+├── raw/                          # 原始文件（符号链接）
+├── outputs/                      # Layer 0: LLM 产物
+├── wiki/                         # Layer 1: 经审核
+├── curated/                      # Layer 2: 人工精选
+└── logs/                         # 编译日志
 ```
 
 ## CLI 命令参考

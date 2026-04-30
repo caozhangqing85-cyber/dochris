@@ -11,6 +11,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # 路径配置
 KB_PATH = Path.home() / ".openclaw/knowledge-base"
@@ -147,7 +148,7 @@ def check_process_status() -> dict:
 
 
 def check_alerts(
-    progress_info: dict, log_info: dict, quality_info: dict, process_info: dict
+    progress_info: dict[str, Any], log_info: dict[str, Any], quality_info: dict[str, Any], process_info: dict[str, Any]
 ) -> list[str]:
     """检查告警条件"""
     alerts = []
@@ -176,7 +177,7 @@ def check_alerts(
 
 
 def generate_report(
-    progress_info: dict, log_info: dict, quality_info: dict, process_info: dict
+    progress_info: dict[str, Any], log_info: dict[str, Any], quality_info: dict[str, Any], process_info: dict[str, Any]
 ) -> str:
     """生成监控报告"""
     report = []

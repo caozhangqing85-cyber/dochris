@@ -1,9 +1,11 @@
 # 核心模块
 
 from .cache import cache_dir, clear_cache, file_hash, load_cached, save_cached
+from .hierarchical_summarizer import HierarchicalSummarizer
 from .llm_client import LLMClient
 from .quality_scorer import get_quality_threshold, score_summary_quality_v4
 from .retry_manager import RetryManager
+from .summary_generator import SummaryGenerator
 from .utils import (
     compute_file_hash,
     ensure_dir,
@@ -24,6 +26,8 @@ __all__ = [
     "clear_cache",
     # llm_client
     "LLMClient",
+    "SummaryGenerator",
+    "HierarchicalSummarizer",
     # quality_scorer
     "score_summary_quality_v4",
     "get_quality_threshold",

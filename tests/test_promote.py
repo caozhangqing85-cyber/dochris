@@ -1,350 +1,322 @@
 #!/usr/bin/env python3
 """
-测试 promote_artifact.py 内容提升脚本
-12+ 测试用例
+Promote 模块单元测试
 """
 
-import sys
-import tempfile
-import unittest
-from pathlib import Path
+import pytest
 
-# 添加 scripts 目录到路径
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-
-class TestPromoteToWiki(unittest.TestCase):
-    """测试提升到 wiki"""
-
-    def setUp(self):
-        """设置测试环境"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
-
-        # 创建目录结构
-        (self.temp_path / "outputs" / "summaries").mkdir(parents=True)
-        (self.temp_path / "outputs" / "concepts").mkdir(parents=True)
-        (self.temp_path / "wiki" / "summaries").mkdir(parents=True)
-        (self.temp_path / "wiki" / "concepts").mkdir(parents=True)
-        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
-
-    def tearDown(self):
-        """清理测试环境"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    def test_promote_to_wiki_success(self):
-        """测试成功提升到 wiki"""
-        from dochris.manifest import create_manifest
-        from dochris.promote import promote_to_wiki
-
-        # 创建 manifest 和输出文件
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0001",
-            title="Test Document",
-            file_type="article",
-            source_path=Path("/source/test.pdf"),
-            file_path="raw/articles/test.pdf",
-            content_hash="hash123",
-            size_bytes=1024,
-        )
-
-        # 创建输出摘要文件
-        summary_file = self.temp_path / "outputs" / "summaries" / "Test Document.md"
-        summary_file.write_text("# Test Document\n\nSummary content", encoding='utf-8')
-
-        # 更新为 compiled 状态
-        from dochris.manifest import update_manifest_status
-        update_manifest_status(
-            self.temp_path,
-            "SRC-0001",
-            "compiled",
-            quality_score=90,
-            summary={"one_line": "test"}
-        )
-
-        # 提升
-        result = promote_to_wiki(self.temp_path, "SRC-0001")
-        self.assertTrue(result)
-
-    def test_promote_to_wiki_wrong_status(self):
-        """测试错误状态提升失败"""
-        from dochris.manifest import create_manifest
-        from dochris.promote import promote_to_wiki
-
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0002",
-            title="Test Doc 2",
-            file_type="article",
-            source_path=Path("/source/test2.pdf"),
-            file_path="raw/articles/test2.pdf",
-            content_hash="hash456",
-            size_bytes=1024,
-        )
-        # 状态是 ingested，不是 compiled
-
-        result = promote_to_wiki(self.temp_path, "SRC-0002")
-        self.assertFalse(result)
-
-    def test_promote_to_wiki_missing_manifest(self):
-        """测试提升不存在的 manifest"""
-        from dochris.promote import promote_to_wiki
-
-        result = promote_to_wiki(self.temp_path, "SRC-9999")
-        self.assertFalse(result)
-
-    def test_promote_to_wiki_creates_symlink_copy(self):
-        """测试提升创建文件副本"""
-        from dochris.manifest import create_manifest, update_manifest_status
-
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0003",
-            title="SimpleTitle",
-            file_type="article",
-            source_path=Path("/source/test3.pdf"),
-            file_path="raw/articles/test3.pdf",
-            content_hash="hash789",
-            size_bytes=1024,
-        )
-
-        # 创建输出文件
-        summary_file = self.temp_path / "outputs" / "summaries" / "SimpleTitle.md"
-        summary_file.write_text("# SimpleTitle\n\nContent", encoding='utf-8')
-
-        update_manifest_status(
-            self.temp_path,
-            "SRC-0003",
-            "compiled",
-            quality_score=85,
-            summary={"one_line": "test"}
-        )
-
-        # 提升
-        from dochris.promote import promote_to_wiki
-        promote_to_wiki(self.temp_path, "SRC-0003")
-
-        # 验证文件被复制
-        wiki_summary = self.temp_path / "wiki" / "summaries" / "SimpleTitle.md"
-        self.assertTrue(wiki_summary.exists())
+from dochris.promote import (
+    _copy_file,
+    _ensure_dirs,
+    _find_output_file,
+    promote_to_curated,
+    promote_to_wiki,
+    show_status,
+)
 
 
-class TestPromoteToCurated(unittest.TestCase):
-    """测试提升到 curated"""
+@pytest.fixture
+def temp_workspace(tmp_path):
+    """创建临时工作区"""
+    workspace = tmp_path / "knowledge-base"
+    workspace.mkdir()
 
-    def setUp(self):
-        """设置测试环境"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+    # 创建必要的目录
+    (workspace / "outputs" / "summaries").mkdir(parents=True)
+    (workspace / "outputs" / "concepts").mkdir(parents=True)
+    (workspace / "wiki" / "summaries").mkdir(parents=True)
+    (workspace / "wiki" / "concepts").mkdir(parents=True)
+    (workspace / "curated" / "promoted").mkdir(parents=True)
+    (workspace / "manifests" / "sources").mkdir(parents=True)
 
-        (self.temp_path / "wiki" / "summaries").mkdir(parents=True)
-        (self.temp_path / "wiki" / "concepts").mkdir(parents=True)
-        (self.temp_path / "curated" / "promoted").mkdir(parents=True)
-        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
-
-    def tearDown(self):
-        """清理测试环境"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    def test_promote_to_curated_success(self):
-        """测试成功提升到 curated"""
-        from dochris.manifest import create_manifest, update_manifest_status
-        from dochris.promote import promote_to_curated
-
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0001",
-            title="Curated Doc",
-            file_type="article",
-            source_path=Path("/source/test.pdf"),
-            file_path="raw/articles/test.pdf",
-            content_hash="hash123",
-            size_bytes=1024,
-        )
-
-        # 创建 wiki 文件
-        wiki_summary = self.temp_path / "wiki" / "summaries" / "Curated Doc.md"
-        wiki_summary.write_text("# Curated Doc\n\nContent", encoding='utf-8')
-
-        # 更新为 promoted_to_wiki 状态
-        update_manifest_status(
-            self.temp_path,
-            "SRC-0001",
-            "promoted_to_wiki",
-            quality_score=90,
-            summary={"one_line": "test"}
-        )
-
-        # 提升
-        result = promote_to_curated(self.temp_path, "SRC-0001")
-        self.assertTrue(result)
-
-    def test_promote_to_curated_wrong_status(self):
-        """测试错误状态提升失败"""
-        from dochris.manifest import create_manifest
-        from dochris.promote import promote_to_curated
-
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0002",
-            title="Test Doc",
-            file_type="article",
-            source_path=Path("/source/test2.pdf"),
-            file_path="raw/articles/test2.pdf",
-            content_hash="hash456",
-            size_bytes=1024,
-        )
-        # 状态是 ingested
-
-        result = promote_to_curated(self.temp_path, "SRC-0002")
-        self.assertFalse(result)
+    return workspace
 
 
-class TestShowStatus(unittest.TestCase):
-    """测试显示状态"""
+@pytest.fixture
+def sample_manifest(temp_workspace):
+    """创建示例 manifest 文件"""
+    import json
 
-    def setUp(self):
-        """设置测试环境"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
-        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
+    manifest = {
+        "id": "SRC-0001",
+        "title": "测试文档",
+        "type": "pdf",
+        "status": "compiled",
+        "quality_score": 90,
+        "source_path": "/test/source.pdf",
+        "file_path": "/test/raw/source.pdf",
+        "compiled_summary": {
+            "one_line": "测试摘要",
+            "key_points": ["要点1", "要点2"],
+            "detailed_summary": "详细摘要内容",
+            "concepts": [
+                {"name": "概念1", "explanation": "解释1"},
+                {"name": "概念2", "explanation": "解释2"},
+            ],
+        },
+    }
 
-    def tearDown(self):
-        """清理测试环境"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+    manifest_path = temp_workspace / "manifests" / "sources" / "SRC-0001.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-    def test_show_status_existing_manifest(self):
-        """测试显示现有 manifest 状态"""
-        from dochris.manifest import create_manifest
-        from dochris.promote import show_status
-
-        create_manifest(
-            workspace_path=self.temp_path,
-            src_id="SRC-0001",
-            title="Status Test",
-            file_type="article",
-            source_path=Path("/source/test.pdf"),
-            file_path="raw/articles/test.pdf",
-            content_hash="hash123",
-            size_bytes=1024,
-        )
-
-        # 不应该抛出异常
-        try:
-            import sys
-            from io import StringIO
-            old_stdout = sys.stdout
-            sys.stdout = StringIO()
-            show_status(self.temp_path, "SRC-0001")
-            output = sys.stdout.getvalue()
-            sys.stdout = old_stdout
-
-            self.assertIn("SRC-0001", output)
-            self.assertIn("Status Test", output)
-        except Exception:
-            self.fail("show_status raised an exception")
-
-    def test_show_status_nonexistent_manifest(self):
-        """测试显示不存在的 manifest"""
-        from dochris.promote import show_status
-
-        try:
-            import sys
-            from io import StringIO
-            old_stdout = sys.stdout
-            sys.stdout = StringIO()
-            show_status(self.temp_path, "SRC-9999")
-            output = sys.stdout.getvalue()
-            sys.stdout = old_stdout
-
-            self.assertIn("未找到", output)
-        except Exception:
-            self.fail("show_status raised an exception")
+    return manifest
 
 
-class TestFileCopy(unittest.TestCase):
-    """测试文件复制"""
+@pytest.fixture
+def sample_output_files(temp_workspace, sample_manifest):
+    """创建示例输出文件"""
+    # 摘要文件
+    summary_path = temp_workspace / "outputs" / "summaries" / "测试文档.md"
+    summary_path.write_text("# 测试文档\n\n摘要内容", encoding="utf-8")
 
-    def setUp(self):
-        """设置测试环境"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.temp_path = Path(self.temp_dir)
+    # 概念文件
+    concept1_path = temp_workspace / "outputs" / "concepts" / "概念1.md"
+    concept1_path.write_text("# 概念1\n\n解释1", encoding="utf-8")
 
-    def tearDown(self):
-        """清理测试环境"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+    concept2_path = temp_workspace / "outputs" / "concepts" / "概念2.md"
+    concept2_path.write_text("# 概念2\n\n解释2", encoding="utf-8")
 
-    def test_copy_file_to_directory(self):
-        """测试复制文件到目录"""
-        from dochris.promote import _copy_file
+    return {
+        "summary": summary_path,
+        "concepts": [concept1_path, concept2_path],
+    }
 
-        src = self.temp_path / "source.txt"
-        dst_dir = self.temp_path / "dest"
+
+class TestCopyFile:
+    """测试 _copy_file 函数"""
+
+    def test_copy_file_new(self, tmp_path):
+        """测试复制新文件"""
+        src = tmp_path / "source.txt"
+        src.write_text("测试内容")
+        dst_dir = tmp_path / "dest"
         dst_dir.mkdir()
-
-        src.write_text("test content")
 
         result = _copy_file(src, dst_dir)
-        self.assertTrue(result.exists())
-        self.assertEqual(result.read_text(), "test content")
 
-    def test_copy_file_handles_duplicates(self):
-        """测试复制处理重名"""
-        from dochris.promote import _copy_file
+        assert result == dst_dir / "source.txt"
+        assert result.exists()
+        assert result.read_text() == "测试内容"
 
-        src = self.temp_path / "source.txt"
-        dst_dir = self.temp_path / "dest"
+    def test_copy_file_with_conflict(self, tmp_path):
+        """测试处理重名冲突"""
+        src = tmp_path / "file.txt"
+        src.write_text("内容")
+        dst_dir = tmp_path / "dest"
         dst_dir.mkdir()
 
-        src.write_text("content")
+        # 创建已存在的目标文件
+        (dst_dir / "file.txt").write_text("已存在")
+        (dst_dir / "file_1.txt").write_text("已存在1")
 
-        # 第一次复制
-        result1 = _copy_file(src, dst_dir)
-        self.assertEqual(result1.name, "source.txt")
+        result = _copy_file(src, dst_dir)
 
-        # 第二次复制（应该重命名）
-        result2 = _copy_file(src, dst_dir)
-        self.assertEqual(result2.name, "source_1.txt")
+        # 应该创建 file_2.txt
+        assert result == dst_dir / "file_2.txt"
+        assert result.exists()
+        assert result.read_text() == "内容"
 
-        # 第三次复制
-        result3 = _copy_file(src, dst_dir)
-        self.assertEqual(result3.name, "source_2.txt")
+    def test_copy_file_max_retries_exceeded(self, tmp_path, monkeypatch):
+        """测试超过最大重试次数"""
+        # 降低 MAX_COPY_RETRIES 以加快测试
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "MAX_COPY_RETRIES", 3)
 
+        src = tmp_path / "file.txt"
+        src.write_text("内容")
+        dst_dir = tmp_path / "dest"
+        dst_dir.mkdir()
 
-class TestTitleSanitization(unittest.TestCase):
-    """测试标题清洗"""
+        # 创建冲突文件：file.txt, file_1.txt, file_2.txt, file_3.txt
+        (dst_dir / "file.txt").write_text("已存在")
+        for i in range(1, 4):
+            (dst_dir / f"file_{i}.txt").write_text(f"已存在{i}")
 
-    def test_remove_special_characters(self):
-        """测试移除特殊字符"""
-        import re
-
-        titles = [
-            ("Test/File", "TestFile"),
-            ("Test\\File", "TestFile"),
-            ("Test:File", "TestFile"),
-            ("Test*File", "TestFile"),
-            ("Test?File", "TestFile"),
-            ('Test"File', "TestFile"),
-            ("Test<File", "TestFile"),
-            ("Test>File", "TestFile"),
-            ("Test|File", "TestFile"),
-        ]
-
-        for raw, expected in titles:
-            sanitized = re.sub(r'[<>:"/\\|?*]', '', raw)
-            self.assertEqual(sanitized, expected)
-
-    def test_truncate_long_title(self):
-        """测试截断长标题"""
-        long_title = "A" * 100
-        truncated = long_title[:80]
-        self.assertEqual(len(truncated), 80)
+        with pytest.raises(ValueError, match="文件复制重名冲突超过上限"):
+            _copy_file(src, dst_dir)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestEnsureDirs:
+    """测试 _ensure_dirs 函数"""
+
+    def test_ensure_dirs_creates_missing(self, tmp_path):
+        """测试创建缺失的目录"""
+        dir1 = tmp_path / "new_dir1"
+        dir2 = tmp_path / "new_dir2"
+
+        _ensure_dirs(dir1, dir2)
+
+        assert dir1.exists()
+        assert dir2.exists()
+
+    def test_ensure_dirs_existing_ok(self, tmp_path):
+        """测试已存在的目录不会报错"""
+        existing_dir = tmp_path / "existing"
+        existing_dir.mkdir()
+
+        # 不应该抛出异常
+        _ensure_dirs(existing_dir)
+
+
+class TestFindOutputFile:
+    """测试 _find_output_file 函数"""
+
+    def test_find_output_file_direct_match(self, tmp_path):
+        """测试直接文件名匹配"""
+        (tmp_path / "SRC-0001.md").write_text("内容")
+
+        result = _find_output_file(tmp_path, "SRC-0001", ".md")
+
+        assert result == tmp_path / "SRC-0001.md"
+
+    def test_find_output_file_not_found(self, tmp_path):
+        """测试文件未找到"""
+        result = _find_output_file(tmp_path, "SRC-9999", ".md")
+
+        assert result is None
+
+
+class TestPromoteToWiki:
+    """测试 promote_to_wiki 函数"""
+
+    def test_promote_to_wiki_success(
+        self, temp_workspace, sample_manifest, sample_output_files, monkeypatch
+    ):
+        """测试成功晋升到 wiki"""
+        # Mock get_manifest 和 update_manifest_status
+        def mock_get_manifest(path, src_id):
+            return sample_manifest
+
+        def mock_update_status(*args, **kwargs):
+            pass
+
+        def mock_append_log(*args, **kwargs):
+            pass
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+        monkeypatch.setattr(dochris.promote, "update_manifest_status", mock_update_status)
+        monkeypatch.setattr(dochris.promote, "append_log", mock_append_log)
+
+        result = promote_to_wiki(temp_workspace, "SRC-0001")
+
+        assert result is True
+        # 检查文件被复制
+        assert (temp_workspace / "wiki" / "summaries" / "测试文档.md").exists()
+
+    def test_promote_to_wiki_manifest_not_found(self, temp_workspace, monkeypatch):
+        """测试 manifest 不存在"""
+        def mock_get_manifest(path, src_id):
+            return None
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+
+        result = promote_to_wiki(temp_workspace, "SRC-9999")
+
+        assert result is False
+
+    def test_promote_to_wiki_wrong_status(
+        self, temp_workspace, sample_manifest, monkeypatch
+    ):
+        """测试状态不正确"""
+        wrong_manifest = sample_manifest.copy()
+        wrong_manifest["status"] = "pending"
+
+        def mock_get_manifest(path, src_id):
+            return wrong_manifest
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+
+        result = promote_to_wiki(temp_workspace, "SRC-0001")
+
+        assert result is False
+
+
+class TestPromoteToCurated:
+    """测试 promote_to_curated 函数"""
+
+    def test_promote_to_curated_success(
+        self, temp_workspace, sample_manifest, sample_output_files, monkeypatch
+    ):
+        """测试成功晋升到 curated"""
+        # 先创建 wiki 中的文件
+        wiki_summary = temp_workspace / "wiki" / "summaries" / "测试文档.md"
+        wiki_summary.write_text("# Wiki 摘要", encoding="utf-8")
+
+        wiki_concept1 = temp_workspace / "wiki" / "concepts" / "概念1.md"
+        wiki_concept1.write_text("# Wiki 概念1", encoding="utf-8")
+
+        # 修改 manifest 状态
+        wiki_manifest = sample_manifest.copy()
+        wiki_manifest["status"] = "promoted_to_wiki"
+
+        def mock_get_manifest(path, src_id):
+            return wiki_manifest
+
+        def mock_update_status(*args, **kwargs):
+            pass
+
+        def mock_append_log(*args, **kwargs):
+            pass
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+        monkeypatch.setattr(dochris.promote, "update_manifest_status", mock_update_status)
+        monkeypatch.setattr(dochris.promote, "append_log", mock_append_log)
+
+        result = promote_to_curated(temp_workspace, "SRC-0001")
+
+        assert result is True
+        # 检查文件被复制到 curated
+        assert (temp_workspace / "curated" / "promoted" / "测试文档.md").exists()
+
+    def test_promote_to_curated_wrong_status(
+        self, temp_workspace, sample_manifest, monkeypatch
+    ):
+        """测试状态不正确"""
+        def mock_get_manifest(path, src_id):
+            return sample_manifest
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+
+        result = promote_to_curated(temp_workspace, "SRC-0001")
+
+        assert result is False
+
+
+class TestShowStatus:
+    """测试 show_status 函数"""
+
+    def test_show_status_existing(
+        self, temp_workspace, sample_manifest, monkeypatch, capsys
+    ):
+        """测试显示现有 manifest 状态"""
+        def mock_get_manifest(path, src_id):
+            return sample_manifest
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+
+        show_status(temp_workspace, "SRC-0001")
+
+        captured = capsys.readouterr()
+        assert "SRC-0001" in captured.out
+        assert "测试文档" in captured.out
+        assert "compiled" in captured.out
+
+    def test_show_status_not_found(self, temp_workspace, monkeypatch, capsys):
+        """测试 manifest 不存在"""
+        def mock_get_manifest(path, src_id):
+            return None
+
+        import dochris.promote
+        monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
+
+        show_status(temp_workspace, "SRC-9999")
+
+        captured = capsys.readouterr()
+        assert "未找到 manifest" in captured.out

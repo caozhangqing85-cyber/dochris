@@ -8,7 +8,7 @@ Manifest 格式：
   "id": "SRC-NNNN",
   "title": "来源标题",
   "type": "pdf|audio|video|ebook|article|other",
-  "source_path": "/vol1/1000/...",
+  "source_path": "/path/to/sources/filename.pdf",
   "file_path": "raw/pdfs/filename.pdf",
   "content_hash": "SHA-256",
   "date_ingested": "YYYY-MM-DD",

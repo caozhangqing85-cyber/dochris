@@ -23,6 +23,9 @@ from dochris.core.utils import sanitize_filename
 from dochris.log import append_log
 from dochris.manifest import get_manifest, update_manifest_status
 
+# 文件复制重名冲突最大重试次数
+MAX_COPY_RETRIES = 999
+
 
 def _ensure_dirs(*paths: Path) -> None:
     """确保目录存在"""
@@ -31,10 +34,25 @@ def _ensure_dirs(*paths: Path) -> None:
 
 
 def _copy_file(src: Path, dst_dir: Path) -> Path:
-    """复制文件到目标目录，处理重名冲突"""
+    """复制文件到目标目录，处理重名冲突
+
+    Args:
+        src: 源文件路径
+        dst_dir: 目标目录
+
+    Returns:
+        复制后的文件路径
+
+    Raises:
+        ValueError: 当重名冲突超过 MAX_COPY_RETRIES 时
+    """
     dst = dst_dir / src.name
     counter = 1
     while dst.exists():
+        if counter > MAX_COPY_RETRIES:
+            raise ValueError(
+                f"文件复制重名冲突超过上限 ({MAX_COPY_RETRIES}): {src.name}"
+            )
         stem = src.stem
         suffix = src.suffix
         dst = dst_dir / f"{stem}_{counter}{suffix}"

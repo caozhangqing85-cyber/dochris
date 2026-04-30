@@ -132,22 +132,20 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
 
 
 async def generate_summary_with_llm(
-    async_client, text: str, title: str, logger, rate_limiter=None, adaptive_delay=None
+    text: str, title: str, logger, rate_limiter=None, adaptive_delay=None
 ) -> dict[str, Any] | None:
     """使用 LLM 生成摘要
 
     Args:
-        async_client: AsyncOpenAI 客户端
         text: 待摘要文本
         title: 文档标题
         logger: 日志记录器
-        rate_limiter: 速率限制器（未使用）
-        adaptive_delay: 自适应延迟列表（未使用）
+        rate_limiter: 速率限制器（未使用，保留兼容）
+        adaptive_delay: 自适应延迟列表（未使用，保留兼容）
 
     Returns:
         摘要字典，失败返回 None
     """
-    # 使用 dochris.core.llm_client.LLMClient
     from dochris.core.llm_client import LLMClient
     from dochris.settings import get_settings
 
@@ -173,7 +171,6 @@ async def generate_summary_with_llm(
 
 
 async def compile_with_model_fallback(
-    async_client,
     text: str,
     title: str,
     logger,
@@ -183,17 +180,26 @@ async def compile_with_model_fallback(
     """带模型降级的编译
 
     依次尝试模型链中的每个模型，直到成功或全部失败
+
+    Args:
+        text: 待摘要文本
+        title: 文档标题
+        logger: 日志记录器
+        model_chain: 模型链（依次尝试）
+        adaptive_delay: 自适应延迟列表
+
+    Returns:
+        摘要字典，失败返回 None
     """
     from dochris.core.llm_client import LLMClient
+    from dochris.settings import get_settings
+
+    settings = get_settings()
 
     for model_name in model_chain:
         logger.info(f"尝试模型: {model_name}")
 
         # 创建使用指定模型的 LLMClient
-        from dochris.settings import get_settings
-
-        settings = get_settings()
-
         client = LLMClient(
             api_key=settings.api_key,
             base_url=settings.api_base,
@@ -302,7 +308,6 @@ async def retry_llm_failed(
 
 async def compensate_single(
     manifest: dict,
-    async_client,
     logger,
     semaphore: asyncio.Semaphore,
     adaptive_delay: list,
@@ -352,7 +357,6 @@ async def compensate_single(
         # 2. LLM 编译（带模型降级）
         logger.info(f"补偿编译: {clean_title[:60]} [{src_id}] extract={extraction_method}")
         summary = await compile_with_model_fallback(
-            async_client,
             text,
             clean_title,
             logger,
@@ -461,20 +465,12 @@ async def run_compensate(logger, compensate_type: str, max_files: int = 0) -> No
         manifests = manifests[:max_files]
         logger.info(f"限制数量: {max_files}")
 
-    # 创建 LLM 客户端
+    # 验证 API 配置
     import os
 
-    try:
-        from openai import AsyncOpenAI
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            logger.error("OPENAI_API_KEY 环境变量未设置")
-            return
-        base_url = get_settings().api_base
-        async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-    except (ImportError, OSError, ValueError) as e:
-        logger.error(f"无法创建 LLM 客户端: {e}")
+    api_key = os.environ.get("OPENAI_API_KEY") or get_settings().api_key
+    if not api_key:
+        logger.error("OPENAI_API_KEY 未设置（环境变量或 settings）")
         return
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -524,7 +520,6 @@ async def run_compensate(logger, compensate_type: str, max_files: int = 0) -> No
             tasks.append(
                 compensate_single(
                     m,
-                    async_client,
                     logger,
                     semaphore,
                     adaptive_delay,

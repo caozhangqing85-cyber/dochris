@@ -27,6 +27,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # 确保 scripts 包可导入
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -154,7 +155,7 @@ def quality_gate(
     workspace_path: Path,
     src_id: str,
     min_score: int = MIN_QUALITY_SCORE,
-) -> dict:
+) -> dict[str, Any]:
     """质量门禁检查
 
     检查 manifest 是否满足 promote 条件：
@@ -230,7 +231,7 @@ def auto_downgrade(
     workspace_path: Path,
     src_id: str,
     reason: str = "auto_downgrade",
-) -> dict:
+) -> dict[str, Any]:
     """自动降级 manifest
 
     将 manifest 降级到 outputs/ 层级：

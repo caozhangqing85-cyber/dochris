@@ -14,10 +14,13 @@
     print(settings.api_key)
 """
 
+import logging
 import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # 默认 LLM API Base URL（统一常量，所有引用都从这里取）
 DEFAULT_LLM_API_BASE = "https://open.bigmodel.cn/api/paas/v4"
@@ -352,6 +355,58 @@ class Settings:
                 "或在 .env 文件中添加: OPENAI_API_KEY=your-api-key"
             )
         return api_key
+
+    def validate(self) -> list[str]:
+        """验证关键配置项
+
+        验证规则：
+            - api_base 不能为空字符串
+            - model 不能为空
+            - workspace 路径应该存在或可创建
+            - api_key 应该存在（警告级别，可通过 OpenClaw config 获取）
+
+        Returns:
+            警告信息列表（空列表表示无警告）
+
+        Raises:
+            ValueError: 当关键配置无效时
+        """
+        warnings: list[str] = []
+
+        # 验证 api_base
+        if not self.api_base or not self.api_base.strip():
+            raise ValueError("api_base 不能为空，请设置 OPENAI_API_BASE 环境变量")
+
+        # 验证 model
+        if not self.model or not self.model.strip():
+            raise ValueError("model 不能为空，请设置 MODEL 环境变量")
+
+        # 验证 workspace
+        if not self.workspace:
+            raise ValueError("workspace 路径不能为空")
+
+        # 尝试创建 workspace 目录
+        try:
+            self.workspace.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise ValueError(
+                f"workspace 路径无效或无法创建: {self.workspace}\n错误: {e}"
+            ) from e
+
+        # 验证 api_key（警告级别）
+        api_key = self.api_key or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            # 检查 OpenClaw 配置文件
+            if self.openclaw_config_path.exists():
+                warnings.append(
+                    f"OPENAI_API_KEY 未设置，可能从 OpenClaw 配置获取: {self.openclaw_config_path}"
+                )
+            else:
+                warnings.append(
+                    "OPENAI_API_KEY 未设置，请在运行前设置环境变量或 .env 文件"
+                )
+
+        return warnings
 
 
 # ============================================================

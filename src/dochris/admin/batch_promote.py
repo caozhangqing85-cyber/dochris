@@ -15,6 +15,7 @@
 
 import sys
 from pathlib import Path
+from typing import Any
 
 # 确保 scripts 包可导入
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -34,7 +35,7 @@ def batch_promote_to_wiki(
     min_score: int = 85,
     limit: int = 0,
     dry_run: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """批量将 compiled 的产物 promote 到 wiki
 
     Args:
@@ -100,7 +101,7 @@ def batch_promote_to_curated(
     min_score: int = 90,
     limit: int = 0,
     dry_run: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """批量将 wiki 中的产物 promote 到 curated
 
     Args:
@@ -166,7 +167,7 @@ def batch_promote_to_obsidian(
     min_score: int = 95,
     limit: int = 0,
     dry_run: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """批量将 promoted 的产物推送到 Obsidian 主库
 
     Args:

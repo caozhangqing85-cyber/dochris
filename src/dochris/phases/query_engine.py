@@ -10,7 +10,6 @@ import openai
 
 from dochris.phases.query_utils import (
     DATA_PATH,
-    MODEL,
     OUTPUTS_CONCEPTS_PATH,
     OUTPUTS_SUMMARIES_PATH,
     WIKI_CONCEPTS_PATH,
@@ -19,7 +18,11 @@ from dochris.phases.query_utils import (
     _extract_summary,
     _keyword_search,
 )
-from dochris.settings import OPENCLAW_CONFIG_PATH
+from dochris.settings import OPENCLAW_CONFIG_PATH, get_settings
+
+# 从 settings 获取默认模型
+_settings = get_settings()
+MODEL = _settings.query_model
 
 # 全局缓存
 _llm_client_cache: openai.OpenAI | None = None
@@ -291,7 +294,12 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
 
 
 def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
-    """创建 OpenAI 兼容客户端，从 OpenClaw 配置读取认证信息（带缓存）
+    """创建 OpenAI 兼容客户端（按优先级读取 API Key）
+
+    API Key 优先级:
+    1. 环境变量 OPENAI_API_KEY
+    2. settings.py 中的 api_key
+    3. OpenClaw 配置文件（fallback）
 
     Args:
         logger: 日志记录器
@@ -303,6 +311,39 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
     if _llm_client_cache is not None:
         return _llm_client_cache
 
+    # 1. 优先尝试环境变量
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if api_key:
+        try:
+            settings = get_settings()
+            base_url = settings.api_base
+            client_kwargs = {"api_key": api_key, "timeout": 60}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            _llm_client_cache = openai.OpenAI(**client_kwargs)
+            if logger:
+                logger.info(f"OpenAI 兼容客户端创建成功（使用环境变量，Base URL: {base_url}）")
+            return _llm_client_cache
+        except (openai.OpenAIError, ValueError) as e:
+            if logger:
+                logger.error(f"使用环境变量创建客户端失败: {e}")
+
+    # 2. 尝试 settings.py 中的 api_key
+    settings = get_settings()
+    if settings.api_key:
+        try:
+            client_kwargs = {"api_key": settings.api_key, "timeout": 60}
+            if settings.api_base:
+                client_kwargs["base_url"] = settings.api_base
+            _llm_client_cache = openai.OpenAI(**client_kwargs)
+            if logger:
+                logger.info(f"OpenAI 兼容客户端创建成功（使用 settings，Base URL: {settings.api_base}）")
+            return _llm_client_cache
+        except (openai.OpenAIError, ValueError) as e:
+            if logger:
+                logger.error(f"使用 settings 创建客户端失败: {e}")
+
+    # 3. Fallback: 尝试 OpenClaw 配置文件
     provider = read_openclaw_config(logger)
     if provider:
         try:
@@ -317,17 +358,8 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
             if logger:
                 logger.error(f"使用 OpenClaw 配置创建客户端失败: {e}")
 
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        try:
-            _llm_client_cache = openai.OpenAI(api_key=api_key)
-            return _llm_client_cache
-        except (openai.OpenAIError, ValueError) as e:
-            if logger:
-                logger.error(f"使用环境变量创建客户端失败: {e}")
-
     if logger:
-        logger.error("无法创建 LLM 客户端：OpenClaw 配置和环境变量中均未找到 API Key")
+        logger.error("无法创建 LLM 客户端：环境变量、settings、OpenClaw 配置中均未找到 API Key")
     return None
 
 

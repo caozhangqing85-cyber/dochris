@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import logging
 import sys
 
 from dochris import __version__
@@ -31,6 +32,39 @@ from dochris.cli.cli_utils import error
 from dochris.cli.cli_vault import cmd_vault
 from dochris.settings import get_settings
 
+logger = logging.getLogger(__name__)
+
+
+def _setup_logging(settings) -> None:
+    """配置统一的日志格式和级别
+
+    Args:
+        settings: Settings 实例
+    """
+    # 获取日志级别
+    log_level_str = settings.log_level.upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # 设置根日志记录器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+
+    # 清除现有处理器
+    root_logger.handlers.clear()
+
+    # 创建控制台处理器
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(log_level)
+
+    # 设置格式
+    formatter = logging.Formatter(
+        settings.log_format,
+        datefmt=settings.log_date_format,
+    )
+    handler.setFormatter(formatter)
+
+    root_logger.addHandler(handler)
+
 
 def main() -> int:
     """主入口函数
@@ -38,6 +72,21 @@ def main() -> int:
     Returns:
         退出码（0 表示成功，非 0 表示错误）
     """
+    # 获取配置
+    settings = get_settings()
+
+    # 配置日志
+    _setup_logging(settings)
+
+    # 验证配置
+    try:
+        warnings = settings.validate()
+        for warning in warnings:
+            logger.warning(f"配置警告: {warning}")
+    except ValueError as e:
+        error(f"配置验证失败: {e}")
+        return 1
+
     parser = argparse.ArgumentParser(
         prog="kb",
         description="dochris: 个人知识库编译系统",
@@ -84,7 +133,6 @@ def main() -> int:
     )
 
     # compile 命令
-    settings = get_settings()
     parser_compile = subparsers.add_parser(
         "compile",
         help="Phase 2: 编译文档",
