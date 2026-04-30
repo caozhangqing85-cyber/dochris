@@ -25,7 +25,7 @@ Usage:
     kb version                    # 显示版本
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "caozhangqing85-cyber"
 
 __all__ = [
