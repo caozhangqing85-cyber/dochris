@@ -34,7 +34,7 @@ class TestCLIMain:
             rc = main()
         assert rc == 0
         mock_print.assert_called_once()
-        assert "1.0.1" in mock_print.call_args[0][0]
+        assert "1.1.0" in mock_print.call_args[0][0]
 
     def test_main_verbose_flag(self):
         """-v 标志不影响命令路由"""
