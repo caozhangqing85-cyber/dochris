@@ -135,3 +135,26 @@ class TestTextChunkerModule:
 
         assert isinstance(chunks, list)
         assert len(chunks) >= 1
+
+    def test_structure_aware_split_empty_text(self):
+        """测试空文本结构感知分块"""
+        from dochris.core.text_chunker import structure_aware_split
+
+        chunks = structure_aware_split("", chunk_size=1000, overlap=50)
+
+        assert isinstance(chunks, list)
+
+    def test_structure_aware_split_with_numbering(self):
+        """测试带数字编号的文本分块"""
+        from dochris.core.text_chunker import structure_aware_split
+
+        text = """1. 第一条内容
+第二条内容继续。
+
+2. 第二条内容
+第三条内容继续。
+"""
+        chunks = structure_aware_split(text, chunk_size=500, overlap=50)
+
+        assert isinstance(chunks, list)
+        assert len(chunks) >= 1

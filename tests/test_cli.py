@@ -869,3 +869,47 @@ class TestCLIVault:
         with patch("builtins.print"):
             rc = cmd_vault(args)
         assert rc == 1
+
+
+class TestCLIQualityPollution:
+    """测试 quality 命令污染检查"""
+
+    def test_cmd_quality_check_pollution_clean(self):
+        """quality 检查污染，干净返回 0"""
+        from dochris.cli.cli_review import cmd_quality
+
+        args = MagicMock(report=False, check_pollution=True, src_id=None)
+        mock_result = {"polluted": False}
+        with (
+            patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
+            patch("dochris.quality.quality_gate.check_pollution", return_value=mock_result),
+            patch("builtins.print"),
+        ):
+            rc = cmd_quality(args)
+        assert rc == 0
+
+    def test_cmd_quality_check_pollution_dirty(self):
+        """quality 检查污染，发现污染返回 1"""
+        from dochris.cli.cli_review import cmd_quality
+
+        args = MagicMock(report=False, check_pollution=True, src_id=None)
+        mock_result = {"polluted": True, "details": "发现重复文件"}
+        with (
+            patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
+            patch("dochris.quality.quality_gate.check_pollution", return_value=mock_result),
+            patch("builtins.print"),
+        ):
+            rc = cmd_quality(args)
+        assert rc == 1
+        """quality 检查污染，发现污染返回 1"""
+        from dochris.cli.cli_review import cmd_quality
+
+        args = MagicMock(report=False, check_pollution=True, src_id=None)
+        mock_result = {"polluted": True, "details": "发现重复文件"}
+        with (
+            patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
+            patch("dochris.quality.quality_gate.check_pollution", return_value=mock_result),
+            patch("builtins.print"),
+        ):
+            rc = cmd_quality(args)
+        assert rc == 1
