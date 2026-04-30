@@ -21,6 +21,9 @@ Dochris 是一个 AI 驱动的知识库编译系统，通过**四阶段流水线
 - **信任分层**：四层信任模型，从 LLM 生成到人工精选，逐步提升可信度
 - **多格式支持**：PDF、音频、视频、电子书、文章，一个系统全搞定
 - **Obsidian 联动**：支持双向同步，高质量内容可推送回 Obsidian 笔记库
+- **插件系统**：6 个扩展点，支持自定义解析器、编译前后处理、查询增强
+- **多 LLM 提供商**：OpenAI 兼容、Ollama 本地模型，轻松切换
+- **多向量库**：ChromaDB、FAISS，按需选择
 
 ## 系统架构
 
@@ -217,10 +220,10 @@ knowledge-base/
 │   │   ├── hierarchical_summarizer.py  # 分层摘要器（Map-Reduce）
 │   │   ├── quality_scorer.py     # 质量评分
 │   │   ├── text_chunker.py       # 文本分块
-│   │   ├── cache.py              # 缓存管理
-│   │   └── utils.py              # 通用工具
+│   │   ├── retry_manager.py      # 重试管理
+│   │   └── cache.py              # 缓存管理
 │   ├── parsers/                  # 文件解析器
-│   │   ├── pdf_parser.py         # PDF 解析
+│   │   ├── pdf_parser.py         # PDF 解析（5 种回退策略）
 │   │   ├── doc_parser.py         # 文档解析
 │   │   └── code_parser.py        # 代码解析
 │   ├── phases/                   # 流水线阶段
@@ -229,20 +232,28 @@ knowledge-base/
 │   │   ├── phase3_query.py       # 查询阶段
 │   │   ├── query_engine.py       # 查询引擎
 │   │   └── query_utils.py        # 查询工具
+│   ├── llm/                      # LLM 抽象层
+│   │   ├── base.py               # LLM Provider 协议
+│   │   ├── openai_compat.py      # OpenAI 兼容实现
+│   │   └── ollama.py             # Ollama 本地模型实现
+│   ├── vector/                   # 向量库抽象层
+│   │   ├── base.py               # VectorStore 协议
+│   │   ├── chromadb_store.py     # ChromaDB 实现
+│   │   └── faiss_store.py        # FAISS 实现
+│   ├── plugin/                   # 插件系统
+│   │   ├── registry.py           # 插件注册中心
+│   │   ├── loader.py             # 插件加载器
+│   │   └── hookspec.py           # Hook 定义
+│   ├── settings/                 # 配置管理（拆分为子模块）
 │   ├── workers/                  # 工作进程
-│   │   ├── compiler_worker.py    # 编译 worker
-│   │   └── monitor_worker.py     # 监控 worker
 │   ├── quality/                  # 质量管理
-│   │   ├── quality_gate.py       # 质量门禁
-│   │   └── quality_monitor.py    # 质量监控
 │   ├── compensate/               # 失败补偿
 │   ├── admin/                    # 管理工具
 │   ├── vault/                    # Obsidian 集成
-│   ├── settings.py               # 配置管理
-│   ├── exceptions.py             # 异常定义
-│   ├── manifest.py               # Manifest 管理
-│   ├── promote.py                # 晋升机制
-│   └── log.py                    # 日志工具
+│   ├── exceptions.py             # 异常层次结构
+│   ├── types.py                  # 类型定义
+│   ├── protocols.py              # 协议定义
+│   └── constants.py              # 全局常量
 ├── tests/                        # 测试文件
 ├── docs/                         # 文档
 ├── manifests/                    # Manifest 存储
@@ -339,6 +350,44 @@ def post_compile(src_id: str, result: dict) -> None:
 - `examples/plugins/compile_notify.py` — 编译完成通知
 - `examples/plugins/query_enhance.py` — 查询增强
 
+## 多 LLM 提供商
+
+Dochris 支持多种 LLM 后端：
+
+```bash
+# OpenAI 兼容 API（默认）
+LLM_PROVIDER=openai_compat
+OPENAI_API_BASE=https://api.openai.com/v1
+
+# Ollama 本地模型
+LLM_PROVIDER=ollama
+LOCAL_LLM_BASE_URL=http://localhost:11434/v1
+LOCAL_LLM_MODEL=qwen:14b
+```
+
+切换提供商只需修改配置，无需改动代码。
+
+## 多向量库
+
+```bash
+# ChromaDB（默认）
+VECTOR_STORE=chromadb
+
+# FAISS
+VECTOR_STORE=faiss
+```
+
+## 项目状态
+
+| 指标 | 数值 |
+|------|------|
+| 测试 | 1544 passing |
+| 覆盖率 | 64.66% |
+| 类型检查 | mypy 0 errors |
+| 代码规范 | ruff 0 errors |
+| Python | 3.11+ |
+| 许可证 | MIT |
+
 ## 常见问题
 
 ### Q: 编译时出现 API 内容过滤错误（400, error 1301）
@@ -379,6 +428,10 @@ pytest tests/ --cov=dochris --cov-report=term-missing
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！详见 [CONTRIBUTING.md](CONTRIBUTING.md)
+
+## 变更日志
+
+详见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 安全
 
