@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]" mypy
-      - run: mypy src/dochris/ --ignore-missing-imports || true
+      - run: mypy src/dochris/ --ignore-missing-imports 
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -59,4 +59,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install bandit
-      - run: bandit -r src/dochris/ -ll --skip B101 || true
+      - run: bandit -r src/dochris/ -ll --skip B101 
