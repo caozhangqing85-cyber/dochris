@@ -26,7 +26,7 @@ Usage:
 """
 
 __version__ = "1.0.0"
-__author__ = "Knowledge Base Project"
+__author__ = "caozhangqing85-cyber"
 
 __all__ = [
     "__version__",

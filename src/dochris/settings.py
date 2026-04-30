@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # 默认 LLM API Base URL（统一常量，所有引用都从这里取）
-DEFAULT_LLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
+DEFAULT_LLM_API_BASE = "https://open.bigmodel.cn/api/paas/v4"
 
 # 尝试导入 python-dotenv，如果不存在则提示安装
 try:

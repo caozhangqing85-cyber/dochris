@@ -58,7 +58,7 @@ class LLMClient:
         self,
         api_key: str,
         base_url: str,
-        model: str = "zai/glm-4.7",
+        model: str = "glm-5.1",
         max_tokens: int = 40000,
         temperature: float = 0.1,
         request_delay: float = 5.0,
@@ -68,7 +68,7 @@ class LLMClient:
         Args:
             api_key: API 密钥
             base_url: API 基础 URL
-            model: 模型名称（默认 zai/glm-4.7）
+            model: 模型名称（默认 glm-5.1）
             max_tokens: 最大生成 token 数（默认 40000）
             temperature: 采样温度（默认 0.1，较低温度保证稳定输出）
             request_delay: 请求间隔秒数（默认 5.0，用于速率限制）

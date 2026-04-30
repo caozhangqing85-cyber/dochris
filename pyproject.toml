@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "Knowledge Base Project"}
+    {name = "caozhangqing85-cyber"}
 ]
 keywords = ["knowledge", "compiler", "llm", "vector-search"]
 classifiers = [
@@ -67,9 +67,9 @@ where = ["src"]
 "" = "src"
 
 [project.urls]
-Homepage = "https://github.com/gongzhuming/dochris"
-Repository = "https://github.com/gongzhuming/dochris"
-Issues = "https://github.com/gongzhuming/dochris/issues"
+Homepage = "https://github.com/caozhangqing85-cyber/dochris"
+Repository = "https://github.com/caozhangqing85-cyber/dochris"
+Issues = "https://github.com/caozhangqing85-cyber/dochris/issues"
 
 [tool.black]
 line-length = 100

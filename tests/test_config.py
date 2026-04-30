@@ -108,7 +108,7 @@ class TestAPIConfig:
 
     def test_default_api_base(self):
         """测试默认 API base URL"""
-        assert DEFAULT_API_BASE == "https://open.bigmodel.cn/api/coding/paas/v4"
+        assert DEFAULT_API_BASE == "https://open.bigmodel.cn/api/paas/v4"
 
     def test_openrouter_api_base(self):
         """测试 OpenRouter API base URL"""

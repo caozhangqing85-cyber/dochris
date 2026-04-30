@@ -99,7 +99,7 @@ Layer 3: locked/      — 锁定保护，不可修改
 
 ```bash
 # 克隆项目
-git clone https://github.com/gongzhuming/dochris.git
+git clone https://github.com/caozhangqing85-cyber/dochris.git
 cd dochris
 
 # 创建虚拟环境
@@ -121,7 +121,7 @@ cp .env.example .env
 ```bash
 # LLM API 配置（必需）
 OPENAI_API_KEY=your_api_key_here
-OPENAI_API_BASE=https://open.bigmodel.cn/api/coding/paas/v4
+OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
 MODEL=glm-5.1
 
 # 工作区路径（可选，默认 ~/.knowledge-base）

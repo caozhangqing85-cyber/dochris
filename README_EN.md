@@ -1,4 +1,4 @@
-# Knowledge Base Compilation System
+# Dochris
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
@@ -184,7 +184,7 @@ docker-compose exec knowledge-base bash
 
 ```bash
 # Clone the project
-git clone https://github.com/yourusername/knowledge-base.git
+git clone https://github.com/caozhangqing85-cyber/dochris.git
 cd knowledge-base
 
 # Create virtual environment
@@ -206,7 +206,7 @@ Create a `.env` file with the following:
 ```bash
 # LLM API configuration (required)
 OPENAI_API_KEY=your_api_key_here
-OPENAI_API_BASE=https://open.bigmodel.cn/api/coding/paas/v4
+OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
 MODEL=glm-5.1
 
 # Optional configuration

@@ -50,3 +50,13 @@ Thumbs.db
 docker-compose.override.yml
 manifests/
 outputs/
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Development notes
+REFACTOR_*.md
+
+# Runtime state
+progress.json
