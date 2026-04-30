@@ -2,10 +2,10 @@
 
 > **Doc + Chris** — 用 LLM 锻造你的个人知识库
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Status](https://img.shields.io/badge/Status-Active-success.svg)
-![Type](https://img.shields.io/badge/Type-Typed-blue.svg)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/caozhangqing85-cyber/dochris/ci.yml?branch=main)](https://github.com/caozhangqing85-cyber/dochris/actions)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **"Doc"** 代表文档，**"Chris"** 是作者的名字。Dochris 意味着：**让文档为 Chris 服务** — 将海量信息锻造为可用的知识。
 
@@ -20,6 +20,34 @@ Dochris 是一个 AI 驱动的知识库编译系统，通过**四阶段流水线
 - **Obsidian 联动**：支持双向同步，高质量内容可推送回 Obsidian 笔记库
 
 ## 系统架构
+
+```mermaid
+graph TB
+    subgraph Input["📥 输入层"]
+        A[原始文件<br/>PDF / MD / TXT / 音频] --> B[Phase 1: 摄入]
+    end
+
+    subgraph Process["⚙️ 处理层"]
+        B --> C[文本提取<br/>PDF→MD / 音频→TXT]
+        C --> D[Phase 2: 编译]
+        D --> E[LLM 摘要生成]
+        E --> F[Phase 2.5: 补偿]
+        F --> G[失败重试<br/>降级处理]
+    end
+
+    subgraph Storage["💾 存储层"]
+        D --> H[(Manifests<br/>元数据索引)]
+        E --> I[(Wiki<br/>结构化知识)]
+        D --> J[(ChromaDB<br/>向量索引)]
+    end
+
+    subgraph Output["📤 输出层"]
+        I --> K[Phase 3: 查询]
+        J --> K
+        K --> L[知识检索 + LLM 回答]
+        I --> M[Obsidian 双向同步]
+    end
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐

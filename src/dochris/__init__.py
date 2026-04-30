@@ -34,6 +34,13 @@ __all__ = [
     "get_settings",
     "Settings",
     "LLMClient",
+    # 类型定义
+    "FileStatus",
+    "FileType",
+    "ManifestEntry",
+    "CompilationResult",
+    "QueryResult",
+    "QualityReport",
 ]
 
 
@@ -54,4 +61,15 @@ def __getattr__(name: str):
         from dochris.settings import get_settings
 
         return get_settings
+    elif name in (
+        "FileStatus",
+        "FileType",
+        "ManifestEntry",
+        "CompilationResult",
+        "QueryResult",
+        "QualityReport",
+    ):
+        from dochris import types
+
+        return getattr(types, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
