@@ -83,6 +83,11 @@ indent_style = tab
 indent_size = 2
 ```
 
+**子任务**:
+- [ ] 创建 `.editorconfig` 文件
+- [ ] 添加 Python/YAML/JSON/TOML/Markdown/Makefile 规则
+- [ ] 安装 editorconfig-checker 验证
+
 **验证**:
 ```bash
 pip install editorconfig-checker
@@ -186,6 +191,18 @@ docs:  ## 生成 API 文档（如安装了 pdoc）
 	pdoc src/dochris/ -o docs/api/
 ```
 
+**子任务**:
+- [ ] 创建 Makefile 文件
+- [ ] 实现 help 目标（自动显示所有命令）
+- [ ] 实现 install/install-dev/install-all/install-audio 命令
+- [ ] 实现 test/test-cov/test-fast 命令
+- [ ] 实现 lint/format/format-check/typecheck/check 命令
+- [ ] 实现 clean 命令
+- [ ] 实现 build 命令
+- [ ] 实现 docker-build/docker-up/docker-down 命令
+- [ ] 实现 docs 命令
+- [ ] 验证 `make help` 正常显示
+
 **验证**:
 ```bash
 make help        # 显示所有命令
@@ -259,6 +276,15 @@ dev = [
     "pre-commit>=3.0",
 ]
 ```
+
+**子任务**:
+- [ ] 创建 `.pre-commit-config.yaml`
+- [ ] 配置 ruff lint + format hooks
+- [ ] 配置通用文件检查（trailing-whitespace/end-of-file/check-yaml 等）
+- [ ] 配置 detect-private-key 安全检查
+- [ ] 配置 conventional-pre-commit commit 消息规范
+- [ ] 将 pre-commit 加入 dev 依赖
+- [ ] 验证 `pre-commit run --all-files` 通过
 
 **收益**: 在 commit 时自动发现 90% 的格式和 lint 问题，减少 CI 失败
 
@@ -363,6 +389,15 @@ except Exception as e:
     sys.exit(EXIT_FAILURE)
 ```
 
+**子任务**:
+- [ ] 在 cli_utils.py 新增 format_error/format_warning 函数
+- [ ] 修改 main.py 配置验证错误处理（带修复建议）
+- [ ] 修改 main.py 未知命令错误处理（提示可用命令）
+- [ ] 修改 main.py 顶层异常捕获（按异常类型分流）
+- [ ] 定义标准化退出码常量（EXIT_SUCCESS/FAILURE/USAGE/CONFIG 等）
+- [ ] 添加 verbose 模式支持（--verbose 显示完整堆栈）
+- [ ] 验证各错误场景的输出
+
 **验证**:
 ```bash
 # 不带参数应显示友好帮助
@@ -451,6 +486,14 @@ jobs:
 
 **移除** `--ignore=tests/test_phase3_v2.py`，改为在文件内 `@pytest.mark.skip`
 
+**子任务**:
+- [ ] 重写 ci.yml（4 个并行 job：lint/typecheck/test/security）
+- [ ] 配置 Python 3.11 + 3.12 矩阵测试
+- [ ] 集成 Codecov 覆盖率上传
+- [ ] 添加 bandit 安全扫描 job
+- [ ] 移除 --ignore=test_phase3_v2.py，改为文件内 @pytest.mark.skip
+- [ ] 验证 CI 全部通过
+
 **收益**: CI 更全面，增加 Codecov 覆盖率徽章
 
 ---
@@ -513,6 +556,14 @@ eval "$(kb --completion bash)"
 eval "$(kb --completion zsh)"
 # 永久: 加入 ~/.zshrc
 ```
+
+**子任务**:
+- [ ] 在 main.py 实现 completion_script() 函数
+- [ ] 实现 bash 补全脚本生成
+- [ ] 实现 zsh 补全脚本生成
+- [ ] 实现 fish 补全脚本生成
+- [ ] 添加 --completion 命令行参数
+- [ ] 验证三种 shell 的补全功能
 
 **收益**: Tab 补全大幅提升日常使用效率
 
@@ -708,6 +759,13 @@ class QualityScorer(Protocol):
 from dochris.types import QualityReport  # noqa: E402
 ```
 
+**子任务**:
+- [ ] 创建 src/dochris/types.py（FileStatus/FileType/ManifestEntry 等）
+- [ ] 创建 src/dochris/protocols.py（LLMProvider/VectorStore/FileParser/QualityScorer）
+- [ ] 在 __init__.py 导出新类型
+- [ ] 编写类型单元测试
+- [ ] 验证 mypy 类型检查通过
+
 **迁移策略**:
 1. 先创建 types.py 和 protocols.py，不修改现有代码
 2. 逐步在新增代码中使用这些类型
@@ -793,6 +851,17 @@ RETRY_BACKOFF_FACTOR = 2
 CACHE_RETENTION_DAYS = 30
 ```
 
+**子任务**:
+- [ ] 创建 src/dochris/constants.py
+- [ ] 统一项目信息常量（PROJECT_NAME/VERSION/REPO_URL）
+- [ ] 统一默认配置常量（API_BASE/MODEL/THRESHOLD 等）
+- [ ] 统一文件处理常量（SUPPORTED_EXTENSIONS/MAX_FILE_SIZE 等）
+- [ ] 统一质量评分常量（QUALITY_EXCELLENT/GOOD/PASS）
+- [ ] 统一目录结构常量（DIR_DATA/RAW/OUTPUTS 等）
+- [ ] 统一 LLM/重试/缓存参数常量
+- [ ] 在现有代码中逐步替换硬编码为常量引用
+- [ ] 验证测试全部通过
+
 **迁移策略**:
 1. 创建 constants.py
 2. 用 grep 找出所有硬编码数字/字符串
@@ -854,6 +923,12 @@ graph TB
     style L fill:#9f9,stroke:#333
     style H fill:#ff9,stroke:#333
 ```
+
+**子任务**:
+- [ ] 在 README 顶部添加 badges 行（Python/License/CI/Coverage/Ruff/PyPI）
+- [ ] 在 README 中添加 Mermaid 架构图
+- [ ] 验证 badges 图片正常显示
+- [ ] 验证 Mermaid 图在 GitHub 正确渲染
 
 ---
 
@@ -1083,6 +1158,14 @@ class JSONFormatter(logging.Formatter):
         return json.dumps(log_entry, ensure_ascii=False)
 ```
 
+**子任务**:
+- [ ] 创建 JSONFormatter 日志格式化器
+- [ ] 修改 setup_logging 支持 --log-format json 参数
+- [ ] 确保 JSON 日志包含 timestamp/level/module/message/function/line
+- [ ] 异常信息以 JSON 格式输出
+- [ ] 验证 JSON 日志可被 jq 解析
+- [ ] 编写日志格式切换测试
+
 ---
 
 ## P3：V3.0 路线图（~80 小时）
@@ -1095,6 +1178,16 @@ class JSONFormatter(logging.Formatter):
 - **后端**: FastAPI + WebSocket（实时查询反馈）
 - **前端**: Gradio（快速原型）或 Next.js（生产级）
 - **功能**: 查询面板 + 文件管理 + 质量仪表盘 + 编译进度
+
+**子任务**:
+- [ ] 搭建 FastAPI 后端框架
+- [ ] 实现查询 API（POST /api/query）
+- [ ] 实现文件管理 API（GET/POST/DELETE /api/files）
+- [ ] 实现编译进度 WebSocket 推送
+- [ ] 实现质量仪表盘数据 API
+- [ ] 搭建 Gradio 前端原型
+- [ ] 添加 Docker Compose 配置（app + chromadb）
+- [ ] 编写前端集成测试
 
 ### P3-2: 性能基准测试（~10 小时）
 
@@ -1119,6 +1212,15 @@ def test_llm_call_latency(benchmark):
 **对标**: FastAPI（自动 Swagger UI）、LlamaIndex（mkdocs-material）
 
 **技术选型**: `mkdocs-material` + `mkdocstrings`
+
+**子任务**:
+- [ ] 安装 mkdocs-material + mkdocstrings
+- [ ] 创建 mkdocs.yml 配置
+- [ ] 编写 docs/index.md 首页
+- [ ] 自动从 docstring 生成 API 文档
+- [ ] 添加教程章节（快速开始/配置/插件开发）
+- [ ] 配置 GitHub Pages 自动部署
+- [ ] 验证文档站点可访问
 
 ### P3-4: 知识图谱可视化（~15 小时）
 
