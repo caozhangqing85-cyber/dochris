@@ -64,7 +64,7 @@ def get_vector_store() -> object:
     # 创建存储实例
     if settings.vector_store == "chromadb":
         # ChromaDB 使用 data_dir 作为持久化目录
-        _vector_store_cache = store_cls(persist_directory=str(DATA_PATH))
+        _vector_store_cache = store_cls(persist_directory=str(DATA_PATH))  # type: ignore[call-arg]
     else:
         # 其他存储使用默认配置
         _vector_store_cache = store_cls()
@@ -268,7 +268,7 @@ def _vector_search_with_store(
     """
     try:
         store = get_vector_store()
-        collections = store.list_collections()
+        collections = store.list_collections()  # type: ignore[attr-defined]
 
         if not collections:
             if logger:
@@ -278,7 +278,7 @@ def _vector_search_with_store(
         all_results: list[dict] = []
         for collection in collections:
             try:
-                results = store.query(
+                results = store.query(  # type: ignore[attr-defined]
                     collection=collection,
                     query_text=query,
                     n_results=top_k,

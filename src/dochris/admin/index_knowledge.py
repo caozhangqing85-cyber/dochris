@@ -10,6 +10,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import chromadb
 from chromadb.utils import embedding_functions
@@ -71,7 +72,8 @@ except Exception as e:
 
 # 创建或获取 collection
 collection = client.get_or_create_collection(
-    name="knowledge_base", embedding_function=sentence_transformer_ef
+    name="knowledge_base",
+    embedding_function=cast(Any, sentence_transformer_ef),
 )
 
 
