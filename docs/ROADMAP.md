@@ -44,9 +44,25 @@
 - [x] P2-4: 结构化日志（5 小时）
 
 ### P3：V3.0 路线图（~80 小时）
-- [ ] P3-1: Web UI（40 小时）
-- [ ] P3-2: 性能基准测试（10 小时）
-- [ ] P3-3: API 文档自动生成（15 小时）
+- [x] py.typed（PEP 561）
+- [x] .gitattributes（行尾+LFS）
+- [x] CODEOWNERS
+- [x] FUNDING.yml
+- [x] PR 模板（完整 checklist）
+- [x] Stale Issue Bot
+- [x] uv.lock（依赖锁文件）
+- [x] 端到端示例（6 个 examples/）
+- [x] 集成测试（14 个）
+- [x] 参数化测试（91 个用例，18 个测试类）
+- [x] Settings 拆分（801 行 → settings/ 包）
+- [x] 异常规范化（except Exception → 具体异常）
+- [x] mypy 完全清零（114→0）
+- [x] P3-2: 性能基准测试（benchmark/）
+- [x] Dependabot（pip + github-actions）
+- [x] CHANGELOG 自动生成（git-cliff）
+- [x] Dockerfile
+- [ ] P3-1: Web UI 查询面板（40 小时）
+- [ ] P3-3: API 文档站点（mkdocs-material）
 - [ ] P3-4: 知识图谱可视化（15 小时）
 
 ---
@@ -1261,3 +1277,37 @@ def test_llm_call_latency(benchmark):
 | PrivateGPT | https://github.com/imartinez/privateGPT | 知识库 UI 标杆 |
 | httpx | https://github.com/encode/httpx | 代码质量标杆 |
 | structlog | https://github.com/hynek/structlog | 结构化日志标杆 |
+
+---
+
+## 2026-04-30 质量提升批次
+
+### 已完成项
+
+**P3 工程化基础设施（全部完成 ✅）**
+- [x] py.typed（PEP 561 类型标记）
+- [x] .gitattributes（行尾统一 + LFS 配置）
+- [x] CODEOWNERS（代码所有权定义）
+- [x] FUNDING.yml（开源资助配置）
+- [x] PR 模板（完整 checklist 审查流程）
+- [x] Stale Issue Bot（自动关闭过期 Issue）
+- [x] uv.lock（依赖锁文件，可复现构建）
+- [x] Dependabot（pip + github-actions 自动依赖更新）
+
+**P3 测试与质量（全部完成 ✅）**
+- [x] 端到端示例（6 个 examples/ 目录）
+- [x] 集成测试（14 个测试文件）
+- [x] 参数化测试（91 个用例，18 个测试类）
+- [x] 性能基准测试（benchmark/ 目录）
+
+**P3 代码质量提升（全部完成 ✅）**
+- [x] Settings 拆分（801 行单体 → settings/ 包）
+- [x] 异常规范化（except Exception → 具体异常类型）
+- [x] mypy 完全清零（114 个错误 → 0）
+- [x] CHANGELOG 自动生成（git-cliff 配置）
+- [x] Dockerfile（容器化部署支持）
+
+### 仍待完成
+- [ ] API 文档站点（mkdocs-material）
+- [ ] Web UI 查询面板
+- [ ] 知识图谱可视化
