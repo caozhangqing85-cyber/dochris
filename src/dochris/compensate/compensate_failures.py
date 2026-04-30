@@ -132,7 +132,7 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
 
 
 async def generate_summary_with_llm(
-    text: str, title: str, logger, rate_limiter=None, adaptive_delay=None
+    text: str, title: str, logger, rate_limiter=None, adaptive_delay: float | None = None
 ) -> dict[str, Any] | None:
     """使用 LLM 生成摘要
 
@@ -141,7 +141,7 @@ async def generate_summary_with_llm(
         title: 文档标题
         logger: 日志记录器
         rate_limiter: 速率限制器（未使用，保留兼容）
-        adaptive_delay: 自适应延迟列表（未使用，保留兼容）
+        adaptive_delay: 自适应延迟值（未使用，保留兼容）
 
     Returns:
         摘要字典，失败返回 None
@@ -175,7 +175,7 @@ async def compile_with_model_fallback(
     title: str,
     logger,
     model_chain: list[str],
-    adaptive_delay: list,
+    adaptive_delay: float,
 ) -> dict[str, Any] | None:
     """带模型降级的编译
 
@@ -186,7 +186,7 @@ async def compile_with_model_fallback(
         title: 文档标题
         logger: 日志记录器
         model_chain: 模型链（依次尝试）
-        adaptive_delay: 自适应延迟列表
+        adaptive_delay: 自适应延迟值
 
     Returns:
         摘要字典，失败返回 None
@@ -226,7 +226,7 @@ async def retry_llm_failed(
     manifest: dict,
     async_client,
     logger,
-    adaptive_delay: list,
+    adaptive_delay: float,
     model_chain: list[str],
 ) -> tuple[str, bool, str, str]:
     """重试 llm_failed 的文件
@@ -310,7 +310,7 @@ async def compensate_single(
     manifest: dict,
     logger,
     semaphore: asyncio.Semaphore,
-    adaptive_delay: list,
+    adaptive_delay: float,
     model_chain: list[str],
     compensate_type: str,
 ) -> tuple[str, bool, str, str]:
@@ -474,12 +474,16 @@ async def run_compensate(logger, compensate_type: str, max_files: int = 0) -> No
         return
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
-    adaptive_delay = [2.0]
+    adaptive_delay = 2.0
     shutdown_event = asyncio.Event()
 
     def signal_handler() -> None:
         logger.info("收到中断信号，正在安全退出...")
-        shutdown_event.set()
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(shutdown_event.set)
+        except RuntimeError:
+            shutdown_event.set()
 
     loop = asyncio.get_event_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

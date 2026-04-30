@@ -49,20 +49,28 @@ def cleanup_all_clients() -> None:
 
     此函数设计为在程序退出时通过 atexit 调用，
     确保所有 LLM 客户端的网络连接被正确关闭。
+
+    注意：这是同步函数（atexit 要求），使用 asyncio.run() 在新循环中运行异步关闭。
     """
-    for client in _client_instances:
-        try:
-            if hasattr(client, "close"):
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 事件循环正在运行，创建后台任务
-                    loop.create_task(client.close())
-                else:
-                    # 事件循环未运行，直接运行关闭任务
-                    loop.run_until_complete(client.close())
-        except Exception as e:
-            logger.debug(f"清理 LLMClient 时出错（可忽略）: {e}")
-    _client_instances.clear()
+    if not _client_instances:
+        return
+
+    async def _close_all() -> None:
+        """在异步上下文中关闭所有客户端"""
+        for client in _client_instances:
+            try:
+                if hasattr(client, "close"):
+                    await client.close()
+            except Exception:
+                pass
+        _client_instances.clear()
+
+    try:
+        asyncio.run(_close_all())
+    except RuntimeError as e:
+        # 事件循环已在运行（非常见情况），尝试在线程池中运行
+        logger.debug(f"清理 LLMClient 时事件循环冲突: {e}")
+        _client_instances.clear()
 
 
 class LLMClient:

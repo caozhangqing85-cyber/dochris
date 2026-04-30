@@ -207,7 +207,7 @@ async def recompile_single(
     compiler_worker: CompilerWorker,
     logger,
     semaphore: asyncio.Semaphore,
-    adaptive_delay: list[float],
+    adaptive_delay: float,
     stats: CompileStats,
 ) -> tuple[str, bool, str]:
     """重新编译单个文件，只补充 concepts_data"""
@@ -379,7 +379,7 @@ async def run_recompile(logger, stats: CompileStats, max_files: int = 0) -> None
 
     # 5. 逐批编译
     semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
-    adaptive_delay = [2.0]
+    adaptive_delay = 2.0
     shutdown_event = asyncio.Event()
 
     def signal_handler() -> None:
@@ -650,11 +650,8 @@ def generate_report(stats: CompileStats, verify_result: dict, logger) -> str:
 
     # 6. 优化建议
     report_lines.append("\n## 7. 优化建议")
-    # 动态计算待编译文件数
-    total_manifests = len(list((KB_PATH / "manifests" / "sources").glob("SRC-*.json")))
-    # 使用 stats 中的数据更准确
-    successfully_compiled = stats.total_success
-    remaining = total_manifests - successfully_compiled
+    # 重新统计当前仍缺少 concepts_data 的文件数（更准确）
+    remaining = len(find_missing_concepts_data(logger))
     report_lines.append(f"  待编译文件总数: {remaining}")
     if stats.total_failed > 0:
         report_lines.append(f"  建议排查 {stats.total_failed} 个失败文件的错误原因")

@@ -276,7 +276,7 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
         provider = config.get("models", {}).get("providers", {}).get("zai", {})
         if provider and provider.get("apiKey"):
             if logger:
-                logger.info(f"从 OpenClaw 配置读取 API Key: ...{provider['apiKey'][-6:]}")
+                logger.info("从 OpenClaw 配置读取 API Key")
                 logger.info(f"Base URL: {provider.get('baseUrl', 'default')}")
             return provider
         else:
