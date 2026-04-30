@@ -1,5 +1,9 @@
 """
 测试 phase3_query.py 模块
+
+注意: 此测试文件已被弃用。
+Phase 3 模块已重构为 query_engine.py 和 query_utils.py，
+这些功能现在在 test_query_engine.py 和 test_query_utils.py 中测试。
 """
 
 import json
@@ -9,6 +13,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+# 标记整个测试模块为跳过
+pytestmark = pytest.mark.skip(
+    reason="此测试文件已弃用。Phase 3 模块已重构为 query_engine.py 和 query_utils.py，"
+    "相关测试已迁移到 test_query_engine.py 和 test_query_utils.py"
+)
 
 # 添加 scripts 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))

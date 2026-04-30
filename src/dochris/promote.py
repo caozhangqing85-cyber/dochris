@@ -250,7 +250,7 @@ def promote_to_curated(workspace_path: Path, src_id: str) -> bool:
 
     print(f"晋升成功：{src_id} → curated/")
     for f in promoted_files:
-        print(f)
+        print(f"  {f}")
     return True
 
 

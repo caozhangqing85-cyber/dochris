@@ -650,7 +650,11 @@ def generate_report(stats: CompileStats, verify_result: dict, logger) -> str:
 
     # 6. 优化建议
     report_lines.append("\n## 7. 优化建议")
-    remaining = 4715 - 283  # 总数 - 已编译
+    # 动态计算待编译文件数
+    total_manifests = len(list((KB_PATH / "manifests" / "sources").glob("SRC-*.json")))
+    # 使用 stats 中的数据更准确
+    successfully_compiled = stats.total_success
+    remaining = total_manifests - successfully_compiled
     report_lines.append(f"  待编译文件总数: {remaining}")
     if stats.total_failed > 0:
         report_lines.append(f"  建议排查 {stats.total_failed} 个失败文件的错误原因")

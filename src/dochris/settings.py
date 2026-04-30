@@ -19,6 +19,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -669,51 +670,90 @@ def get_file_category(ext: str) -> str | None:
 
 
 # ============================================================
-# 模块级便捷变量（从全局 Settings 实例派生）
+# 模块级便捷变量（延迟访问模式）
 # ============================================================
+# 使用 __getattr__ 实现延迟访问，避免 import 时立即执行
+# 这样可以保持向后兼容，同时支持配置动态更新
 
-_initial = get_settings()
 
-# 旧代码中常用的模块级变量
-SOURCE_PATH: Path | None = _initial.source_path
-OBSIDIAN_PATHS: list[Path] = _initial.obsidian_vaults
-OBSIDIAN_VAULT: Path | None = (
-    _initial.obsidian_vaults[0] if _initial.obsidian_vaults else None
-)
+def __getattr__(name: str) -> Any:
+    """延迟获取配置值
 
-# 日志格式
-LOG_FORMAT: str = _initial.log_format
-LOG_FORMAT_SIMPLE: str = _initial.log_format_simple
-LOG_DATE_FORMAT: str = _initial.log_date_format
+    允许以模块级变量形式访问配置，同时支持配置动态更新。
+    例如: from dochris.settings import SOURCE_PATH
 
-# 编译参数
-DEFAULT_API_BASE: str = _initial.api_base
-DEFAULT_API_KEY: str | None = _initial.api_key
-DEFAULT_MODEL: str = _initial.model
-DEFAULT_CONCURRENCY: int = _initial.max_concurrency
-BATCH_SIZE: int = _initial.batch_size
-LLM_MAX_TOKENS: int = _initial.llm_max_tokens
-LLM_TEMPERATURE: float = _initial.llm_temperature
-LLM_TIMEOUT: float = _initial.llm_timeout
-LLM_REQUEST_DELAY: float = _initial.llm_request_delay
+    Args:
+        name: 配置项名称
 
-# 质量/重试/缓存
-MAX_CONTENT_CHARS: int = _initial.max_content_chars
-MIN_QUALITY_SCORE: int = _initial.min_quality_score
-MIN_TEXT_LENGTH: int = _initial.min_text_length
-MIN_AUDIO_TEXT_LENGTH: int = _initial.min_text_length
-MAX_FILE_SIZE: int = _initial.max_file_size
-MAX_RETRIES: int = _initial.max_retries
-CACHE_RETENTION_DAYS: int = _initial.cache_retention_days
-QUERY_MODEL: str = _initial.query_model
-EMBEDDING_MODEL: str = _initial.embedding_model
+    Returns:
+        配置值
 
-# OpenRouter
-OPENROUTER_API_BASE: str = _initial.openrouter_api_base
-OPENROUTER_MODEL: str = _initial.openrouter_model
+    Raises:
+        AttributeError: 配置项不存在时
+    """
+    settings = get_settings()
 
-# 清理临时变量
-del _initial
+    # 路径配置
+    if name == "SOURCE_PATH":
+        return settings.source_path
+    elif name == "OBSIDIAN_PATHS":
+        return settings.obsidian_vaults
+    elif name == "OBSIDIAN_VAULT":
+        return settings.obsidian_vaults[0] if settings.obsidian_vaults else None
+
+    # 日志格式
+    elif name == "LOG_FORMAT":
+        return settings.log_format
+    elif name == "LOG_FORMAT_SIMPLE":
+        return settings.log_format_simple
+    elif name == "LOG_DATE_FORMAT":
+        return settings.log_date_format
+
+    # 编译参数
+    elif name == "DEFAULT_API_BASE":
+        return settings.api_base
+    elif name == "DEFAULT_API_KEY":
+        return settings.api_key
+    elif name == "DEFAULT_MODEL":
+        return settings.model
+    elif name == "DEFAULT_CONCURRENCY":
+        return settings.max_concurrency
+    elif name == "BATCH_SIZE":
+        return settings.batch_size
+    elif name == "LLM_MAX_TOKENS":
+        return settings.llm_max_tokens
+    elif name == "LLM_TEMPERATURE":
+        return settings.llm_temperature
+    elif name == "LLM_TIMEOUT":
+        return settings.llm_timeout
+    elif name == "LLM_REQUEST_DELAY":
+        return settings.llm_request_delay
+
+    # 质量/重试/缓存
+    elif name == "MAX_CONTENT_CHARS":
+        return settings.max_content_chars
+    elif name == "MIN_QUALITY_SCORE":
+        return settings.min_quality_score
+    elif name == "MIN_TEXT_LENGTH" or name == "MIN_AUDIO_TEXT_LENGTH":
+        return settings.min_text_length
+    elif name == "MAX_FILE_SIZE":
+        return settings.max_file_size
+    elif name == "MAX_RETRIES":
+        return settings.max_retries
+    elif name == "CACHE_RETENTION_DAYS":
+        return settings.cache_retention_days
+    elif name == "QUERY_MODEL":
+        return settings.query_model
+    elif name == "EMBEDDING_MODEL":
+        return settings.embedding_model
+
+    # OpenRouter
+    elif name == "OPENROUTER_API_BASE":
+        return settings.openrouter_api_base
+    elif name == "OPENROUTER_MODEL":
+        return settings.openrouter_model
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_default_workspace() -> Path:

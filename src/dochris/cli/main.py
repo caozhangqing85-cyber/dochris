@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import atexit
 import logging
 import sys
 
@@ -76,6 +77,10 @@ def main() -> int:
     Returns:
         退出码（0 表示成功，非 0 表示错误）
     """
+    # 注册资源清理函数（在程序退出时自动调用）
+    from dochris.core.llm_client import cleanup_all_clients
+    atexit.register(cleanup_all_clients)
+
     # 获取配置
     settings = get_settings()
 

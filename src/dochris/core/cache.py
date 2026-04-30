@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-SHA256 缓存管理 (参考 graphify/cache.py)
+SHA256 缓存管理
+
+用于缓存文件提取结果，避免重复处理相同内容。
 """
 
 import hashlib
@@ -33,7 +35,7 @@ def file_hash(path: Path) -> str | None:
 
 def cache_dir(root: Path = Path(".")) -> Path:
     """返回缓存目录路径"""
-    d = root / "graphify-out" / "cache"
+    d = root / "cache"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

@@ -139,7 +139,10 @@ def get_manifest(workspace_path: Path, src_id: str) -> dict | None:
         src_id: 来源 ID
 
     Returns:
-        manifest 字典，不存在则返回 None
+        manifest 字典，不存在或读取失败则返回 None
+
+    Raises:
+        JSONDecodeError: 当 JSON 解析失败时抛出（不返回损坏数据）
     """
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
     if not manifest_path.exists():
@@ -148,11 +151,31 @@ def get_manifest(workspace_path: Path, src_id: str) -> dict | None:
     # 首先尝试严格模式读取，捕获编码错误
     try:
         with open(manifest_path, encoding="utf-8") as f:
-            return json.load(f)
-    except UnicodeDecodeError:
-        logger.warning(f"Encoding error in {manifest_path}, using replacement characters")
-        with open(manifest_path, encoding="utf-8", errors="replace") as f:
-            return json.load(f)
+            data = json.load(f)
+    except UnicodeDecodeError as e:
+        # 记录详细的编码错误信息
+        logger.warning(
+            f"编码错误 in {manifest_path}: {e.__class__.__name__}, "
+            f"使用 replacement characters 读取。"
+        )
+        try:
+            with open(manifest_path, encoding="utf-8", errors="replace") as f:
+                data = json.load(f)
+        except json.JSONDecodeError as json_e:
+            # JSON 解析也失败时抛出异常，不返回损坏数据
+            logger.error(
+                f"JSON 解析失败（编码错误后）in {manifest_path}: {json_e}"
+            )
+            raise
+
+    # 验证返回的 JSON 数据完整性
+    if not isinstance(data, dict):
+        logger.error(f"manifest 数据格式错误（非字典类型）: {manifest_path}")
+        return None
+    if "id" not in data:
+        logger.warning(f"manifest 缺少 id 字段: {manifest_path}")
+
+    return data
 
 
 def update_manifest_status(

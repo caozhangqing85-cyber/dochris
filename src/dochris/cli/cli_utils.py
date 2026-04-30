@@ -46,26 +46,74 @@ def style(text: str, color: str) -> str:
 
 
 def success(text: str) -> str:
+    """返回绿色样式的文本（用于表示成功状态）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带绿色 ANSI 颜色代码的文本
+    """
     return style(text, Colors.GREEN)
 
 
 def warning(text: str) -> str:
+    """返回黄色样式的文本（用于表示警告信息）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带黄色 ANSI 颜色代码的文本
+    """
     return style(text, Colors.YELLOW)
 
 
 def error(text: str) -> str:
+    """返回红色样式的文本（用于表示错误信息）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带红色 ANSI 颜色代码的文本
+    """
     return style(text, Colors.RED)
 
 
 def info(text: str) -> str:
+    """返回青色样式的文本（用于表示一般信息）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带青色 ANSI 颜色代码的文本
+    """
     return style(text, Colors.CYAN)
 
 
 def dim(text: str) -> str:
+    """返回暗色样式的文本（用于表示次要信息）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带 DIM ANSI 样式代码的文本
+    """
     return style(text, Colors.DIM)
 
 
 def bold(text: str) -> str:
+    """返回粗体样式的文本（用于表示强调信息）
+
+    Args:
+        text: 要样式的文本
+
+    Returns:
+        带 BOLD ANSI 样式代码的文本
+    """
     return style(text, Colors.BOLD)
 
 

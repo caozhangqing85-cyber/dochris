@@ -226,7 +226,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    import re
-    from pathlib import Path
-
     main()

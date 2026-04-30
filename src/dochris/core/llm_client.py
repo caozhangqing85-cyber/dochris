@@ -32,6 +32,38 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# 客户端实例追踪与清理（用于资源管理）
+# ============================================================
+
+_client_instances: list["LLMClient"] = []
+
+
+def register_client(client: "LLMClient") -> None:
+    """注册 LLMClient 实例，用于程序退出时清理资源"""
+    _client_instances.append(client)
+
+
+def cleanup_all_clients() -> None:
+    """清理所有已注册的 LLMClient 实例
+
+    此函数设计为在程序退出时通过 atexit 调用，
+    确保所有 LLM 客户端的网络连接被正确关闭。
+    """
+    for client in _client_instances:
+        try:
+            if hasattr(client, "close"):
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 事件循环正在运行，创建后台任务
+                    loop.create_task(client.close())
+                else:
+                    # 事件循环未运行，直接运行关闭任务
+                    loop.run_until_complete(client.close())
+        except Exception as e:
+            logger.debug(f"清理 LLMClient 时出错（可忽略）: {e}")
+    _client_instances.clear()
+
 
 class LLMClient:
     """异步 LLM 客户端（核心功能）
@@ -91,6 +123,9 @@ class LLMClient:
         self.request_delay = request_delay
         self.no_think = model and "qwen3" in model.lower()
         self.last_request_time = 0.0
+
+        # 注册实例以便程序退出时清理资源
+        register_client(self)
 
     def _apply_no_think(self, messages: list) -> list:
         """qwen3 模型需要在 system prompt 末尾加 /no_think"""
