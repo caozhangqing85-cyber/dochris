@@ -1,9 +1,8 @@
 [project]
 name = "dochris"
-version = "1.0.0"
+version = "1.0.1"
 description = "个人知识库编译系统 - 四阶段流水线"
 readme = "README.md"
-readme-content-type = "text/markdown"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
