@@ -34,6 +34,7 @@ from dochris.cli.cli_config import cmd_config, cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
 from dochris.cli.cli_ingest import cmd_ingest
 from dochris.cli.cli_init import cmd_init
+from dochris.cli.cli_plugin import cmd_plugin, setup_plugin_parser
 from dochris.cli.cli_query import cmd_query
 from dochris.cli.cli_review import cmd_promote, cmd_quality, cmd_status
 from dochris.cli.cli_utils import (
@@ -273,6 +274,9 @@ def main() -> int:
     # version 命令
     subparsers.add_parser("version", help="显示版本", description="显示版本信息")
 
+    # plugin 命令
+    setup_plugin_parser(subparsers)
+
     # 解析参数
     args = parser.parse_args()
 
@@ -315,6 +319,8 @@ def main() -> int:
             return cmd_config(args)
         elif args.command == "version":
             return cmd_version(args)
+        elif args.command == "plugin":
+            return cmd_plugin(args)
         else:
             print(
                 format_error(

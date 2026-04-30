@@ -261,9 +261,81 @@ knowledge-base/
 | `kb query "关键词"` | Phase 3: 查询知识库 |
 | `kb promote <id> --to <target>` | 晋升到信任层 |
 | `kb quality [--report]` | 质量检查 |
+| `kb plugin list` | 列出所有插件 |
+| `kb plugin info <name>` | 查看插件详情 |
+| `kb plugin enable <name>` | 启用插件 |
+| `kb plugin disable <name>` | 禁用插件 |
+| `kb plugin load <path>` | 手动加载插件 |
 | `kb vault seed "主题"` | 从 Obsidian 拉取笔记 |
 | `kb config` | 显示当前配置 |
 | `kb version` | 显示版本信息 |
+
+## 插件系统
+
+Dochris 提供轻量级插件系统，允许开发者通过 Hook 扩展系统功能。
+
+### 可用扩展点
+
+| Hook | 触发时机 | 用途 |
+|------|---------|------|
+| `ingest_parser` | Phase 1 摄入文件时 | 自定义文件解析器（如 EPUB、MOBI） |
+| `pre_compile` | Phase 2 编译前 | 文本清洗、格式转换、元数据增强 |
+| `post_compile` | Phase 2 编译后 | 发送通知、更新索引、触发其他流程 |
+| `quality_score` | 质量评分时 | 自定义评分算法 |
+| `pre_query` | Phase 3 查询前 | 查询扩展、拼写纠正、意图识别 |
+| `post_query` | Phase 3 查询后 | 结果重排、过滤、聚合 |
+
+### 编写插件
+
+```python
+# my_plugin.py
+from dochris.plugin import hookimpl
+
+@hookimpl
+def pre_compile(text: str, metadata: dict) -> tuple[str, dict]:
+    """编译前处理：清理特殊字符"""
+    clean_text = text.replace("\\x00", "")
+    metadata["processed"] = True
+    return clean_text, metadata
+
+@hookimpl
+def post_compile(src_id: str, result: dict) -> None:
+    """编译后通知"""
+    if result.get("status") == "compiled":
+        print(f"✓ 编译完成: {src_id}")
+```
+
+### 安装和使用插件
+
+1. **目录加载**：将插件文件放入插件目录
+   ```bash
+   # 默认目录
+   ~/.knowledge-base/plugins/
+   
+   # 或通过配置指定
+   export PLUGIN_DIRS=/path/to/plugins
+   ```
+
+2. **手动加载**：使用 CLI 命令加载
+   ```bash
+   kb plugin load /path/to/my_plugin.py
+   ```
+
+3. **管理插件**
+   ```bash
+   kb plugin list              # 列出所有插件
+   kb plugin info my_plugin    # 查看插件详情
+   kb plugin enable my_plugin  # 启用插件
+   kb plugin disable my_plugin # 禁用插件
+   ```
+
+### 示例插件
+
+项目提供了几个示例插件供参考：
+
+- `examples/plugins/epub_parser.py` — EPUB 电子书解析
+- `examples/plugins/compile_notify.py` — 编译完成通知
+- `examples/plugins/query_enhance.py` — 查询增强
 
 ## 常见问题
 

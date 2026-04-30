@@ -18,6 +18,7 @@ from dochris.phases.query_utils import (
     _extract_summary,
     _keyword_search,
 )
+from dochris.plugin import get_plugin_manager
 from dochris.settings import OPENCLAW_CONFIG_PATH, get_settings
 
 # 从 settings 获取默认模型
@@ -77,8 +78,12 @@ def get_vector_store() -> object:
 
 def search_concepts(query: str, top_k: int = 5) -> list[dict]:
     """搜索概念 — wiki 优先，outputs fallback"""
+    # 查询前处理
+    plugin_manager = get_plugin_manager()
+    processed_query = plugin_manager.call_hook_firstresult("pre_query", query) or query
+
     wiki_results = _keyword_search(
-        query,
+        processed_query,
         WIKI_CONCEPTS_PATH,
         top_k,
         _extract_concept,
@@ -88,7 +93,7 @@ def search_concepts(query: str, top_k: int = 5) -> list[dict]:
         return wiki_results
 
     return _keyword_search(
-        query,
+        processed_query,
         OUTPUTS_CONCEPTS_PATH,
         top_k,
         _extract_concept,
@@ -98,8 +103,12 @@ def search_concepts(query: str, top_k: int = 5) -> list[dict]:
 
 def search_summaries(query: str, top_k: int = 5) -> list[dict]:
     """搜索摘要 — wiki 优先，outputs fallback"""
+    # 查询前处理
+    plugin_manager = get_plugin_manager()
+    processed_query = plugin_manager.call_hook_firstresult("pre_query", query) or query
+
     wiki_results = _keyword_search(
-        query,
+        processed_query,
         WIKI_SUMMARIES_PATH,
         top_k,
         _extract_summary,
@@ -109,7 +118,7 @@ def search_summaries(query: str, top_k: int = 5) -> list[dict]:
         return wiki_results
 
     return _keyword_search(
-        query,
+        processed_query,
         OUTPUTS_SUMMARIES_PATH,
         top_k,
         _extract_summary,
@@ -128,8 +137,12 @@ def search_all(query: str, top_k: int = 5) -> dict:
             "search_sources": ["wiki", "outputs", "vector"]
         }
     """
-    concepts = search_concepts(query, top_k)
-    summaries = search_summaries(query, top_k)
+    # 查询前处理
+    plugin_manager = get_plugin_manager()
+    processed_query = plugin_manager.call_hook_firstresult("pre_query", query) or query
+
+    concepts = search_concepts(processed_query, top_k)
+    summaries = search_summaries(processed_query, top_k)
 
     # 确定搜索来源
     sources_used = set()
@@ -139,16 +152,23 @@ def search_all(query: str, top_k: int = 5) -> dict:
         sources_used.add(summaries[0]["source"])
 
     # 向量检索始终执行（作为补充）
-    vector_results = vector_search(query, top_k)
+    vector_results = vector_search(processed_query, top_k)
     if vector_results:
         sources_used.add("vector")
 
-    return {
+    results = {
         "concepts": concepts,
         "summaries": summaries,
         "vector_results": vector_results,
         "search_sources": sorted(sources_used),
     }
+
+    # 查询后处理
+    post_processed = plugin_manager.call_hook("post_query", query, [results])
+    if post_processed and post_processed[0] is not None:
+        return post_processed[0]
+
+    return results
 
 
 # ============================================================

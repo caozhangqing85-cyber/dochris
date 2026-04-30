@@ -193,6 +193,19 @@ class Settings:
     log_date_format: str = "%Y%m%d_%H%M%S"
 
     # ============================================================
+    # 插件配置
+    # ============================================================
+
+    plugin_dirs: list[str] = field(default_factory=list)
+    """插件目录列表"""
+
+    plugins_enabled: list[str] = field(default_factory=list)
+    """启用的插件列表"""
+
+    plugins_disabled: list[str] = field(default_factory=list)
+    """禁用的插件列表"""
+
+    # ============================================================
     # 缓存配置
     # ============================================================
 
@@ -262,6 +275,16 @@ class Settings:
         api_base = os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
         model = os.environ.get("MODEL", "glm-5.1")
 
+        # 解析插件配置
+        plugin_dirs_str = os.environ.get("PLUGIN_DIRS", "")
+        plugin_dirs = [Path(p).expanduser() for p in plugin_dirs_str.split(":")] if plugin_dirs_str else []
+
+        plugins_enabled_str = os.environ.get("PLUGINS_ENABLED", "")
+        plugins_enabled = plugins_enabled_str.split(",") if plugins_enabled_str else []
+
+        plugins_disabled_str = os.environ.get("PLUGINS_DISABLED", "")
+        plugins_disabled = plugins_disabled_str.split(",") if plugins_disabled_str else []
+
         # 3. 创建实例
         return cls(
             workspace=workspace,
@@ -278,6 +301,9 @@ class Settings:
             min_quality_score=int(os.environ.get("MIN_QUALITY_SCORE", "85")),
             max_content_chars=int(os.environ.get("MAX_CONTENT_CHARS", "20000")),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
+            plugin_dirs=[str(p) for p in plugin_dirs],
+            plugins_enabled=plugins_enabled,
+            plugins_disabled=plugins_disabled,
         )
 
     # ============================================================

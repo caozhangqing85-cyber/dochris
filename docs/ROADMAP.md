@@ -32,7 +32,13 @@
 - [x] P1-5: README Badges + 架构图（1 小时）
 
 ### P2：V2.0 路线图（~40 小时）
-- [x] P2-1: 插件/扩展机制（15 小时）— 暂缓，待抽象层稳定
+- [x] P2-1: 插件/扩展机制（15 小时）— 已完成
+  - [x] 创建 `src/dochris/plugin/` 包（registry.py, loader.py, hookspec.py）
+  - [x] 实现 6 个扩展点（ingest_parser, pre_compile, post_compile, quality_score, pre_query, post_query）
+  - [x] 集成到 Phase 2/3 流水线
+  - [x] 实现 `kb plugin` CLI 命令
+  - [x] 创建示例插件（epub_parser, compile_notify, query_enhance）
+  - [x] 单元测试覆盖
 - [x] P2-2: LLM 提供商抽象层（10 小时）
 - [x] P2-3: 向量数据库抽象层（10 小时）
 - [x] P2-4: 结构化日志（5 小时）

@@ -4,6 +4,7 @@
 支持：
 - 多种文件格式（PDF、Office、代码、文本、音视频转录）
 - 智谱优先 + 本地 Ollama 兜底的双通道策略
+- 插件系统扩展
 """
 
 import logging
@@ -15,6 +16,7 @@ from typing import Any
 scripts_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(scripts_dir))
 
+# 导入插件系统
 # 导入 manifest 管理
 from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
@@ -25,6 +27,7 @@ from dochris.manifest import get_default_workspace, get_manifest, update_manifes
 from dochris.parsers.code_parser import detect_code_file, extract_from_code
 from dochris.parsers.doc_parser import detect_document_file, parse_document
 from dochris.parsers.pdf_parser import parse_pdf
+from dochris.plugin import get_plugin_manager
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -89,6 +92,32 @@ class CompilerWorker:
         self.enable_fallback = enable_fallback
         self.workspace = get_default_workspace()
         self.cache_dir = cache_dir(self.workspace)
+
+        # 插件管理器
+        self.plugin_manager = get_plugin_manager()
+        self._init_plugins_from_settings(settings)
+
+    def _init_plugins_from_settings(self, settings) -> None:
+        """从 settings 初始化插件
+
+        Args:
+            settings: Settings 实例
+        """
+        plugin_dirs = getattr(settings, "plugin_dirs", [])
+        for plugin_dir in plugin_dirs:
+            plugin_path = Path(plugin_dir).expanduser()
+            if plugin_path.exists():
+                loaded = self.plugin_manager.load_from_directory(plugin_path)
+                logger.info(f"从 {plugin_dir} 加载了 {len(loaded)} 个插件")
+
+        # 应用启用/禁用配置
+        enabled = getattr(settings, "plugins_enabled", [])
+        for name in enabled:
+            self.plugin_manager.enable_plugin(name)
+
+        disabled = getattr(settings, "plugins_disabled", [])
+        for name in disabled:
+            self.plugin_manager.disable_plugin(name)
 
     async def _generate_with_fallback(
         self,
@@ -158,6 +187,15 @@ class CompilerWorker:
             if text is None:
                 return None
 
+            # 3.5 编译前处理（插件 hook）
+            metadata = manifest.copy()
+            pre_result = self.plugin_manager.call_hook_firstresult(
+                "pre_compile", text, metadata
+            )
+            if pre_result:
+                text, metadata = pre_result
+                logger.debug(f"应用 pre_compile hook: {src_id}")
+
             # 4. LLM 编译（带兜底）
             compile_result = await self._generate_with_fallback(text, manifest["title"])
 
@@ -166,8 +204,17 @@ class CompilerWorker:
                 await self._mark_failed(src_id, "LLM compilation failed")
                 return None
 
-            # 5. 质量评分
-            quality_score = score_summary_quality_v4(compile_result)
+            # 5. 质量评分（支持插件自定义）
+            plugin_score = self.plugin_manager.call_hook_firstresult(
+                "quality_score",
+                compile_result.get("detailed_summary", ""),
+                manifest,
+            )
+            if plugin_score is not None:
+                quality_score = int(plugin_score)
+                logger.debug(f"使用插件质量评分: {quality_score}")
+            else:
+                quality_score = score_summary_quality_v4(compile_result)
             compile_result["quality_score"] = quality_score
 
             # 6. 保存到缓存
@@ -178,6 +225,13 @@ class CompilerWorker:
 
             # 7. 保存结果
             await self._save_result(src_id, compile_result, quality_score)
+
+            # 7.5 编译后处理（插件 hook）
+            self.plugin_manager.call_hook(
+                "post_compile",
+                src_id,
+                {"status": "compiled", "result": compile_result, **manifest},
+            )
 
             logger.info(f"✓ Compiled {src_id} (quality: {quality_score})")
             return compile_result
@@ -199,6 +253,14 @@ class CompilerWorker:
         Returns:
             提取的文本，失败返回 None
         """
+        # 首先尝试插件解析器
+        plugin_text = self.plugin_manager.call_hook_firstresult(
+            "ingest_parser", str(file_path)
+        )
+        if plugin_text:
+            logger.info(f"使用插件解析器提取文本: {file_path.name}")
+            return plugin_text
+
         ext = file_path.suffix.lower()
 
         # 音视频文件 → 查找对应转录 txt
