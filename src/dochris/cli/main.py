@@ -22,6 +22,7 @@ import argparse
 import atexit
 import logging
 import sys
+import traceback
 
 from dochris import __version__
 
@@ -33,8 +34,25 @@ from dochris.cli.cli_ingest import cmd_ingest
 from dochris.cli.cli_init import cmd_init
 from dochris.cli.cli_query import cmd_query
 from dochris.cli.cli_review import cmd_promote, cmd_quality, cmd_status
-from dochris.cli.cli_utils import error
+from dochris.cli.cli_utils import (
+    EXIT_CONFIG_ERROR,
+    EXIT_FAILURE,
+    EXIT_NETWORK_ERROR,
+    EXIT_USAGE_ERROR,
+    format_error,
+)
 from dochris.cli.cli_vault import cmd_vault
+from dochris.exceptions import (
+    APIKeyError,
+    ConfigurationError,
+    FileProcessingError,
+    KnowledgeBaseError,
+    LLMConnectionError,
+    LLMContentFilterError,
+    LLMError,
+    LLMRateLimitError,
+    LLMTimeoutError,
+)
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -79,6 +97,7 @@ def main() -> int:
     """
     # 注册资源清理函数（在程序退出时自动调用）
     from dochris.core.llm_client import cleanup_all_clients
+
     atexit.register(cleanup_all_clients)
 
     # 获取配置
@@ -93,8 +112,8 @@ def main() -> int:
         for warning in warnings:
             logger.warning(f"配置警告: {warning}")
     except ValueError as e:
-        error(f"配置验证失败: {e}")
-        return 1
+        print(format_error("配置验证", str(e), hint="运行 'kb init' 重新配置"))
+        return EXIT_CONFIG_ERROR
 
     parser = argparse.ArgumentParser(
         prog="kb",
@@ -121,9 +140,7 @@ def main() -> int:
 
     parser.add_argument("--verbose", "-v", action="store_true", help="显示详细输出")
     parser.add_argument("--quiet", "-q", action="store_true", help="静默模式，仅输出错误信息")
-    parser.add_argument(
-        "--version", action="store_true", help="显示版本信息"
-    )
+    parser.add_argument("--version", action="store_true", help="显示版本信息")
 
     subparsers = parser.add_subparsers(
         dest="command",
@@ -175,7 +192,8 @@ def main() -> int:
         help="[已弃用，请使用 --limit] 编译数量限制（默认编译所有）",
     )
     parser_compile.add_argument(
-        "--limit", "-n",
+        "--limit",
+        "-n",
         type=int,
         default=None,
         dest="named_limit",
@@ -228,9 +246,7 @@ def main() -> int:
         "quality", help="质量管理", description="检查和报告知识库质量"
     )
     parser_quality.add_argument("--report", action="store_true", help="生成详细报告")
-    parser_quality.add_argument(
-        "--fix", action="store_true", help="自动修复可修复的问题"
-    )
+    parser_quality.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
 
     # vault 命令
     parser_vault = subparsers.add_parser(
@@ -244,14 +260,10 @@ def main() -> int:
     vault_subparsers.add_parser("status", help="显示同步状态")
 
     # config 命令
-    subparsers.add_parser(
-        "config", help="显示配置", description="显示当前配置信息"
-    )
+    subparsers.add_parser("config", help="显示配置", description="显示当前配置信息")
 
     # version 命令
-    subparsers.add_parser(
-        "version", help="显示版本", description="显示版本信息"
-    )
+    subparsers.add_parser("version", help="显示版本", description="显示版本信息")
 
     # 解析参数
     args = parser.parse_args()
@@ -291,18 +303,52 @@ def main() -> int:
         elif args.command == "version":
             return cmd_version(args)
         else:
-            error(f"未知命令: {args.command}")
-            return 1
+            print(
+                format_error(
+                    "命令", f"未知命令: {args.command}", hint="运行 'kb --help' 查看所有可用命令"
+                )
+            )
+            return EXIT_USAGE_ERROR
     except KeyboardInterrupt:
         print("\n操作已取消")
         return 130
+    except APIKeyError as e:
+        print(
+            format_error(
+                "API 配置", str(e), hint="请检查 OPENAI_API_KEY 环境变量或运行 'kb init' 重新配置"
+            )
+        )
+        return EXIT_CONFIG_ERROR
+    except ConfigurationError as e:
+        print(
+            format_error(
+                "配置错误", str(e), hint="运行 'kb config' 查看当前配置，或 'kb init' 重新配置"
+            )
+        )
+        return EXIT_CONFIG_ERROR
+    except (LLMConnectionError, LLMTimeoutError) as e:
+        print(format_error("网络连接", str(e), hint="请检查网络连接和 API_BASE 配置"))
+        return EXIT_NETWORK_ERROR
+    except LLMRateLimitError as e:
+        print(format_error("API 限流", str(e), hint="请稍后重试或调整并发数"))
+        return EXIT_NETWORK_ERROR
+    except LLMContentFilterError as e:
+        print(format_error("内容过滤", str(e), hint="源内容可能包含敏感词，请检查源文件"))
+        return EXIT_FAILURE
+    except LLMError as e:
+        print(format_error("LLM 调用", str(e), hint="请检查 API 配置和网络连接"))
+        return EXIT_FAILURE
+    except FileProcessingError as e:
+        print(format_error("文件处理", str(e), hint="请检查文件是否存在且可读"))
+        return EXIT_FAILURE
+    except KnowledgeBaseError as e:
+        print(format_error("知识库系统", str(e)))
+        return EXIT_FAILURE
     except Exception as e:
-        error(f"执行出错: {e}")
+        print(format_error("未知错误", str(e)))
         if args.verbose:
-            import traceback
-
             traceback.print_exc()
-        return 1
+        return EXIT_FAILURE
 
 
 if __name__ == "__main__":

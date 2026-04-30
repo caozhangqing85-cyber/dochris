@@ -118,6 +118,54 @@ def bold(text: str) -> str:
 
 
 # ============================================================
+# 错误格式化
+# ============================================================
+
+
+def format_error(context: str, message: str, hint: str | None = None) -> str:
+    """格式化错误信息，包含上下文、描述和修复建议
+
+    Args:
+        context: 错误发生的上下文（如配置加载、API 调用等）
+        message: 错误描述
+        hint: 可选的修复建议
+
+    Returns:
+        格式化后的错误信息字符串
+    """
+    parts = [f"{error('✗ Error')} {dim(context)}\n", f"  {message}"]
+    if hint:
+        parts.append(f"\n  {dim('💡')} {hint}")
+    return "\n".join(parts)
+
+
+def format_warning(context: str, message: str, hint: str | None = None) -> str:
+    """格式化警告信息
+
+    Args:
+        context: 警告发生的上下文
+        message: 警告描述
+        hint: 可选的处理建议
+
+    Returns:
+        格式化后的警告信息字符串
+    """
+    parts = [f"{warning('⚠ Warning')} {dim(context)}\n", f"  {message}"]
+    if hint:
+        parts.append(f"\n  {dim('💡')} {hint}")
+    return "\n".join(parts)
+
+
+# 标准化退出码
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+EXIT_USAGE_ERROR = 2
+EXIT_CONFIG_ERROR = 3
+EXIT_NETWORK_ERROR = 4
+EXIT_PERMISSION_ERROR = 5
+
+
+# ============================================================
 # 状态显示
 # ============================================================
 
