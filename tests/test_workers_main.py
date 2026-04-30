@@ -2,8 +2,49 @@
 测试 workers/__main__.py 模块
 """
 
+import sys
 from pathlib import Path
 from unittest.mock import patch
+
+
+class TestWorkersMainModule:
+    """测试 __main__.py 主模块"""
+
+    @patch('builtins.print')
+    def test_main_module_runs_without_error(self, mock_print):
+        """测试 __main__.py 可以执行而不报错"""
+        import importlib
+
+        # 清除模块缓存以便重新导入
+        module_name = 'dochris.workers.__main__'
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+        # 导入模块（会执行其代码）
+        importlib.import_module(module_name)
+
+        # 验证 print 被调用
+        assert mock_print.call_count > 0
+
+    @patch('builtins.print')
+    def test_main_imports_compiler_worker(self, mock_print):
+        """测试 __main__.py 导入 compiler_worker"""
+        import importlib
+
+        # 清除模块缓存
+        module_name = 'dochris.workers.__main__'
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+        # 导入模块
+        importlib.import_module(module_name)
+
+        # 验证有输出
+        assert mock_print.call_count > 0
+        # 验证输出包含预期内容
+        call_args = [str(call) for call in mock_print.call_args_list]
+        output = ' '.join(call_args)
+        assert any(keyword in output.lower() for keyword in ['testing', 'workers', 'compiler', '✓', 'import'])
 
 
 class TestWorkersMain:

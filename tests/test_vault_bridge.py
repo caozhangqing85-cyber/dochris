@@ -320,5 +320,39 @@ class TestContentCleaning(unittest.TestCase):
         self.assertEqual(cleaned.count("📚 来源:"), 3)
 
 
+class TestGetObsidianVault(unittest.TestCase):
+    """测试获取 Obsidian 主库路径"""
+
+    def test_get_obsidian_vault_none_when_empty(self):
+        """测试当 obsidian_vaults 为空时返回 None"""
+        from unittest.mock import MagicMock, patch
+
+        with patch('dochris.vault.bridge._get_settings') as mock_settings:
+            mock_instance = MagicMock()
+            mock_instance.obsidian_vaults = []
+            mock_settings.return_value = mock_instance
+
+            from dochris.vault.bridge import _get_obsidian_vault
+
+            result = _get_obsidian_vault()
+            self.assertIsNone(result)
+
+    def test_get_obsidian_vault_returns_path(self):
+        """测试当有配置时返回路径"""
+        import tempfile
+        from unittest.mock import MagicMock, patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch('dochris.vault.bridge._get_settings') as mock_settings:
+                mock_instance = MagicMock()
+                mock_instance.obsidian_vaults = [Path(tmpdir)]
+                mock_settings.return_value = mock_instance
+
+                from dochris.vault.bridge import _get_obsidian_vault
+
+                result = _get_obsidian_vault()
+                self.assertIsInstance(result, Path)
+
+
 if __name__ == "__main__":
     unittest.main()

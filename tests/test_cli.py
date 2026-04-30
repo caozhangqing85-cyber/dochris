@@ -428,6 +428,37 @@ class TestCLIConfig:
             rc = cmd_version(args)
         assert rc == 0
 
+    def test_cmd_config_with_obsidian_vaults(self):
+        """cmd_config 显示 Obsidian Vaults 信息"""
+        from pathlib import Path
+
+        from dochris.cli.cli_config import cmd_config
+
+        with patch("dochris.cli.cli_config.get_settings") as mock_s:
+            mock_vault_path = Path("/test/vault")
+            mock_s.return_value = MagicMock(
+                workspace=MagicMock(),
+                logs_dir=MagicMock(),
+                wiki_dir=MagicMock(),
+                outputs_dir=MagicMock(),
+                source_path=None,
+                obsidian_vaults=[mock_vault_path],  # 有 Obsidian vault
+                api_key=None,
+                api_base="http://test",
+                model="test-model",
+                max_concurrency=3,
+                min_quality_score=85,
+                max_content_chars=20000,
+            )
+            args = MagicMock()
+            with patch("builtins.print") as mock_print:
+                rc = cmd_config(args)
+
+        assert rc == 0
+        # 验证打印了 Obsidian Vault 信息
+        printed = "".join(str(c) for c in mock_print.call_args_list)
+        assert "Vault" in printed or "1 个" in printed
+
 
 # ============================================================
 # TestCLICompile
@@ -657,6 +688,42 @@ class TestCLIReview:
             rc = cmd_quality(args)
         assert rc == 0
 
+    def test_cmd_quality_with_src_id_passed(self):
+        """quality 带 src_id 参数，质量门禁通过"""
+        from dochris.cli.cli_review import cmd_quality
+
+        args = MagicMock(report=False, check_pollution=False, src_id="SRC-0001")
+        mock_gate_result = {
+            "passed": True,
+            "src_id": "SRC-0001",
+            "title": "Test Document",
+            "quality_score": 90,
+        }
+        with (
+            patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
+            patch("dochris.quality.quality_gate.quality_gate", return_value=mock_gate_result),
+            patch("builtins.print"),
+        ):
+            rc = cmd_quality(args)
+        assert rc == 0
+
+    def test_cmd_quality_with_src_id_failed(self):
+        """quality 带 src_id 参数，质量门禁未通过"""
+        from dochris.cli.cli_review import cmd_quality
+
+        args = MagicMock(report=False, check_pollution=False, src_id="SRC-0001")
+        mock_gate_result = {
+            "passed": False,
+            "reason": "质量分数不足",
+        }
+        with (
+            patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
+            patch("dochris.quality.quality_gate.quality_gate", return_value=mock_gate_result),
+            patch("builtins.print"),
+        ):
+            rc = cmd_quality(args)
+        assert rc == 1
+
 
 class TestCLIVault:
     """测试 vault 命令"""
@@ -732,6 +799,23 @@ class TestCLIVault:
             rc = cmd_vault(args)
         assert rc == 1
 
+    def test_cmd_vault_promote_failed(self):
+        """vault promote 失败返回 1"""
+        from dochris.cli.cli_vault import cmd_vault
+
+        args = MagicMock(vault_command="promote", src_id="SRC-0001")
+
+        mock_promote = MagicMock(return_value=False)
+        mock_settings = MagicMock(return_value=MagicMock())
+
+        with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
+            with patch.dict("sys.modules", {
+                "dochris.vault.bridge": MagicMock(promote_to_obsidian=mock_promote),
+            }):
+                with patch("builtins.print"):
+                    rc = cmd_vault(args)
+        assert rc == 1
+
     def test_cmd_vault_list_success(self):
         """vault list 成功返回 0"""
         from dochris.cli.cli_vault import cmd_vault
@@ -764,6 +848,16 @@ class TestCLIVault:
             }):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
+        assert rc == 1
+
+    def test_cmd_vault_list_no_src_id(self):
+        """vault list 缺少 src_id 返回 1"""
+        from dochris.cli.cli_vault import cmd_vault
+
+        args = MagicMock(vault_command="list", src_id=None)
+
+        with patch("builtins.print"):
+            rc = cmd_vault(args)
         assert rc == 1
 
     def test_cmd_vault_unknown_subcommand(self):
