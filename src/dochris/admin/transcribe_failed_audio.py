@@ -60,6 +60,8 @@ try:
 except ImportError:
     FASTER_WHISPER_AVAILABLE = False
     logger.error("❌ faster-whisper 未安装")
+    logger.error("请安装音频处理依赖: pip install dochris[audio]")
+    logger.error("或: pip install faster-whisper>=0.10.0")
     sys.exit(1)
 
 

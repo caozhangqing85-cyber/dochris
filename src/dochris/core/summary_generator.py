@@ -5,7 +5,6 @@
 提供基础摘要生成功能，从 LLMClient 拆分出来。
 """
 
-import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING, Any
@@ -13,10 +12,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .llm_client import LLMClient
 
-logger = logging.getLogger(__name__)
+from .retry_manager import RetryManager
 
-# 最大重试等待时间（秒）
-MAX_RETRY_WAIT = 60
+logger = logging.getLogger(__name__)
 
 
 class SummaryGenerator:
@@ -58,86 +56,49 @@ class SummaryGenerator:
             不抛出异常，失败返回 None
 
         重试策略:
-            - 429 错误: 指数退避（20s, 40s, 80s）
-            - 连接/超时错误: 指数退避（15s, 30s, 60s）
+            - 429 错误: 指数退避（30s, 60s, 120s...）
+            - 连接/超时错误: 指数退避（20s, 40s, 80s...）
             - 内容过滤: 不重试，直接返回 None
-            - 其他错误: 指数退避（10s, 20s, 40s）
+            - 其他错误: 指数退避（10s, 20s, 40s...）
         """
-        # 速率限制：确保两次请求之间有足够间隔
-        await self.llm_client._rate_limit()
+        async def _do_llm_call() -> dict[str, Any]:
+            """执行实际的 LLM API 调用"""
+            # 速率限制：确保两次请求之间有足够间隔
+            await self.llm_client._rate_limit()
 
-        for attempt in range(max_retries):
+            messages = self._build_messages(text, title)
+            # qwen3 模型需要 /no_think 禁用思考过程
+            messages = self.llm_client._apply_no_think(messages)
+
+            response = await self.llm_client.client.chat.completions.create(
+                model=self.llm_client.model,
+                max_tokens=self.llm_client.max_tokens,
+                temperature=self.llm_client.temperature,
+                messages=messages,
+            )
+
+            content = response.choices[0].message.content.strip()
+
+            # 解析 JSON
             try:
-                messages = self._build_messages(text, title)
-
-                # qwen3 模型需要 /no_think 禁用思考过程
-                messages = self.llm_client._apply_no_think(messages)
-
-                response = await self.llm_client.client.chat.completions.create(
-                    model=self.llm_client.model,
-                    max_tokens=self.llm_client.max_tokens,
-                    temperature=self.llm_client.temperature,
-                    messages=messages,
-                )
-
-                content = response.choices[0].message.content.strip()
-
-                # 解析 JSON
+                return json.loads(content)
+            except json.JSONDecodeError:
+                # 尝试使用 json_repair
                 try:
-                    result = json.loads(content)
-                except json.JSONDecodeError:
-                    # 尝试使用 json_repair
-                    try:
-                        import json_repair
+                    import json_repair
+                    return json_repair.loads(content)
+                except ImportError:
+                    logger.warning("json_repair not installed, trying simple extraction")
+                    return self.llm_client._extract_json_from_text(content)
 
-                        result = json_repair.loads(content)
-                    except ImportError:
-                        logger.warning("json_repair not installed, trying simple extraction")
-                        # 简单尝试提取 JSON
-                        result = self.llm_client._extract_json_from_text(content)
+        # 使用统一的重试逻辑
+        result = await RetryManager.llm_retry_with_filter(
+            _do_llm_call, max_retries=max_retries, on_content_filter=None
+        )
 
-                logger.info(f"✓ LLM call succeeded on attempt {attempt + 1}")
-                return result
-
-            except Exception as e:
-                error_str = str(e)
-
-                # 429/限流错误：指数退避重试
-                if "429" in error_str or "rate" in error_str.lower():
-                    wait = min(30 * (2**attempt), MAX_RETRY_WAIT)  # 指数退避，最多 5 分钟
-                    logger.warning(
-                        f"429/rate limit error (attempt {attempt + 1}), waiting {wait}s..."
-                    )
-                    await asyncio.sleep(wait)
-
-                # 连接错误/超时：延迟重试
-                elif (
-                    "connection" in error_str.lower()
-                    or "timeout" in error_str.lower()
-                    or "timed out" in error_str.lower()
-                ):
-                    wait = min(20 * (2**attempt), MAX_RETRY_WAIT)  # 指数退避，最多 5 分钟
-                    logger.warning(
-                        f"Connection/timeout error (attempt {attempt + 1}), waiting {wait}s..."
-                    )
-                    await asyncio.sleep(wait)
-
-                # 内容过滤：不重试
-                elif "contentFilter" in error_str.lower() or "content filter" in error_str.lower():
-                    logger.warning(f"Content filter triggered: {e}")
-                    return None
-
-                # 其他错误：重试
-                elif attempt < max_retries - 1:
-                    wait = min(10 * (2**attempt), MAX_RETRY_WAIT)  # 增加延迟，最多 5 分钟
-                    logger.warning(f"LLM call failed (attempt {attempt + 1}): {e}")
-                    logger.info(f"Waiting {wait}s before retry...")
-                    await asyncio.sleep(wait)
-                else:
-                    logger.error(f"LLM call failed after {max_retries} attempts: {e}")
-                    return None
-
-        return None
+        if result is not None:
+            logger.info("✓ LLM call succeeded")
+        return result
 
     def _build_messages(self, text: str, title: str) -> list[dict]:
         """构建 LLM 消息

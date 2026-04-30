@@ -15,6 +15,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+
 # 导入统一配置
 sys.path.insert(0, str(Path(__file__).parent))
 from dochris.log import append_log
@@ -265,6 +268,39 @@ def scan_source_dir(source_path: Path, logger: logging.Logger) -> list[dict]:
     return files
 
 
+def resolve_path_conflict(
+    target_dir: Path, filename: str, logger: logging.Logger, max_attempts: int = 1000
+) -> Path | None:
+    """解决文件名冲突，生成唯一的目标路径
+
+    如果目标文件已存在，则在文件名后添加递增数字后缀。
+
+    Args:
+        target_dir: 目标目录
+        filename: 原始文件名
+        logger: 日志记录器
+        max_attempts: 最大尝试次数
+
+    Returns:
+        唯一的目标路径，如果无法解决冲突则返回 None
+    """
+    dst_path = target_dir / filename
+    counter = 1
+
+    while dst_path.exists() and counter < max_attempts:
+        stem = Path(filename).stem
+        suffix = Path(filename).suffix
+        dst_name = f"{stem}_{counter}{suffix}"
+        dst_path = target_dir / dst_name
+        counter += 1
+
+    if counter >= max_attempts and dst_path.exists():
+        logger.error(f"无法解决文件名冲突: {filename} (尝试了 {max_attempts} 次)")
+        return None
+
+    return dst_path
+
+
 def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     """使用符号链接将文件摄入到 raw/
 
@@ -299,19 +335,8 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     cat_dir.mkdir(parents=True, exist_ok=True)
 
     # 避免文件名冲突
-    dst_name = entry["name"]
-    dst_path = cat_dir / dst_name
-    counter = 1
-    max_attempts = 1000
-    while dst_path.exists() and counter < max_attempts:
-        stem = Path(dst_name).stem
-        suffix = Path(dst_name).suffix
-        dst_name = f"{stem}_{counter}{suffix}"
-        dst_path = cat_dir / dst_name
-        counter += 1
-
-    if counter >= max_attempts:
-        logger.error(f"无法解决文件名冲突: {dst_name}")
+    dst_path = resolve_path_conflict(cat_dir, entry["name"], logger)
+    if dst_path is None:
         phase1["stats"]["failed"] += 1
         return False
 
@@ -367,17 +392,20 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     return True
 
 
-def run_phase1(logger: logging.Logger) -> dict:
+def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
     """执行 Phase 1 数据摄入
 
     Args:
         logger: 日志记录器
+        dry_run: 模拟运行，只显示将要执行的操作
 
     Returns:
         统计信息字典
     """
     logger.info("=" * 60)
     logger.info("Phase 1: 数据摄入开始")
+    if dry_run:
+        logger.info("⚠ DRY-RUN 模式: 不会实际执行任何操作")
     logger.info("=" * 60)
 
     progress = load_progress()
@@ -420,19 +448,60 @@ def run_phase1(logger: logging.Logger) -> dict:
     for cat, count in cat_counts.most_common():
         logger.info(f"  {cat}: {count} 个文件")
 
+    # Dry-run 模式：只显示将要处理的文件
+    if dry_run:
+        logger.info("=" * 60)
+        logger.info("将要处理的文件列表:")
+        for i, entry in enumerate(new_files, 1):
+            logger.info(f"  [{i}] [{entry['category']}] {entry['name']} ({entry.get('size', 0)} bytes)")
+        logger.info("=" * 60)
+        return {
+            "total": len(new_files),
+            "linked": len(new_files),
+            "skipped": 0,
+            "failed": 0,
+        }
+
     # 摄入文件
     success = 0
     failed = 0
-    for i, entry in enumerate(new_files):
-        logger.info(f"[{i + 1}/{len(new_files)}] 处理: {entry['name']}")
-        if ingest_file(entry, progress, logger):
-            success += 1
-        else:
-            failed += 1
 
-        # 每100个文件保存一次进度
-        if (i + 1) % 100 == 0:
-            save_progress(progress)
+    # 使用 rich 进度条（仅在交互模式且有文件时）
+    console = Console()
+    if new_files and sys.stdout.isatty():
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=console,
+            transient=False,
+        ) as pbar:
+            task = pbar.add_task("[cyan]摄入文件...", total=len(new_files))
+            for i, entry in enumerate(new_files):
+                pbar.update(task, description=f"[cyan]处理: {entry['name'][:40]}")
+                if ingest_file(entry, progress, logger):
+                    success += 1
+                else:
+                    failed += 1
+                pbar.advance(task)
+
+                # 每100个文件保存一次进度
+                if (i + 1) % 100 == 0:
+                    save_progress(progress)
+    else:
+        # 非交互模式或空列表：使用简单循环
+        for i, entry in enumerate(new_files):
+            logger.info(f"[{i + 1}/{len(new_files)}] 处理: {entry['name']}")
+            if ingest_file(entry, progress, logger):
+                success += 1
+            else:
+                failed += 1
+
+            # 每100个文件保存一次进度
+            if (i + 1) % 100 == 0:
+                save_progress(progress)
 
     # 最终保存
     progress["phase1"]["stats"]["total"] = len(progress["phase1"]["ingested_files"])

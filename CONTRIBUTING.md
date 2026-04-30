@@ -13,7 +13,7 @@
 ### 克隆项目
 
 ```bash
-git clone https://github.com/gongzhuming/dochris.git
+git clone https://github.com/caozhangqing85-cyber/dochris.git
 cd dochris
 ```
 

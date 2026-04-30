@@ -16,10 +16,9 @@ if TYPE_CHECKING:
 
     from .llm_client import LLMClient
 
-logger = logging.getLogger(__name__)
+from .retry_manager import RetryManager
 
-# 最大重试等待时间（秒）
-MAX_RETRY_WAIT = 60
+logger = logging.getLogger(__name__)
 
 # 分层摘要最大字符数（超过此大小会截断）
 MAX_HIERARCHICAL_CHARS = 100000  # 10 万字
@@ -182,64 +181,40 @@ class HierarchicalSummarizer:
             """为单个块生成摘要"""
             chunk_title = chunk.title or f"{title} - 第 {index + 1} 部分"
 
-            # 使用简化的 prompt
-            messages = self._build_chunk_messages(chunk.content, chunk_title)
+            async def _do_llm_call() -> dict[str, Any]:
+                """执行实际的 LLM API 调用"""
+                await self.llm_client._rate_limit()
 
-            for attempt in range(max_retries):
+                messages = self._build_chunk_messages(chunk.content, chunk_title)
+
+                response = await self.llm_client.client.chat.completions.create(
+                    model=self.llm_client.model,
+                    max_tokens=8000,
+                    temperature=self.llm_client.temperature,
+                    messages=self.llm_client._apply_no_think(messages),
+                )
+
+                content = response.choices[0].message.content.strip()
+
+                # 解析 JSON
                 try:
-                    await self.llm_client._rate_limit()
-
-                    response = await self.llm_client.client.chat.completions.create(
-                        model=self.llm_client.model,
-                        max_tokens=8000,
-                        temperature=self.llm_client.temperature,
-                        messages=self.llm_client._apply_no_think(messages),
-                    )
-
-                    content = response.choices[0].message.content.strip()
-
-                    # 解析 JSON
+                    return json.loads(content)
+                except json.JSONDecodeError:
                     try:
-                        result = json.loads(content)
-                        return result
-                    except json.JSONDecodeError:
-                        try:
-                            import json_repair
-
-                            result = json_repair.loads(content)
+                        import json_repair
+                        return json_repair.loads(content)
+                    except ImportError:
+                        result = self.llm_client._extract_json_from_text(content)
+                        if result:
                             return result
-                        except ImportError:
-                            result = self.llm_client._extract_json_from_text(content)
-                            if result:
-                                return result
+                        raise
 
-                except Exception as e:
-                    error_str = str(e)
-
-                    # 429/限流错误
-                    if "429" in error_str or "rate" in error_str.lower():
-                        wait = 30 * (2**attempt)
-                        logger.warning(f"Chunk {index + 1}: 429 错误，等待 {wait}s")
-                        await asyncio.sleep(wait)
-                    # 连接错误/超时
-                    elif "connection" in error_str.lower() or "timeout" in error_str.lower():
-                        wait = 20 * (2**attempt)
-                        logger.warning(f"Chunk {index + 1}: 连接错误，等待 {wait}s")
-                        await asyncio.sleep(wait)
-                    # 内容过滤
-                    elif "contentFilter" in error_str.lower():
-                        logger.warning(f"Chunk {index + 1}: 内容过滤")
-                        return None
-                    # 其他错误
-                    elif attempt < max_retries - 1:
-                        wait = 10 * (2**attempt)
-                        logger.warning(f"Chunk {index + 1}: 失败，等待 {wait}s 后重试")
-                        await asyncio.sleep(wait)
-                    else:
-                        logger.error(f"Chunk {index + 1}: 失败 {max_retries} 次")
-                        return None
-
-            return None
+            # 使用统一的重试逻辑
+            return await RetryManager.llm_retry_with_filter(
+                _do_llm_call,
+                max_retries=max_retries,
+                on_content_filter=None,
+            )
 
         # 并行处理所有块
         results = await asyncio.gather(
@@ -277,12 +252,16 @@ class HierarchicalSummarizer:
         if len(summaries) == 1:
             return summaries[0]
 
-        # 构建合并 prompt
-        merged_content = self._build_merge_prompt(summaries, title)
+        async def _do_llm_call() -> dict[str, Any]:
+            """执行实际的 LLM API 调用"""
+            await self.llm_client._rate_limit()
 
-        # qwen3 模型的合并 prompt 已内嵌在 _build_merge_prompt_qwen3 中，
-        # 这里只设置通用 system prompt 作为 fallback
-        merge_system = """你是知识库编译器。请将多个文档片段的摘要合并为一个连贯的全局摘要。
+            # 构建合并 prompt
+            merged_content = self._build_merge_prompt(summaries, title)
+
+            # qwen3 模型的合并 prompt 已内嵌在 _build_merge_prompt_qwen3 中，
+            # 这里只设置通用 system prompt 作为 fallback
+            merge_system = """你是知识库编译器。请将多个文档片段的摘要合并为一个连贯的全局摘要。
 
 【强制 JSON 格式要求】
 必须输出合法的 JSON 对象，包含以下 4 个字段：
@@ -296,63 +275,49 @@ class HierarchicalSummarizer:
 - 保留所有重要概念
 - detailed_summary 应该是连贯的叙述，而非简单拼接"""
 
-        messages = [
-            {
-                "role": "system",
-                "content": merge_system
-                if not self.llm_client.no_think
-                else "你是一位资深知识工程师，擅长知识合并和结构化整理。请严格按照用户要求的 JSON 格式输出。",
-            },
-            {"role": "user", "content": merged_content},
-        ]
+            messages = [
+                {
+                    "role": "system",
+                    "content": merge_system
+                    if not self.llm_client.no_think
+                    else "你是一位资深知识工程师，擅长知识合并和结构化整理。请严格按照用户要求的 JSON 格式输出。",
+                },
+                {"role": "user", "content": merged_content},
+            ]
 
-        for attempt in range(max_retries):
+            response = await self.llm_client.client.chat.completions.create(
+                model=self.llm_client.model,
+                max_tokens=self.llm_client.max_tokens,
+                temperature=self.llm_client.temperature,
+                messages=self.llm_client._apply_no_think(messages),
+            )
+
+            content = response.choices[0].message.content.strip()
+
+            # 解析 JSON
             try:
-                await self.llm_client._rate_limit()
-
-                response = await self.llm_client.client.chat.completions.create(
-                    model=self.llm_client.model,
-                    max_tokens=self.llm_client.max_tokens,
-                    temperature=self.llm_client.temperature,
-                    messages=self.llm_client._apply_no_think(messages),
-                )
-
-                content = response.choices[0].message.content.strip()
-
-                # 解析 JSON
+                result = json.loads(content)
+                logger.info("✓ 合并摘要成功")
+                return result
+            except json.JSONDecodeError:
                 try:
-                    result = json.loads(content)
-                    logger.info("✓ 合并摘要成功")
+                    import json_repair
+                    result = json_repair.loads(content)
+                    logger.info("✓ 合并摘要成功（使用 json_repair）")
                     return result
-                except json.JSONDecodeError:
-                    try:
-                        import json_repair
-
-                        result = json_repair.loads(content)
-                        logger.info("✓ 合并摘要成功（使用 json_repair）")
+                except ImportError:
+                    result = self.llm_client._extract_json_from_text(content)
+                    if result:
+                        logger.info("✓ 合并摘要成功（简单提取）")
                         return result
-                    except ImportError:
-                        result = self.llm_client._extract_json_from_text(content)
-                        if result:
-                            logger.info("✓ 合并摘要成功（简单提取）")
-                            return result
+                    raise
 
-            except Exception as e:
-                error_str = str(e)
-
-                if "429" in error_str or "rate" in error_str.lower():
-                    wait = 30 * (2**attempt)
-                    logger.warning(f"合并摘要 429 错误，等待 {wait}s")
-                    await asyncio.sleep(wait)
-                elif attempt < max_retries - 1:
-                    wait = 10 * (2**attempt)
-                    logger.warning(f"合并摘要失败，等待 {wait}s 后重试")
-                    await asyncio.sleep(wait)
-                else:
-                    logger.error(f"合并摘要失败 {max_retries} 次: {e}")
-                    return None
-
-        return None
+        # 使用统一的重试逻辑
+        return await RetryManager.llm_retry_with_filter(
+            _do_llm_call,
+            max_retries=max_retries,
+            on_content_filter=None,
+        )
 
     def _build_chunk_messages(self, chunk_text: str, chunk_title: str) -> list[dict]:
         """为单个文本块构建消息"""

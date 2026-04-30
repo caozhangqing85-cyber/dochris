@@ -11,20 +11,25 @@
 
 ### 报告流程
 
-1. **发送邮件**到：gongzhuming@example.com
-   - 邮件标题：`[SECURITY] Dochris 漏洞报告`
-   - 包含以下信息：
-     - 漏洞描述
-     - 影响版本
-     - 复现步骤
-     - 潜在影响
-     - 建议的修复方案（如有）
+请通过以下方式报告安全漏洞：
 
-2. **确认收到**
+1. **GitHub Security Advisory**（推荐）
+   - 访问: https://github.com/caozhangqing85-cyber/dochris/security/advisories
+   - 点击 "Report a vulnerability"
+   - 填写漏洞详情
+
+2. **报告内容应包含**：
+   - 漏洞描述
+   - 影响版本
+   - 复现步骤
+   - 潜在影响
+   - 建议的修复方案（如有）
+
+3. **确认收到**
    - 我们会在 48 小时内确认收到你的报告
    - 提供预计的修复时间表
 
-3. **修复过程**
+4. **修复过程**
    - 我们会调查并验证漏洞
    - 开发修复补丁
    - 在发布新版本前协调公开披露
@@ -86,7 +91,7 @@
 
 关注 GitHub Releases 以获取安全更新：
 
-https://github.com/gongzhuming/dochris/releases
+https://github.com/caozhangqing85-cyber/dochris/releases
 
 ## 致谢
 

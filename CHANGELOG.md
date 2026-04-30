@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-04-30
+
+### Added
+- `kb init` 命令：交互式初始化知识库工作区
+- `kb doctor` 命令：环境诊断和配置检查
+- GitHub Actions CI/CD 配置
+- PR 模板和贡献指南
+- 全面的测试覆盖（Phase 1, Phase 2, 质量评分等）
+
+### Changed
+- 统一配置管理：从 `config.py` 迁移到 `settings.py`
+- 重构 CLI 命令结构，改进命令分组
+- 改进错误处理和异常层级
+- 优化重试逻辑和模型降级策略
+
+### Fixed
+- 移除硬编码的 API Key
+- 修复质量评分首次总是 10 分的问题
+- 修复 CLI 参数处理和并发控制
+
+### Security
+- 添加 SECURITY.md 安全策略
+- 实现敏感词过滤和内容审核
+
 ## [Unreleased]
 
 ### Added
@@ -127,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Major Features |
 |---------|------|----------------|
+| 1.0.0 | 2026-04-30 | Production release: init/doctor commands, CI/CD, comprehensive tests |
 | 0.5.0 | 2026-04-15 | Code quality, test coverage, modularization |
 | 0.4.0 | 2026-04-10 | Async compilation, caching, resume support |
 | 0.3.0 | 2026-04-07 | Vault Bridge, Obsidian integration |

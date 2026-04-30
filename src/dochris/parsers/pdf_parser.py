@@ -9,6 +9,8 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 
+from dochris.exceptions import TextExtractionError
+
 logger = logging.getLogger(__name__)
 
 
@@ -138,12 +140,18 @@ def parse_with_tesseract_ocr(file_path: Path) -> str | None:
         return None
 
 
-def parse_pdf(file_path: Path) -> str | None:
+def parse_pdf(file_path: Path) -> str:
     """
     解析 PDF 文件 (降级策略)
 
+    Args:
+        file_path: PDF 文件路径
+
     Returns:
-        提取的文本，或 None
+        提取的文本内容
+
+    Raises:
+        TextExtractionError: 所有解析器都失败时抛出
     """
     # 解析器列表（按优先级排序）
     # pdfplumber 对普通 PDF 最快，pymupdf 对加密 PDF 兼容性最好
@@ -156,6 +164,7 @@ def parse_pdf(file_path: Path) -> str | None:
         ("tesseract_ocr", parse_with_tesseract_ocr),
     ]
 
+    errors = []
     for parser_name, parser_func in parsers:
         try:
             text = parser_func(file_path)
@@ -164,13 +173,18 @@ def parse_pdf(file_path: Path) -> str | None:
                 logger.info(f"✓ PDF parsed with {parser_name}")
                 return text
         except Exception as e:
+            error_msg = f"{parser_name}: {type(e).__name__}: {e}"
+            errors.append(error_msg)
             logger.warning(
                 f"⚠ {parser_name} 解析失败: {type(e).__name__}: {e} | 文件: {file_path.name}"
             )
             logger.debug(f"{parser_name} 错误堆栈:\n{traceback.format_exc()}")
             continue
 
-    logger.error(
-        f"✗ All parsers failed for {Path(file_path).name if isinstance(file_path, str) else file_path.name}"
+    # 所有解析器都失败，抛出异常
+    filename = Path(file_path).name if isinstance(file_path, str) else file_path.name
+    error_detail = "; ".join(errors)
+    raise TextExtractionError(
+        f"所有 PDF 解析器都失败: {filename} | {error_detail}",
+        file_path=str(file_path),
     )
-    return None

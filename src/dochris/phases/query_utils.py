@@ -8,6 +8,7 @@ import re
 
 # 导入统一配置
 import sys
+import threading
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -49,6 +50,7 @@ MODEL = QUERY_MODEL
 _llm_client_cache: openai.OpenAI | None = None
 _chromadb_client_cache: object | None = None
 _manifest_index_cache: dict[str, str] | None = None  # file_path → src_id 映射
+_manifest_index_lock = threading.Lock()  # 保护 manifest 索引缓存的锁
 
 
 def setup_logging() -> logging.Logger:
@@ -112,22 +114,26 @@ def _build_manifest_index() -> dict[str, str]:
 
 
 def _get_manifest_id(file_path: str) -> str | None:
-    """通过文件路径查找 manifest ID"""
+    """通过文件路径查找 manifest ID
+
+    线程安全：使用锁保护全局缓存。
+    """
     global _manifest_index_cache
-    if _manifest_index_cache is None:
-        _manifest_index_cache = _build_manifest_index()
+    with _manifest_index_lock:
+        if _manifest_index_cache is None:
+            _manifest_index_cache = _build_manifest_index()
 
-    # 直接匹配
-    if file_path in _manifest_index_cache:
-        return _manifest_index_cache[file_path]
+        # 直接匹配
+        if file_path in _manifest_index_cache:
+            return _manifest_index_cache[file_path]
 
-    # 尝试用文件名部分匹配
-    fname = Path(file_path).name
-    for key, src_id in _manifest_index_cache.items():
-        if Path(key).name == fname:
-            return src_id
+        # 尝试用文件名部分匹配
+        fname = Path(file_path).name
+        for key, src_id in _manifest_index_cache.items():
+            if Path(key).name == fname:
+                return src_id
 
-    return None
+        return None
 
 
 def _get_manifest_status(src_id: str) -> str | None:

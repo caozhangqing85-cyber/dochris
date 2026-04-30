@@ -13,7 +13,9 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print(info("Phase 1: 开始摄入文件..."))
 
     try:
-        stats = run_phase1(logger)
+        stats = run_phase1(logger, dry_run=args.dry_run)
+        if args.dry_run:
+            print(f"\n{warning('⚠ Dry-run 模式')}: 未实际执行任何操作")
         print(f"\n{success('✓ Phase 1 完成!')}")
         print(f"  总计: {stats['total']} 文件")
         print(f"  本次新增: {stats['linked']} 文件")

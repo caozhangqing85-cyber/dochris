@@ -5,6 +5,8 @@ dochris CLI 主入口
 提供统一的命令行接口访问所有知识库功能。
 
 Usage:
+    kb init                       # 初始化工作区
+    kb doctor                     # 环境诊断
     kb ingest [path]              # Phase 1: 摄入文件
     kb compile [limit]            # Phase 2: 编译
     kb query "关键词" [options]    # Phase 3: 查询
@@ -25,7 +27,9 @@ from dochris import __version__
 # 导入命令模块
 from dochris.cli.cli_compile import cmd_compile
 from dochris.cli.cli_config import cmd_config, cmd_version
+from dochris.cli.cli_doctor import cmd_doctor
 from dochris.cli.cli_ingest import cmd_ingest
+from dochris.cli.cli_init import cmd_init
 from dochris.cli.cli_query import cmd_query
 from dochris.cli.cli_review import cmd_promote, cmd_quality, cmd_status
 from dochris.cli.cli_utils import error
@@ -93,6 +97,7 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  kb init                             # 初始化工作区
   kb ingest                           # 摄入文件（使用默认源目录）
   kb ingest /path/to/materials        # 从指定目录摄入
   kb compile                          # 编译所有待编译文档
@@ -122,6 +127,20 @@ def main() -> int:
         help="使用 <command> -h 查看具体帮助",
     )
 
+    # init 命令
+    subparsers.add_parser(
+        "init",
+        help="初始化工作区",
+        description="交互式初始化知识库工作区，创建目录结构和配置文件",
+    )
+
+    # doctor 命令
+    subparsers.add_parser(
+        "doctor",
+        help="环境诊断",
+        description="检查系统环境、配置和依赖，诊断潜在问题",
+    )
+
     # ingest 命令
     parser_ingest = subparsers.add_parser(
         "ingest",
@@ -131,6 +150,11 @@ def main() -> int:
     parser_ingest.add_argument(
         "path", nargs="?", default=None, help="源目录路径（默认使用配置中的 SOURCE_PATH）"
     )
+    parser_ingest.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="模拟运行，只显示将要执行的操作",
+    )
 
     # compile 命令
     parser_compile = subparsers.add_parser(
@@ -139,7 +163,18 @@ def main() -> int:
         description="使用 LLM 编译已摄入的文档，输出到 outputs/",
     )
     parser_compile.add_argument(
-        "limit", nargs="?", type=int, default=None, help="编译数量限制（默认编译所有）"
+        "limit",
+        nargs="?",
+        type=int,
+        default=None,
+        help="[已弃用，请使用 --limit] 编译数量限制（默认编译所有）",
+    )
+    parser_compile.add_argument(
+        "--limit", "-n",
+        type=int,
+        default=None,
+        dest="named_limit",
+        help="编译数量限制（默认编译所有）",
     )
     parser_compile.add_argument(
         "--concurrency",
@@ -149,6 +184,11 @@ def main() -> int:
     )
     parser_compile.add_argument(
         "--openrouter", action="store_true", help="使用 OpenRouter 免费模型"
+    )
+    parser_compile.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="模拟运行，只显示将要执行的操作",
     )
 
     # query 命令
@@ -223,7 +263,11 @@ def main() -> int:
 
     # 路由到对应的命令处理器
     try:
-        if args.command == "ingest":
+        if args.command == "init":
+            return cmd_init(args)
+        elif args.command == "doctor":
+            return cmd_doctor(args)
+        elif args.command == "ingest":
             return cmd_ingest(args)
         elif args.command == "compile":
             return cmd_compile(args)

@@ -21,6 +21,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
+
 # 导入核心模块
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -80,6 +90,7 @@ async def compile_all(
     max_concurrent: int = DEFAULT_CONCURRENCY,
     limit: int | None = None,
     use_openrouter: bool = False,
+    dry_run: bool = False,
 ) -> None:
     """编译所有待编译的文档
 
@@ -87,6 +98,7 @@ async def compile_all(
         max_concurrent: 最大并发数
         limit: 限制编译数量（用于测试）
         use_openrouter: 是否使用 OpenRouter API
+        dry_run: 模拟运行，只显示将要执行的操作
     """
     workspace = get_default_workspace()
     logger = logging.getLogger(__name__)
@@ -114,6 +126,36 @@ async def compile_all(
         logger.info("✅ 没有待编译的文档")
         return
 
+    # Dry-run 模式
+    if dry_run:
+        logger.info("=" * 60)
+        logger.info("⚠ DRY-RUN 模式: 不会实际执行任何操作")
+        logger.info("=" * 60)
+        logger.info("将要编译的文档:")
+        total_estimated_calls = 0
+        for i, m in enumerate(all_manifests, 1):
+            file_size = m.get("size_bytes", 0)
+            # 估算 API 调用次数（基于文件大小）
+            if file_size > 100000:  # > 100KB 可能需要多次调用
+                estimated_calls = 3
+            elif file_size > 50000:  # > 50KB 可能需要 2 次
+                estimated_calls = 2
+            else:
+                estimated_calls = 1
+            total_estimated_calls += estimated_calls
+            logger.info(
+                f"  [{i}] {m['id']}: {m.get('title', 'N/A')} "
+                f"({file_size} bytes, ~{estimated_calls} API calls)"
+            )
+        logger.info("=" * 60)
+        logger.info(f"总计: {len(all_manifests)} 个文档")
+        logger.info(f"预估 API 调用次数: ~{total_estimated_calls} 次")
+        # 粗略估算费用（假设每次调用 0.001 元）
+        estimated_cost = total_estimated_calls * 0.001
+        logger.info(f"预估费用: ~¥{estimated_cost:.2f}")
+        logger.info("=" * 60)
+        return
+
     # 创建 worker
     worker = CompilerWorker(api_key=DEFAULT_API_KEY, base_url=api_base, model=model)
 
@@ -134,28 +176,61 @@ async def compile_all(
     success_count = 0
     fail_count = 0
 
-    for i in range(0, len(all_manifests), batch_size):
-        batch = all_manifests[i : i + batch_size]
-        logger.info(f"📦 处理批次 {i // batch_size + 1}: {len(batch)} 个文档")
+    # 使用 rich 进度条（仅在交互模式时）
+    console = Console()
+    if sys.stdout.isatty():
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as pbar:
+            task = pbar.add_task("[cyan]编译文档...", total=len(all_manifests))
 
-        tasks = [compile_one(m["id"]) for m in batch]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            for i in range(0, len(all_manifests), batch_size):
+                batch = all_manifests[i : i + batch_size]
 
-        # 统计结果
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                fail_count += 1
-                # 记录完整异常信息，便于调试
-                logger.error(f"文档 {batch[i]['id']} 编译异常: {type(result).__name__}: {result}")
-            elif result:
-                success_count += 1
-            else:
-                fail_count += 1
+                tasks = [compile_one(m["id"]) for m in batch]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 打印进度
-        completed = i + batch_size
-        percentage = (completed / len(all_manifests)) * 100
-        logger.info(f"📈 进度: {completed}/{len(all_manifests)} ({percentage:.1f}%)")
+                # 统计结果
+                for j, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        fail_count += 1
+                        logger.error(f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}")
+                    elif result:
+                        success_count += 1
+                    else:
+                        fail_count += 1
+
+                # 更新进度条
+                completed = min(i + batch_size, len(all_manifests))
+                pbar.update(task, completed=completed)
+    else:
+        # 非交互模式：使用简单日志
+        for i in range(0, len(all_manifests), batch_size):
+            batch = all_manifests[i : i + batch_size]
+            logger.info(f"📦 处理批次 {i // batch_size + 1}: {len(batch)} 个文档")
+
+            tasks = [compile_one(m["id"]) for m in batch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 统计结果
+            for j, result in enumerate(results):
+                if isinstance(result, Exception):
+                    fail_count += 1
+                    logger.error(f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}")
+                elif result:
+                    success_count += 1
+                else:
+                    fail_count += 1
+
+            # 打印进度
+            completed = i + batch_size
+            percentage = (completed / len(all_manifests)) * 100
+            logger.info(f"📈 进度: {completed}/{len(all_manifests)} ({percentage:.1f}%)")
 
     # 打印最终报告
     logger.info(f"\n{'=' * 60}")

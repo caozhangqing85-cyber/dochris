@@ -11,7 +11,7 @@ from dochris.settings import INFO_KEYWORDS, LEARNING_KEYWORDS, TEMPLATE_PATTERNS
 logger = logging.getLogger(__name__)
 
 
-def score_summary_quality_v4(summary: dict[str, Any]) -> int:
+def score_summary_quality_v4(summary: dict[str, Any] | None) -> int:
     """
     全面优化版质量评分（v4）- 聚焦学习价值和内容质量
 
@@ -29,7 +29,10 @@ def score_summary_quality_v4(summary: dict[str, Any]) -> int:
     """
     score = 0
 
-    # 防御性检查：确保 summary 是 dict
+    # 防御性检查：处理 None 和非 dict 类型
+    if summary is None:
+        logger.debug("summary is None, returning 0")
+        return 0
     if not isinstance(summary, dict):
         logger.warning(f"summary is not dict (type={type(summary).__name__}), returning 0")
         return 0
@@ -154,7 +157,7 @@ def score_summary_quality_v4(summary: dict[str, Any]) -> int:
         logger.warning("Template text detected, -20 points applied")
 
     # 详细的调试日志 - 帮助诊断"首次总是10分"问题
-    logger.info(
+    logger.debug(
         f"Quality score={score}/100: "
         f"ds_len={ds_len}({ds[:50] if ds else 'empty'}...), "
         f"kp_len={kp_len}, "

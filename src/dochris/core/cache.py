@@ -61,9 +61,17 @@ def load_cached(cache_dir: Path, file_hash: str) -> dict[str, Any] | None:
         return None
 
 
-def save_cached(cache_dir: Path, file_hash: str, result: dict[str, Any]) -> None:
+def save_cached(cache_dir: Path, file_hash: str, result: dict[str, Any]) -> bool | None:
     """
     保存提取结果到缓存
+
+    Args:
+        cache_dir: 缓存目录
+        file_hash: 文件哈希值
+        result: 要缓存的结果
+
+    Returns:
+        成功返回 True，失败返回 False，file_hash 为空返回 None
     """
     if not file_hash:
         return None

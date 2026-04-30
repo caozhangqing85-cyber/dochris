@@ -19,6 +19,7 @@ LLM 客户端模块
     result = await client.generate_summary(text, title)
 """
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -103,7 +104,6 @@ class LLMClient:
 
         如果距离上次请求时间不足 request_delay，则等待剩余时间。
         """
-        import asyncio
         import time
 
         current_time = time.time()
@@ -114,6 +114,41 @@ class LLMClient:
             await asyncio.sleep(wait_time)
 
         self.last_request_time = time.time()
+
+    async def close(self) -> None:
+        """关闭 LLM 客户端并释放资源
+
+        关闭底层的 httpx.AsyncClient，释放网络连接。
+        建议在使用完毕后或程序退出前调用此方法。
+
+        Example:
+            client = LLMClient(...)
+            try:
+                result = await client.generate_summary(text, title)
+            finally:
+                await client.close()
+        """
+        if hasattr(self, "client") and self.client is not None:
+            await self.client.close()
+            logger.debug("LLMClient 已关闭")
+
+    async def __aenter__(self) -> "LLMClient":
+        """异步上下文管理器入口
+
+        Example:
+            async with LLMClient(...) as client:
+                result = await client.generate_summary(text, title)
+        """
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        """异步上下文管理器退出，自动关闭客户端"""
+        await self.close()
 
     def _extract_json_from_text(self, text: str) -> dict[str, Any] | None:
         """从文本中提取 JSON（栈匹配方法）
