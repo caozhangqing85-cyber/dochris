@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/caozhangqing85-cyber/dochris/ci.yml?branch=main)](https://github.com/caozhangqing85-cyber/dochris/actions)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![PyPI](https://img.shields.io/pypi/v/dochris)](https://pypi.org/project/dochris/)
 
 **"Doc"** 代表文档，**"Chris"** 是作者的名字。Dochris 意味着：**让文档为 Chris 服务** — 将海量信息锻造为可用的知识。
 
