@@ -19,10 +19,10 @@
 ## TODO 总览
 
 ### P0：本周完成（~3 小时）
-- [ ] P0-1: 创建 .editorconfig（5 分钟）
-- [ ] P0-2: 创建 Makefile（20 分钟）
-- [ ] P0-3: 配置 pre-commit hooks（15 分钟）
-- [ ] P0-4: CLI 错误体验改进（1 小时）
+- [x] P0-1: 创建 .editorconfig（5 分钟）
+- [x] P0-2: 创建 Makefile（20 分钟）
+- [x] P0-3: 配置 pre-commit hooks（15 分钟）
+- [x] P0-4: CLI 错误体验改进（1 小时）
 
 ### P1：本月规划（~10 小时）
 - [ ] P1-1: 完善 CI 流水线（30 分钟）
