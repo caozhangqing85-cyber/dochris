@@ -7,6 +7,7 @@ kb plugin 命令：插件管理
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 from dochris.cli.cli_utils import dim, error, info, success, warning
 from dochris.plugin import get_plugin_manager
@@ -328,7 +329,7 @@ def _load_plugins_from_settings() -> int:
     return total_loaded
 
 
-def setup_plugin_parser(subparsers) -> None:
+def setup_plugin_parser(subparsers: Any) -> None:
     """设置 plugin 子命令解析器
 
     Args:

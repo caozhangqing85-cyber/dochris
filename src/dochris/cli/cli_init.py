@@ -6,13 +6,14 @@ kb init 命令：交互式初始化知识库工作区
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from dochris.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
 
-def cmd_init(args) -> int:
+def cmd_init(args: Any) -> int:
     """初始化知识库工作区
 
     Args:

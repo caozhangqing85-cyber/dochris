@@ -7,7 +7,7 @@
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from .llm_client import LLMClient
@@ -81,15 +81,18 @@ class SummaryGenerator:
 
             # 解析 JSON
             try:
-                return json.loads(content)
+                return cast(dict[str, Any], json.loads(content))
             except json.JSONDecodeError:
                 # 尝试使用 json_repair
                 try:
                     import json_repair
-                    return json_repair.loads(content)
+                    return cast(dict[str, Any], json_repair.loads(content))
                 except ImportError:
                     logger.warning("json_repair not installed, trying simple extraction")
-                    return self.llm_client._extract_json_from_text(content)
+                    result = self.llm_client._extract_json_from_text(content)
+                    if result is None:
+                        raise ValueError("Failed to extract JSON from LLM response") from None
+                    return result
 
         # 使用统一的重试逻辑
         result = await RetryManager.llm_retry_with_filter(

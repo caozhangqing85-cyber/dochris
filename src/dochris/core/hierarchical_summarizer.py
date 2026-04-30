@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from dochris.core.text_chunker import TextChunk
@@ -198,15 +198,15 @@ class HierarchicalSummarizer:
 
                 # 解析 JSON
                 try:
-                    return json.loads(content)
+                    return cast(dict[str, Any], json.loads(content))
                 except json.JSONDecodeError:
                     try:
                         import json_repair
-                        return json_repair.loads(content)
+                        return cast(dict[str, Any], json_repair.loads(content))
                     except ImportError:
                         result = self.llm_client._extract_json_from_text(content)
                         if result:
-                            return result
+                            return cast(dict[str, Any], result)
                         raise
 
             # 使用统一的重试逻辑
@@ -222,12 +222,12 @@ class HierarchicalSummarizer:
         )
 
         # 过滤掉 None 和异常
-        valid_results = []
+        valid_results: list[dict[str, Any]] = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 logger.error(f"Chunk {i + 1}: 异常 - {r}")
             elif r is not None:
-                valid_results.append(r)
+                valid_results.append(cast(dict[str, Any], r))
 
         logger.info(f"段落摘要完成: {len(valid_results)}/{len(chunks)} 成功")
         return valid_results
@@ -296,20 +296,20 @@ class HierarchicalSummarizer:
 
             # 解析 JSON
             try:
-                result = json.loads(content)
+                result = cast(dict[str, Any], json.loads(content))
                 logger.info("✓ 合并摘要成功")
                 return result
             except json.JSONDecodeError:
                 try:
                     import json_repair
-                    result = json_repair.loads(content)
+                    result = cast(dict[str, Any], json_repair.loads(content))
                     logger.info("✓ 合并摘要成功（使用 json_repair）")
                     return result
                 except ImportError:
-                    result = self.llm_client._extract_json_from_text(content)
-                    if result:
+                    extracted_result = self.llm_client._extract_json_from_text(content)
+                    if extracted_result:
                         logger.info("✓ 合并摘要成功（简单提取）")
-                        return result
+                        return extracted_result
                     raise
 
         # 使用统一的重试逻辑
@@ -524,7 +524,7 @@ class HierarchicalSummarizer:
             章节摘要列表
         """
 
-        async def summarize_section(section_title: str, summaries: list) -> dict[str, Any] | None:
+        async def summarize_section(section_title: str, summaries: list[dict[str, Any]]) -> dict[str, Any] | None:
             """为单个章节生成摘要"""
             if len(summaries) == 1:
                 return summaries[0]
@@ -538,12 +538,12 @@ class HierarchicalSummarizer:
         )
 
         # 过滤掉 None 和异常
-        valid_results = []
+        valid_results: list[dict[str, Any]] = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 logger.error(f"Section {i + 1}: 异常 - {r}")
             elif r is not None:
-                valid_results.append(r)
+                valid_results.append(cast(dict[str, Any], r))
 
         logger.info(f"章节摘要完成: {len(valid_results)}/{len(sections)} 成功")
         return valid_results

@@ -104,7 +104,7 @@ def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
         from dochris.parsers.doc_parser import parse_document
 
         try:
-            text = parse_document(file_path)
+            text = parse_document(file_path)  # type: ignore[assignment]
             if text:
                 logger.debug(f"文档提取成功: {file_path.name}")
                 return text[:MAX_CONTENT_CHARS]
@@ -151,6 +151,11 @@ async def generate_summary_with_llm(
 
     settings = get_settings()
 
+    # 检查 api_key
+    if not settings.api_key:
+        logger.error("未配置 API Key，无法创建 LLMClient")
+        return None
+
     # 创建 LLMClient
     client = LLMClient(
         api_key=settings.api_key,
@@ -173,7 +178,7 @@ async def generate_summary_with_llm(
 async def compile_with_model_fallback(
     text: str,
     title: str,
-    logger,
+    logger: Any,
     model_chain: list[str],
     adaptive_delay: float,
 ) -> dict[str, Any] | None:
@@ -195,6 +200,11 @@ async def compile_with_model_fallback(
     from dochris.settings import get_settings
 
     settings = get_settings()
+
+    # 检查 api_key
+    if not settings.api_key:
+        logger.error("未配置 API Key，无法创建 LLMClient")
+        return None
 
     for model_name in model_chain:
         logger.info(f"尝试模型: {model_name}")
@@ -224,8 +234,8 @@ async def compile_with_model_fallback(
 
 async def retry_llm_failed(
     manifest: dict,
-    async_client,
-    logger,
+    async_client: Any,
+    logger: Any,
     adaptive_delay: float,
     model_chain: list[str],
 ) -> tuple[str, bool, str, str]:
@@ -249,7 +259,7 @@ async def retry_llm_failed(
         with contextlib.suppress(ValueError, AttributeError):
             text = sanitize_pdf_content(text)
 
-    if not text or len(text.strip()) < MIN_AUDIO_TEXT_LENGTH:
+    if not text or not text.strip() or len(text.strip()) < MIN_AUDIO_TEXT_LENGTH:
         return src_id, False, "no_text", "none"
 
     # 清洗标题
@@ -260,7 +270,6 @@ async def retry_llm_failed(
 
     # 带模型降级的编译
     summary = await compile_with_model_fallback(
-        async_client,
         text,
         clean_title,
         logger,
@@ -308,7 +317,7 @@ async def retry_llm_failed(
 
 async def compensate_single(
     manifest: dict,
-    logger,
+    logger: Any,
     semaphore: asyncio.Semaphore,
     adaptive_delay: float,
     model_chain: list[str],
@@ -369,7 +378,7 @@ async def compensate_single(
             return src_id, False, "llm_failed", extraction_method
 
         # 3. 质量评分 + 更新 manifest
-        score = score_summary_quality(summary, logger)
+        score = score_summary_quality(summary)
         concepts = summary.get("concepts", [])
         concepts_names = [c.get("name", "") for c in concepts]
 
@@ -404,7 +413,7 @@ async def compensate_single(
 # ============================================================
 
 
-def find_failed_manifests(compensate_type: str, logger) -> list[dict]:
+def find_failed_manifests(compensate_type: str, logger: Any) -> list[dict]:
     """筛选需要补偿的失败 manifest"""
     failed = get_all_manifests(KB_PATH, status="failed")
     logger.info(f"失败 manifest 总数: {len(failed)}")
@@ -448,7 +457,7 @@ def find_failed_manifests(compensate_type: str, logger) -> list[dict]:
 # ============================================================
 
 
-async def run_compensate(logger, compensate_type: str, max_files: int = 0) -> None:
+async def run_compensate(logger: Any, compensate_type: str, max_files: int = 0) -> None:
     """主补偿流程"""
     manifests = find_failed_manifests(compensate_type, logger)
 
@@ -494,7 +503,7 @@ async def run_compensate(logger, compensate_type: str, max_files: int = 0) -> No
     success = 0
     failed = 0
     skipped = 0
-    compensation_stats = Counter()
+    compensation_stats: Counter[str] = Counter()
     total = len(manifests)
 
     # 分批

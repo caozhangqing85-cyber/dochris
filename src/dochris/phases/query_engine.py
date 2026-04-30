@@ -5,6 +5,7 @@ Phase 3 查询引擎：搜索接口、向量检索、LLM 回答生成、客户�
 import json
 import logging
 import os
+from typing import Any
 
 import openai
 
@@ -27,8 +28,8 @@ MODEL = _settings.query_model
 
 # 全局缓存
 _llm_client_cache: openai.OpenAI | None = None
-_chromadb_client_cache: object | None = None
-_vector_store_cache: object | None = None
+_chromadb_client_cache: Any | None = None
+_vector_store_cache: Any | None = None
 
 
 # ============================================================
@@ -381,7 +382,8 @@ def generate_answer(
             max_tokens=2048,
             messages=messages,
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else None
     except (openai.APIError, openai.APITimeoutError, openai.RateLimitError) as e:
         logger.error(f"LLM API error: {e}")
         return None
@@ -451,10 +453,10 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
         try:
             settings = get_settings()
             base_url = settings.api_base
-            client_kwargs = {"api_key": api_key, "timeout": 60}
             if base_url:
-                client_kwargs["base_url"] = base_url
-            _llm_client_cache = openai.OpenAI(**client_kwargs)
+                _llm_client_cache = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=60)
+            else:
+                _llm_client_cache = openai.OpenAI(api_key=api_key, timeout=60)
             if logger:
                 logger.info(f"OpenAI 兼容客户端创建成功（使用环境变量，Base URL: {base_url}）")
             return _llm_client_cache
@@ -466,10 +468,10 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
     settings = get_settings()
     if settings.api_key:
         try:
-            client_kwargs = {"api_key": settings.api_key, "timeout": 60}
             if settings.api_base:
-                client_kwargs["base_url"] = settings.api_base
-            _llm_client_cache = openai.OpenAI(**client_kwargs)
+                _llm_client_cache = openai.OpenAI(api_key=settings.api_key, base_url=settings.api_base, timeout=60)
+            else:
+                _llm_client_cache = openai.OpenAI(api_key=settings.api_key, timeout=60)
             if logger:
                 logger.info(f"OpenAI 兼容客户端创建成功（使用 settings，Base URL: {settings.api_base}）")
             return _llm_client_cache
@@ -481,10 +483,11 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
     provider = read_openclaw_config(logger)
     if provider:
         try:
-            client_kwargs = {"api_key": provider["apiKey"], "timeout": 60}
-            if provider.get("baseUrl"):
-                client_kwargs["base_url"] = provider["baseUrl"]
-            _llm_client_cache = openai.OpenAI(**client_kwargs)
+            base_url = provider.get("baseUrl")
+            if base_url:
+                _llm_client_cache = openai.OpenAI(api_key=provider["apiKey"], base_url=base_url, timeout=60)
+            else:
+                _llm_client_cache = openai.OpenAI(api_key=provider["apiKey"], timeout=60)
             if logger:
                 logger.info("OpenAI 兼容客户端创建成功（使用 OpenClaw 配置）")
             return _llm_client_cache

@@ -102,7 +102,7 @@ class CompilerWorker:
         self.plugin_manager = get_plugin_manager()
         self._init_plugins_from_settings(settings)
 
-    def _init_plugins_from_settings(self, settings) -> None:
+    def _init_plugins_from_settings(self, settings: Any) -> None:
         """从 settings 初始化插件
 
         Args:
@@ -314,11 +314,11 @@ class CompilerWorker:
 
         # 文档文件（.md/.txt/.docx/.pptx/.xlsx 等）
         if detect_document_file(file_path):
-            text = parse_document(file_path)
-            if text and len(text) > 100:
-                return text
-            elif text:
-                await self._mark_failed(src_id, f"文档内容过短 ({len(text)}字)")
+            doc_text = parse_document(file_path)
+            if doc_text and len(doc_text) > 100:
+                return doc_text
+            elif doc_text:
+                await self._mark_failed(src_id, f"文档内容过短 ({len(doc_text)}字)")
                 return None
             return None
 

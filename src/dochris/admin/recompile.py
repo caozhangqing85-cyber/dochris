@@ -97,7 +97,7 @@ def get_recoverable_failed_docs(
         return result
 
     # 默认模式：所有可恢复的失败文档
-    recoverable_errors: list[str] = [
+    default_recoverable_errors: list[str] = [
         "llm_failed",
         "no_text",
         "Failed to process file",
@@ -112,7 +112,7 @@ def get_recoverable_failed_docs(
     return [
         d
         for d in all_manifests
-        if any(err in d.get("error_message", "") for err in recoverable_errors)
+        if any(err in d.get("error_message", "") for err in default_recoverable_errors)
     ]
 
 

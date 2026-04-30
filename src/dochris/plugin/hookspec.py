@@ -133,7 +133,7 @@ def ingest_parser(file_path: str) -> str | None:
 
 
 @hookspec
-def pre_compile(text: str, metadata: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def pre_compile(text: str, metadata: dict[str, Any]) -> tuple[str, dict[str, Any]]:  # type: ignore[empty-body]
     """编译前处理
 
     在 LLM 编译之前对文本和元数据进行预处理。
@@ -203,7 +203,7 @@ def quality_score(text: str, metadata: dict[str, Any] | None = None) -> float | 
 
 
 @hookspec
-def pre_query(query: str) -> str:
+def pre_query(query: str) -> str:  # type: ignore[empty-body]
     """查询前处理
 
     在执行查询前对查询字符串进行预处理。
@@ -225,7 +225,7 @@ def pre_query(query: str) -> str:
 
 
 @hookspec
-def post_query(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def post_query(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:  # type: ignore[empty-body]
     """查询后处理（结果重排/过滤）
 
     在查询结果返回前进行后处理。

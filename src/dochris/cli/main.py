@@ -24,6 +24,7 @@ import atexit
 import logging
 import sys
 import traceback
+from typing import Any
 
 from dochris import __version__
 from dochris.cli.cli_compile import cmd_compile
@@ -64,7 +65,7 @@ from dochris.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _setup_logging(settings, log_format: str = "text") -> None:
+def _setup_logging(settings: Any, log_format: str = "text") -> None:
     """配置统一的日志格式和级别
 
     Args:

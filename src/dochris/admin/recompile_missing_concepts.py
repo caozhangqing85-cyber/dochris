@@ -139,7 +139,7 @@ class CompileStats:
         else:
             self.total_failed += 1
 
-    def add_batch(self, batch_num, total_batches, files, success, failed, skipped, duration) -> None:
+    def add_batch(self, batch_num: int, total_batches: int, files: list, success: int, failed: int, skipped: int, duration: float) -> None:
         self.batch_stats.append(
             {
                 "batch_num": batch_num,

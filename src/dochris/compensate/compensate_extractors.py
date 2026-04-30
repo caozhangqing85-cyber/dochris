@@ -30,7 +30,7 @@ MIN_AUDIO_TEXT_LENGTH = _s.min_text_length
 # ============================================================
 
 
-def extract_text_from_file(file_path: Path, logger) -> str | None:
+def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
     """从文件提取文本，根据扩展名选择解析器
 
     Args:
@@ -62,7 +62,7 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
         from dochris.parsers.doc_parser import parse_document
 
         try:
-            text: str | None = parse_document(file_path)
+            text = parse_document(file_path)  # type: ignore[assignment]
             if text:
                 logger.debug(f"文档提取成功: {file_path.name}")
                 return text[:MAX_CONTENT_CHARS]

@@ -25,6 +25,8 @@ Usage:
     kb version                    # 显示版本
 """
 
+from typing import Any
+
 __version__ = "1.0.1"
 __author__ = "caozhangqing85-cyber"
 
@@ -44,7 +46,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """延迟导入，避免循环依赖
 
     当访问 LLMClient、Settings 等类型时，仅在需要时导入对应模块。

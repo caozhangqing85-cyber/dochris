@@ -33,9 +33,9 @@ class OpenAICompatProvider(BaseLLMProvider):
             **kwargs: 传递给 BaseLLMProvider 的参数
         """
         super().__init__(**kwargs)
-        self._client = None
+        self._client: Any = None
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
         """获取或创建 AsyncOpenAI 客户端
 
         Returns:
@@ -130,7 +130,7 @@ class OpenAICompatProvider(BaseLLMProvider):
             self._client = None
 
     @property
-    def client(self):
+    def client(self) -> Any:
         """暴露底层的 AsyncOpenAI 客户端
 
         这是为了向后兼容性，允许直接访问 client.chat.completions.create()。
