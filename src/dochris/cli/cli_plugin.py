@@ -70,6 +70,9 @@ def _plugin_list(args: argparse.Namespace) -> int:
     Returns:
         退出码
     """
+    # 先从配置加载插件
+    _load_plugins_from_settings()
+
     pm = get_plugin_manager()
     plugins = pm.list_plugins()
 
