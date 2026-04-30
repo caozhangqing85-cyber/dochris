@@ -12,7 +12,7 @@ import threading
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import openai
 
@@ -153,7 +153,8 @@ def _get_manifest_status(src_id: str) -> str | None:
     try:
         with open(manifest_file, encoding="utf-8") as f:
             m = json.load(f)
-        return m.get("status")
+        status = m.get("status")
+        return cast(str | None, status)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return None
 

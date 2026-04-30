@@ -23,13 +23,16 @@ LLM 客户端模块
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
-try:
+if TYPE_CHECKING:
     from openai import AsyncOpenAI
-except ImportError:
-    logging.warning("openai not installed. Please install: pip install openai")
-    AsyncOpenAI = None
+else:
+    try:
+        from openai import AsyncOpenAI
+    except ImportError:
+        logging.warning("openai not installed. Please install: pip install openai")
+        AsyncOpenAI = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +289,7 @@ class LLMClient:
                         # 栈为空，找到完整的 JSON 对象
                         json_str = text[start : i + 1]
                         try:
-                            return json.loads(json_str)
+                            return cast(dict[str, Any] | None, json.loads(json_str))
                         except json.JSONDecodeError:
                             # 继续尝试下一个可能的 JSON 对象
                             continue
@@ -300,7 +303,7 @@ class LLMClient:
 
         json_str = text[start : end + 1]
         try:
-            return json.loads(json_str)
+            return cast(dict[str, Any] | None, json.loads(json_str))
         except json.JSONDecodeError:
             return None
 

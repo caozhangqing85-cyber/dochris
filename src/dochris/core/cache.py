@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def load_cached(cache_dir: Path, file_hash: str) -> dict[str, Any] | None:
             cached_data = json.load(f)
 
         if cached_data.get("hash") == file_hash:
-            return cached_data.get("result")
+            return cast(dict[str, Any], cached_data.get("result"))
         return None
     except (json.JSONDecodeError, OSError):
         return None

@@ -14,6 +14,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
@@ -100,7 +101,7 @@ def load_progress() -> dict:
                 data["phase1"]["hash_index"] = {}
             if "stats" not in data["phase1"]:
                 data["phase1"]["stats"] = {"total": 0, "linked": 0, "skipped": 0, "failed": 0}
-            return data
+            return cast(dict, data)
         except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             pass
     return default
@@ -381,7 +382,7 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
             file_type=category,
             source_path=src.resolve(),
             file_path=rel_dst,
-            content_hash=hash_val,
+            content_hash=hash_val or "",
             size_bytes=entry.get("size", 0),
         )
         append_to_index(KB_PATH, manifest)
@@ -523,7 +524,7 @@ def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
         f"Phase 1 完成: 新增 {stats['linked']} 文件, 跳过 {stats['skipped']} 文件, 失败 {stats['failed']} 文件, 总计 {stats['total']} 文件",
     )
 
-    return stats
+    return cast(dict[str, Any], stats)
 
 
 if __name__ == "__main__":

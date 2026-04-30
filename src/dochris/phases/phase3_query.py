@@ -19,7 +19,7 @@ import time
 
 # 确保 scripts 包可导入
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -47,7 +47,7 @@ def _build_manifest_index() -> dict[str, str]:
     try:
         # 直接使用本模块可能被 patch 的版本
         # 但这里实际实现总是调用 query_utils 版本
-        return query_utils._build_manifest_index()
+        return cast(dict[str, str], query_utils._build_manifest_index())
     finally:
         query_utils.MANIFESTS_PATH = original
 
@@ -60,14 +60,14 @@ def _get_manifest_id(file_path: str) -> str | None:
         query_utils._manifest_index_cache = _manifest_index_cache
     # 直接匹配
     if file_path in _manifest_index_cache:
-        return _manifest_index_cache[file_path]
+        return cast(str | None, _manifest_index_cache[file_path])
     # 文件名匹配
     from pathlib import Path as _Path
 
     fname = _Path(file_path).name
     for key, src_id in _manifest_index_cache.items():
         if _Path(key).name == fname:
-            return src_id
+            return cast(str | None, src_id)
     return None
 
 
@@ -120,7 +120,7 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
     result = query_engine.vector_search(query, top_k, logger)
     # 同步缓存回来
     _chromadb_client_cache = query_engine._chromadb_client_cache
-    return result
+    return cast(list, result)
 
 
 # ============================================================

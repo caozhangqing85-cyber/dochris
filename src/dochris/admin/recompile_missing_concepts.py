@@ -366,19 +366,17 @@ async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) ->
     logger.info(f"分批策略: {total} 个文件, {total_batches} 批, 每批 {BATCH_SIZE} 个")
     logger.info(f"并发数: {MAX_CONCURRENCY}, 批间延迟: {BATCH_DELAY}s")
 
-    # 4. 创建 LLM 客户端
-    try:
-        from openai import AsyncOpenAI
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            logger.error("OPENAI_API_KEY 环境变量未设置")
-            return None
-        base_url = _settings.api_base
-        async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-    except (ImportError, OSError, ValueError) as e:
-        logger.error(f"无法创建 LLM 客户端: {e}")
-        return
+    # 4. 创建 CompilerWorker
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logger.error("OPENAI_API_KEY 环境变量未设置")
+        return None
+    base_url = _settings.api_base
+    compiler_worker = CompilerWorker(
+        api_key=api_key,
+        base_url=base_url,
+        model=_settings.model,
+    )
 
     # 5. 逐批编译
     semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -420,7 +418,7 @@ async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) ->
             if shutdown_event.is_set():
                 break
             tasks.append(
-                recompile_single(m, async_client, logger, semaphore, adaptive_delay, stats)
+                recompile_single(m, compiler_worker, logger, semaphore, adaptive_delay, stats)
             )
 
         for future in asyncio.as_completed(tasks):

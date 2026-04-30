@@ -11,7 +11,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # 路径配置
 KB_PATH = Path.home() / ".openclaw/knowledge-base"
@@ -35,7 +35,7 @@ def load_progress() -> dict:
         return {}
 
     with open(PROGRESS_FILE, encoding="utf-8") as f:
-        return json.load(f)
+        return cast(dict, json.load(f))
 
 
 def check_progress(data: dict) -> dict:

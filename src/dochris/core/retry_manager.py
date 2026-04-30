@@ -50,12 +50,14 @@ class RetryManager:
             config = cls.RETRY_CONFIG[error_type]
 
         if config["exponential"]:
-            return min(
-                config["base_delay"] * (2**attempt),
-                60,  # 最大 60 秒
+            return int(
+                min(
+                    config["base_delay"] * (2**attempt),
+                    60,  # 最大 60 秒
+                )
             )
         else:
-            return config["base_delay"]
+            return int(config["base_delay"])
 
     @classmethod
     async def retry(cls, func: Any, *args: Any, max_attempts: int = 10, **kwargs: Any) -> Any:
@@ -65,7 +67,7 @@ class RetryManager:
         Usage:
             result = await RetryManager.retry(llm_call, text, title)
         """
-        last_error = None
+        last_error: Exception | None = None
 
         for attempt in range(max_attempts):
             try:
@@ -84,7 +86,9 @@ class RetryManager:
                 logger.warning(f"Retry {attempt + 1} after {delay}s: {e}")
                 await asyncio.sleep(delay)
 
-        raise last_error
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Retry failed with no error captured")
 
     @classmethod
     async def llm_retry_with_filter(

@@ -201,7 +201,7 @@ class ChromaDBStore(BaseVectorStore):
         client = self._get_client()
         try:
             col = client.get_collection(name=collection)
-            return col.count()
+            return int(col.count())
         except Exception:
             return 0
 

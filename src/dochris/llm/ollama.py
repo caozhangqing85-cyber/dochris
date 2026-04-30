@@ -119,7 +119,7 @@ class OllamaProvider(BaseLLMProvider):
                 resp.raise_for_status()
                 data = await resp.json()
 
-        return data.get("message", {}).get("content", "")
+        return str(data.get("message", {}).get("content", ""))
 
 
 __all__ = ["OllamaProvider"]

@@ -161,7 +161,7 @@ def index_file(file_path: str | Path, source_type: str = "obsidian") -> None:
             rel_path = file_path.relative_to(workspace)
         except ValueError:
             # 尝试相对于其他可能的基础路径
-            rel_path = file_path.name
+            rel_path = Path(file_path.name)
             _s = get_settings()
             obsidian_vault = _s.obsidian_vaults[0] if _s.obsidian_vaults else None
             if obsidian_vault and file_path.is_relative_to(obsidian_vault):
@@ -243,16 +243,24 @@ def search_knowledge(query: str, n_results: int = 5) -> None:
 
     results = collection.query(query_texts=[query], n_results=n_results)
 
-    if not results["documents"][0]:
+    documents = results.get("documents")
+    if not documents or not documents[0]:
         print("未找到结果")
         return
 
+    metadatas = results.get("metadatas")
+    if not metadatas:
+        metadatas_list: list[list] = [[]]
+    else:
+        metadatas_list = metadatas
+
     for i, (doc, meta) in enumerate(
-        zip(results["documents"][0], results["metadatas"][0], strict=False)
+        zip(documents[0], metadatas_list[0], strict=False)
     ):
-        print(f"\n### {i + 1}. {meta.get('title', '无标题')}")
-        print(f"**路径**: `{meta['path']}`")
-        print(f"**类型**: {meta['type']} | **来源**: {meta['source']}")
+        meta_dict = dict(meta) if not isinstance(meta, dict) else meta
+        print(f"\n### {i + 1}. {meta_dict.get('title', '无标题')}")
+        print(f"**路径**: `{meta_dict.get('path', '')}`")
+        print(f"**类型**: {meta_dict.get('type', '')} | **来源**: {meta_dict.get('source', '')}")
         print("\n**内容片段**:")
         print(f"{doc[:300]}...")
 
@@ -267,10 +275,14 @@ def show_stats() -> None:
     print(f"总文档数: {count}")
 
     # 按来源分组
-    sources = {}
-    for doc in collection.get()["metadatas"]:
-        source = doc["source"]
-        sources[source] = sources.get(source, 0) + 1
+    sources: dict[str, int] = {}
+    collection_data = collection.get()
+    metadatas = collection_data.get("metadatas")
+    if metadatas:
+        for doc in metadatas:
+            doc_dict = dict(doc) if not isinstance(doc, dict) else doc
+            source = str(doc_dict.get("source", "unknown"))
+            sources[source] = sources.get(source, 0) + 1
 
     print("\n按来源分组:")
     for source, cnt in sources.items():

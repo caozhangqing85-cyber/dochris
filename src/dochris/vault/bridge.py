@@ -364,6 +364,7 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
     update_manifest_status(
         workspace_path,
         src_id,
+        status="promoted",
         promoted_to=f"obsidian:{obsidian_target.relative_to(obsidian_vault)}",
     )
 

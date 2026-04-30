@@ -152,7 +152,10 @@ class FasterWhisperTranscriber:
 
             if is_too_long:
                 # 分段转录超长文件
-                return self._transcribe_long(actual_file, src_id, int(duration))
+                if duration is not None:
+                    return self._transcribe_long(actual_file, src_id, int(duration))
+                else:
+                    return None, "无法获取音频时长"
 
             logger.info(f"🎧 处理音频: {actual_file.name}")
             text = self._run_whisper(str(actual_file))
@@ -357,7 +360,12 @@ def main() -> None:
 
         # 转录音频
         try:
-            transcript_text, audio_name = transcriber.transcribe(file_path, src_id)
+            result = transcriber.transcribe(file_path, src_id)
+            if result is None:
+                fail_count += 1
+                logger.warning(f"⚠️  转录失败: {src_id}")
+                continue
+            transcript_text, audio_name = result
 
             if transcript_text:
                 # 更新 manifest

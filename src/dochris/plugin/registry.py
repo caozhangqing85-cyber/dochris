@@ -254,7 +254,7 @@ class PluginManager:
         Returns:
             是否启用
         """
-        return self._plugins.get(name, {}).get("enabled", True)
+        return bool(self._plugins.get(name, {}).get("enabled", True))
 
     def list_plugins(self) -> list[dict[str, Any]]:
         """列出所有插件

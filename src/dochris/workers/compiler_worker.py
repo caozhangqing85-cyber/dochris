@@ -10,7 +10,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # 导入核心模块
 scripts_dir = Path(__file__).parent.parent
@@ -269,7 +269,7 @@ class CompilerWorker:
         )
         if plugin_text:
             logger.info(f"使用插件解析器提取文本: {file_path.name}")
-            return plugin_text
+            return cast(str | None, plugin_text)
 
         ext = file_path.suffix.lower()
 
