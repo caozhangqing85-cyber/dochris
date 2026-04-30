@@ -68,7 +68,7 @@ except ImportError:
 class FasterWhisperTranscriber:
     """faster-whisper 转录器"""
 
-    def __init__(self, model_size="small", device="cpu", compute_type="int8") -> None:
+    def __init__(self, model_size: str = "small", device: str = "cpu", compute_type: str = "int8") -> None:
         """初始化转录器"""
         self.model_size = model_size
         self.device = device
@@ -84,7 +84,7 @@ class FasterWhisperTranscriber:
             logger.error(f"faster-whisper模型加载失败: {e}")
             raise
 
-    def check_duration(self, file_path: Path, max_duration=1800) -> tuple[bool, float | None]:
+    def check_duration(self, file_path: Path, max_duration: int = 1800) -> tuple[bool, float | None]:
         """检查音频时长"""
         import shlex
         import subprocess

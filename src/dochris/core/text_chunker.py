@@ -85,7 +85,7 @@ def _split_by_markdown_headers(text: str) -> list[TextChunk]:
 
     识别 # ## ### #### ##### ###### 等标题
     """
-    chunks = []
+    chunks: list[TextChunk] = []
     lines = text.split("\n")
 
     current_chunk: list[str] = []
@@ -138,7 +138,7 @@ def _split_by_numbering(text: str) -> list[TextChunk]:
     - 一、二、三、等中文编号
     - （1）（2）（3）等括号编号
     """
-    chunks = []
+    chunks: list[TextChunk] = []
     lines = text.split("\n")
 
     current_chunk: list[str] = []

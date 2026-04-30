@@ -29,7 +29,7 @@ class MonitorWorker:
         """生成进度报告"""
         manifests = get_all_manifests(self.workspace)
 
-        status_count = {}
+        status_count: dict[str, int] = {}
         for manifest in manifests:
             status = manifest.get("status", "unknown")
             status_count[status] = status_count.get(status, 0) + 1
@@ -87,7 +87,7 @@ class MonitorWorker:
         print(f"\n✅ 完成率: {report['compiled_percentage']:.1f}%")
         print(f"{'=' * 60}\n")
 
-    def save_report(self, report_path: Path = None) -> None:
+    def save_report(self, report_path: Path | None = None) -> None:
         """保存报告到文件"""
         if report_path is None:
             report_path = (

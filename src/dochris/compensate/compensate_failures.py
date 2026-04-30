@@ -49,7 +49,7 @@ except ImportError:
     def sanitize_prompt(prompt: str) -> str:
         return prompt
 
-    def should_skip_file(filename: str) -> tuple[bool, None]:
+    def should_skip_file(filename: str) -> tuple[bool, str | None]:
         return False, None
 
 
@@ -75,7 +75,7 @@ from dochris.core.quality_scorer import score_summary_quality_v4 as score_summar
 # ============================================================
 
 
-def extract_text_from_file(file_path: Path, logger) -> str | None:
+def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
     """从文件提取文本，根据扩展名选择解析器
 
     Args:
@@ -132,7 +132,7 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
 
 
 async def generate_summary_with_llm(
-    text: str, title: str, logger, rate_limiter=None, adaptive_delay: float | None = None
+    text: str, title: str, logger: Any, rate_limiter: Any = None, adaptive_delay: float | None = None
 ) -> dict[str, Any] | None:
     """使用 LLM 生成摘要
 

@@ -57,7 +57,7 @@ def batch_promote_to_wiki(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
     print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
@@ -123,7 +123,7 @@ def batch_promote_to_curated(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
     print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
@@ -197,7 +197,7 @@ def batch_promote_to_obsidian(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
     print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:

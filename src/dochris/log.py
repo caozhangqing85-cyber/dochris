@@ -20,7 +20,7 @@ def get_default_workspace() -> Path:
     return get_settings().workspace
 
 
-def append_log(workspace_path, operation: str, detail: str) -> None:
+def append_log(workspace_path: Path | str, operation: str, detail: str) -> None:
     """追加日志到 log.md
 
     Args:
@@ -31,7 +31,7 @@ def append_log(workspace_path, operation: str, detail: str) -> None:
     append_log_to_markdown(Path(workspace_path), operation, detail)
 
 
-def append_log_multi(workspace_path, operation: str, details: list[str]) -> None:
+def append_log_multi(workspace_path: Path | str, operation: str, details: list[str]) -> None:
     """批量追加日志（同一操作，多条 detail）
 
     Args:

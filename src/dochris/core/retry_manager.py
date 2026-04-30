@@ -58,7 +58,7 @@ class RetryManager:
             return config["base_delay"]
 
     @classmethod
-    async def retry(cls, func, *args, max_attempts: int = 10, **kwargs) -> Any:
+    async def retry(cls, func: Any, *args: Any, max_attempts: int = 10, **kwargs: Any) -> Any:
         """
         重试包装器
 
@@ -89,11 +89,11 @@ class RetryManager:
     @classmethod
     async def llm_retry_with_filter(
         cls,
-        func,
-        *args,
+        func: Any,
+        *args: Any,
         max_retries: int = 8,
         on_content_filter: Any = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Any | None:
         """
         LLM 调用专用重试（支持 content filter 检测）

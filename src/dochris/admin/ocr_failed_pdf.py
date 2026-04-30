@@ -47,7 +47,7 @@ def get_failed_pdf_manifests() -> list[dict]:
     return failed_pdfs
 
 
-def pdf_to_images(pdf_path: Path, output_dir: Path, dpi=200) -> list[Path]:
+def pdf_to_images(pdf_path: Path, output_dir: Path, dpi: int = 200) -> list[Path]:
     """Convert PDF pages to images using pdftoppm"""
     output_dir.mkdir(parents=True, exist_ok=True)
     prefix = output_dir / "page"
@@ -61,7 +61,7 @@ def pdf_to_images(pdf_path: Path, output_dir: Path, dpi=200) -> list[Path]:
     return images
 
 
-def ocr_image(image_path: Path, lang="chi_sim+eng") -> str:
+def ocr_image(image_path: Path, lang: str = "chi_sim+eng") -> str:
     """OCR a single image"""
     try:
         result = subprocess.run(
@@ -87,8 +87,8 @@ def process_pdf(manifest: dict) -> bool:
 
     logger.info(f"\n📖 处理: {title}")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
+    with tempfile.TemporaryDirectory() as tmpdir_str:
+        tmpdir = Path(tmpdir_str)
         images = pdf_to_images(src_path, tmpdir)
         if not images:
             return False
@@ -119,7 +119,7 @@ def process_pdf(manifest: dict) -> bool:
 
     # Update manifest
     try:
-        update_manifest_status(src_id, "transcribed", {"text_length": len(full_text)})
+        update_manifest_status(get_default_workspace(), src_id, "transcribed", error_message=str({"text_length": len(full_text)}))
         logger.info(f"✓ Manifest已更新: {src_id}")
     except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Manifest更新失败: {e}")

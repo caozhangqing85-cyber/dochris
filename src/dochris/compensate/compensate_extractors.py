@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -97,7 +98,7 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
     return None
 
 
-def extract_ebook_text(filepath: Path, logger) -> str | None:
+def extract_ebook_text(filepath: Path, logger: Any) -> str | None:
     """用 Calibre ebook-convert 提取 ebook 文本
 
     支持: .mobi, .azw3, .epub 等格式
@@ -143,7 +144,7 @@ def extract_ebook_text(filepath: Path, logger) -> str | None:
             Path(tmp_path).unlink(missing_ok=True)
 
 
-def extract_pdf_with_ocr(filepath: Path, logger) -> str | None:
+def extract_pdf_with_ocr(filepath: Path, logger: Any) -> str | None:
     """对扫描 PDF 使用 OCR 提取文本
 
     流程: pdftoppm 转 PNG → tesseract OCR → 拼接文本
@@ -245,7 +246,7 @@ def extract_pdf_with_ocr(filepath: Path, logger) -> str | None:
         return None
 
 
-def extract_text_compensated(filepath: Path, manifest: dict, logger) -> tuple[str | None, str]:
+def extract_text_compensated(filepath: Path, manifest: dict, logger: Any) -> tuple[str | None, str]:
     """补偿文本提取
 
     Returns:

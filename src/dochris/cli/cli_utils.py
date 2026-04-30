@@ -223,7 +223,7 @@ def show_status(workspace: Path | None = None) -> int:
     # Manifest 统计
     print(f"\n{bold('Manifest 统计:')}")
     manifests = get_all_manifests(workspace)
-    status_counts = {}
+    status_counts: dict[str, int] = {}
     score_total = 0
     score_count = 0
     for m in manifests:

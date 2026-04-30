@@ -18,6 +18,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -45,7 +46,7 @@ except ImportError:
     def sanitize_prompt(prompt: str) -> str:
         return prompt
 
-    def should_skip_file(filename: str) -> tuple[bool, None]:
+    def should_skip_file(filename: str) -> tuple[bool, str | None]:
         return False, None
 
 
@@ -117,7 +118,9 @@ class CompileStats:
         self.api_calls = 0
         self.api_success = 0
 
-    def add_record(self, src_id, file_type, status, duration, error=None, quality_score=0) -> None:
+    def add_record(
+        self, src_id: str, file_type: str, status: str, duration: float, error: str | None = None, quality_score: int = 0
+    ) -> None:
         self.file_records.append(
             {
                 "src_id": src_id,
@@ -167,7 +170,7 @@ class CompileStats:
 # ============================================================
 
 
-def find_missing_concepts_data(logger) -> list[dict]:
+def find_missing_concepts_data(logger: Any) -> list[dict]:
     """筛选缺少 concepts_data 的已编译 manifest"""
     sources_dir = KB_PATH / "manifests" / "sources"
     missing = []
@@ -205,7 +208,7 @@ def sort_by_priority(manifests: list[dict]) -> list[dict]:
 async def recompile_single(
     manifest: dict,
     compiler_worker: CompilerWorker,
-    logger,
+    logger: Any,
     semaphore: asyncio.Semaphore,
     adaptive_delay: float,
     stats: CompileStats,
@@ -330,7 +333,7 @@ async def recompile_single(
 # ============================================================
 
 
-async def run_recompile(logger, stats: CompileStats, max_files: int = 0) -> None:
+async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) -> None:
     """主重新编译流程"""
     # 1. 筛选
     logger.info("=" * 60)
@@ -488,7 +491,7 @@ async def run_recompile(logger, stats: CompileStats, max_files: int = 0) -> None
 # ============================================================
 
 
-def verify_results(logger, sample_size: int = 10) -> dict:
+def verify_results(logger: Any, sample_size: int = 10) -> dict:
     """随机抽样验证编译结果"""
     import random
 
@@ -569,7 +572,7 @@ def verify_results(logger, sample_size: int = 10) -> dict:
 # ============================================================
 
 
-def generate_report(stats: CompileStats, verify_result: dict, logger) -> str:
+def generate_report(stats: CompileStats, verify_result: dict, logger: Any) -> str:
     """生成优化报告"""
     report_lines = []
     report_lines.append("=" * 70)

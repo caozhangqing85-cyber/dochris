@@ -112,7 +112,7 @@ _chromadb_client_cache = query_engine._chromadb_client_cache
 _llm_client_cache = query_engine._llm_client_cache
 
 
-def vector_search(query: str, top_k: int = 5, logger: logging.Logger = None) -> list:
+def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list:
     """向量搜索包装器，确保读写本模块的缓存"""
     global _chromadb_client_cache
     # 同步缓存到 query_engine
@@ -145,7 +145,7 @@ def query(
         logger = logging.getLogger("phase3")
 
     start = time.time()
-    result = {
+    result: dict[str, Any] = {
         "query": query_str,
         "mode": mode,
         "concepts": [],

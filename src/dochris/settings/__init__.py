@@ -12,11 +12,12 @@
     print(settings.api_key)
 """
 
+from typing import Any
+
 # ruff: noqa: F405
 # ============================================================
 # 导入核心类和函数
 # ============================================================
-
 from dochris.settings.config import Settings, get_settings, reset_settings
 from dochris.settings.constants import *  # noqa: F403
 from dochris.settings.file_category import get_file_category
@@ -103,7 +104,7 @@ __all__ = [
 # ============================================================
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """延迟获取配置值
 
     允许以模块级变量形式访问配置，同时支持配置动态更新。

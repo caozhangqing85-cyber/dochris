@@ -140,7 +140,7 @@ def check_pollution(workspace_path: Path) -> dict:
     append_log(
         workspace_path,
         "POLLUTION_CHECK",
-        result["details"],
+        str(result["details"]),
     )
 
     return result
@@ -339,7 +339,7 @@ def scan_wiki(workspace_path: Path) -> dict:
 
     # 统计 manifest 状态
     manifests = get_all_manifests(workspace_path)
-    status_counts = {}
+    status_counts: dict[str, int] = {}
     for m in manifests:
         s = m["status"]
         status_counts[s] = status_counts.get(s, 0) + 1
