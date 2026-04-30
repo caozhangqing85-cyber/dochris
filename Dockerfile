@@ -88,8 +88,8 @@ RUN pip install --no-cache-dir -e .[pdf]
 # ============================================================
 # 复制应用代码
 # ============================================================
-# 复制脚本文件
-COPY scripts/ /app/scripts/
+# 复制源代码
+COPY src/ /app/src/
 COPY README.md ./
 
 # ============================================================
@@ -108,8 +108,8 @@ RUN mkdir -p \
 # ============================================================
 # 复制入口脚本并设置权限
 # ============================================================
-COPY scripts/docker_entrypoint.sh /app/scripts/docker_entrypoint.sh
-RUN chmod +x /app/scripts/docker_entrypoint.sh
+COPY docker_entrypoint.sh /app/docker_entrypoint.sh
+RUN chmod +x /app/docker_entrypoint.sh
 
 # 切换到非 root 用户
 USER kbuser
@@ -128,7 +128,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # ============================================================
 # 设置入口点
 # ============================================================
-ENTRYPOINT ["/app/scripts/docker_entrypoint.sh"]
+ENTRYPOINT ["/app/docker_entrypoint.sh"]
 
 # 默认命令：显示帮助信息
 CMD ["--help"]

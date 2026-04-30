@@ -2,25 +2,23 @@
 # Knowledge Base - Docker Compose 配置
 # ============================================================
 # 使用方法:
-#   启动: docker-compose up -d
-#   停止: docker-compose down
-#   查看日志: docker-compose logs -f
-#   执行命令: docker-compose exec knowledge-base python scripts/phase2_compilation.py
-
-version: "3.8"
+#   启动: docker compose up -d
+#   停止: docker compose down
+#   查看日志: docker compose logs -f
+#   执行命令: docker compose exec dochris kb status
 
 services:
   # ============================================================
   # 主服务：知识库编译系统
   # ============================================================
-  knowledge-base:
+  dochris:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         DEBIAN_FRONTEND: noninteractive
-    image: knowledge-base:latest
-    container_name: knowledge-base
+    image: dochris:latest
+    container_name: dochris
 
     # 环境变量从 .env 文件加载
     env_file:

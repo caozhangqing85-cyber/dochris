@@ -2,11 +2,30 @@
 __pycache__/
 *.pyc
 *.pyo
-*.backup*
-.backup_*
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
 .pytest_cache/
 .coverage
+coverage.xml
+.mypy_cache/
 htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# FAISS 数据
+faiss_data/
+
+# ChromaDB 数据
+chroma_data/
 
 # Project specific
 logs/
@@ -41,15 +60,23 @@ build/
 .idea/
 *.swp
 *.swo
+*~
+*.bak
+*.orig
 
 # OS
 .DS_Store
 Thumbs.db
 
 # Docker
+.docker/
 docker-compose.override.yml
 manifests/
 outputs/
+
+# 大文件
+*.tar.gz
+*.zip
 
 # Claude Code
 .claude/
