@@ -354,5 +354,188 @@ class TestGetObsidianVault(unittest.TestCase):
                 self.assertIsInstance(result, Path)
 
 
+class TestSearchObsidianNotesContentMatch(unittest.TestCase):
+    """测试 Obsidian 笔记内容匹配"""
+
+    def setUp(self):
+        """设置测试环境"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_path = Path(self.temp_dir)
+
+        # 创建模拟 Obsidian 主库
+        self.obsidian_dir = self.temp_path / "Obsidian"
+        self.obsidian_dir.mkdir()
+        (self.obsidian_dir / "subdir").mkdir()
+
+    def tearDown(self):
+        """清理测试环境"""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_search_by_content(self):
+        """测试按内容搜索"""
+        from dochris.vault.bridge import _search_obsidian_notes
+
+        # 创建测试文件
+        test_file = self.obsidian_dir / "programming.md"
+        test_file.write_text("# Python Programming\n\nThis is about Python basics.", encoding="utf-8")
+
+        with patch('dochris.vault.bridge._get_obsidian_vault', return_value=self.obsidian_dir):
+            results = _search_obsidian_notes("python")
+
+        self.assertGreater(len(results), 0)
+
+
+class TestSeedFromObsidianSuccess(unittest.TestCase):
+    """测试成功从 Obsidian 导入"""
+
+    def setUp(self):
+        """设置测试环境"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_path = Path(self.temp_dir)
+
+        (self.temp_path / "raw" / "inbox").mkdir(parents=True)
+        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
+        (self.temp_path / "logs").mkdir(parents=True)
+
+        # 创建 Obsidian 主库
+        self.obsidian_dir = self.temp_path / "Obsidian"
+        self.obsidian_dir.mkdir()
+
+    def tearDown(self):
+        """清理测试环境"""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    @patch('dochris.vault.bridge._search_obsidian_notes')
+    @patch('dochris.vault.bridge._get_obsidian_vault')
+    def test_seed_successful_import(self, mock_get_vault, mock_search):
+        """测试成功导入笔记"""
+        from dochris.vault.bridge import seed_from_obsidian
+
+        mock_get_vault.return_value = self.obsidian_dir
+
+        # 创建模拟笔记
+        note_file = self.obsidian_dir / "test_note.md"
+        note_file.write_text("# Test Note\n\nContent here", encoding="utf-8")
+
+        mock_search.return_value = [
+            {
+                "path": note_file,
+                "rel_path": "test_note.md",
+                "title": "test_note",
+                "match_type": "filename",
+            }
+        ]
+
+        result = seed_from_obsidian(self.temp_path, "test")
+
+        self.assertGreater(len(result), 0)
+        self.assertEqual(result[0]["src_id"], "SRC-0001")
+
+
+class TestPromoteToObsidianSuccess(unittest.TestCase):
+    """测试成功推送到 Obsidian"""
+
+    def setUp(self):
+        """设置测试环境"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_path = Path(self.temp_dir)
+
+        (self.temp_path / "curated" / "promoted").mkdir(parents=True)
+        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
+        (self.temp_path / "logs").mkdir(parents=True)
+
+        # 创建 Obsidian 主库
+        self.obsidian_dir = self.temp_path / "Obsidian"
+        self.obsidian_dir.mkdir()
+        (self.obsidian_dir / "06-知识库").mkdir()
+
+    def tearDown(self):
+        """清理测试环境"""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    @patch('dochris.manifest.update_manifest_status')
+    @patch('dochris.vault.bridge._get_obsidian_vault')
+    def test_promote_successful(self, mock_get_vault, mock_update_status):
+        """测试成功推送"""
+        from dochris.manifest import create_manifest, get_manifest
+        from dochris.vault.bridge import promote_to_obsidian
+
+        mock_get_vault.return_value = self.obsidian_dir
+
+        # 创建 manifest
+        create_manifest(
+            workspace_path=self.temp_path,
+            src_id="SRC-0001",
+            title="Test Document",
+            file_type="article",
+            source_path=Path("/source/test.pdf"),
+            file_path="raw/articles/test.pdf",
+            content_hash="hash123",
+            size_bytes=1024,
+        )
+        # 手动更新状态（直接修改 manifest 文件）
+        manifest = get_manifest(self.temp_path, "SRC-0001")
+        manifest["status"] = "promoted"
+        import json
+        manifest_file = self.temp_path / "manifests" / "sources" / "SRC-0001.json"
+        manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+
+        # 创建源文件
+        source_file = self.temp_path / "curated" / "promoted" / "Test Document.md"
+        source_file.write_text("# Test Document\n\nContent here", encoding="utf-8")
+
+        result = promote_to_obsidian(self.temp_path, "SRC-0001")
+
+        self.assertTrue(result)
+
+
+class TestListAssociatedNotesSuccess(unittest.TestCase):
+    """测试列出关联笔记成功"""
+
+    def setUp(self):
+        """设置测试环境"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_path = Path(self.temp_dir)
+        (self.temp_path / "manifests" / "sources").mkdir(parents=True)
+
+    def tearDown(self):
+        """清理测试环境"""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    @patch('dochris.vault.bridge._search_obsidian_notes')
+    def test_list_with_results(self, mock_search):
+        """测试有结果时的列表"""
+        from dochris.manifest import create_manifest
+        from dochris.vault.bridge import list_associated_notes
+
+        create_manifest(
+            workspace_path=self.temp_path,
+            src_id="SRC-0001",
+            title="Python Programming",
+            file_type="article",
+            source_path=Path("/source/test.pdf"),
+            file_path="raw/articles/test.pdf",
+            content_hash="hash123",
+            size_bytes=1024,
+        )
+
+        mock_search.return_value = [
+            {
+                "path": Path("/vault/python.md"),
+                "rel_path": "python.md",
+                "title": "Python",
+                "match_type": "filename",
+            }
+        ]
+
+        result = list_associated_notes(self.temp_path, "SRC-0001")
+
+        self.assertEqual(len(result), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
