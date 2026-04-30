@@ -7,11 +7,41 @@
 
 ## 目录
 
+- [TODO 总览](#todo-总览)
 - [P0：本周完成（~3 小时）](#p0本周完成3-小时)
 - [P1：本月规划（~10 小时）](#p1本月规划10-小时)
 - [P2：V2.0 路线图（~40 小时）](#p2v20-路线图40-小时)
 - [P3：V3.0 路线图（~80 小时）](#p3v30-路线图80-小时)
 - [成熟度对比矩阵](#成熟度对比矩阵)
+
+---
+
+## TODO 总览
+
+### P0：本周完成（~3 小时）
+- [ ] P0-1: 创建 .editorconfig（5 分钟）
+- [ ] P0-2: 创建 Makefile（20 分钟）
+- [ ] P0-3: 配置 pre-commit hooks（15 分钟）
+- [ ] P0-4: CLI 错误体验改进（1 小时）
+
+### P1：本月规划（~10 小时）
+- [ ] P1-1: 完善 CI 流水线（30 分钟）
+- [ ] P1-2: CLI 命令补全（2 小时）
+- [ ] P1-3: 创建 types.py + protocols.py（2 小时）
+- [ ] P1-4: 创建 constants.py（1.5 小时）
+- [ ] P1-5: README Badges + 架构图（1 小时）
+
+### P2：V2.0 路线图（~40 小时）
+- [ ] P2-1: 插件/扩展机制（15 小时）
+- [ ] P2-2: LLM 提供商抽象层（10 小时）
+- [ ] P2-3: 向量数据库抽象层（10 小时）
+- [ ] P2-4: 结构化日志（5 小时）
+
+### P3：V3.0 路线图（~80 小时）
+- [ ] P3-1: Web UI（40 小时）
+- [ ] P3-2: 性能基准测试（10 小时）
+- [ ] P3-3: API 文档自动生成（15 小时）
+- [ ] P3-4: 知识图谱可视化（15 小时）
 
 ---
 
@@ -886,11 +916,11 @@ enabled = true
 ```
 
 **实施步骤**:
-1. 创建 `src/dochris/plugin/registry.py` — 插件注册中心
-2. 创建 `src/dochris/plugin/loader.py` — 插件加载器
-3. 修改 Phase 1 摄入逻辑，优先使用注册的解析器
-4. 添加 `kb plugin list` 命令查看已注册插件
-5. 创建 `examples/custom_parser.py` 示例
+- [ ] 创建 `src/dochris/plugin/registry.py` — 插件注册中心
+- [ ] 创建 `src/dochris/plugin/loader.py` — 插件加载器
+- [ ] 修改 Phase 1 摄入逻辑，优先使用注册的解析器
+- [ ] 添加 `kb plugin list` 命令查看已注册插件
+- [ ] 创建 `examples/custom_parser.py` 示例
 
 ---
 
@@ -955,12 +985,12 @@ MODEL=qwen2
 ```
 
 **实施步骤**:
-1. 创建 `src/dochris/llm/` 包
-2. 实现 `BaseLLMProvider` + `OpenAIProvider` + `OllamaProvider`
-3. 修改 `LLMClient` 使用 Provider 抽象
-4. 修改 settings.py 支持 `LLM_PROVIDER` 配置
-5. 添加 `kb config provider` 命令切换提供商
-6. 测试各提供商的兼容性
+- [ ] 创建 `src/dochris/llm/` 包
+- [ ] 实现 `BaseLLMProvider` + `OpenAIProvider` + `OllamaProvider`
+- [ ] 修改 `LLMClient` 使用 Provider 抽象
+- [ ] 修改 settings.py 支持 `LLM_PROVIDER` 配置
+- [ ] 添加 `kb config provider` 命令切换提供商
+- [ ] 测试各提供商的兼容性
 
 ---
 
@@ -1019,11 +1049,11 @@ CHROMADB_PATH=~/.knowledge-base/data/chroma
 ```
 
 **实施步骤**:
-1. 创建 `src/dochris/vector/` 包
-2. 实现 `BaseVectorStore` + `ChromaDBStore` + `FAISSStore`
-3. 修改 `query_engine.py` 使用抽象接口
-4. 添加 `kb vector index` 命令重建索引
-5. 添加向量存储切换测试
+- [ ] 创建 `src/dochris/vector/` 包
+- [ ] 实现 `BaseVectorStore` + `ChromaDBStore` + `FAISSStore`
+- [ ] 修改 `query_engine.py` 使用抽象接口
+- [ ] 添加 `kb vector index` 命令重建索引
+- [ ] 添加向量存储切换测试
 
 ---
 
