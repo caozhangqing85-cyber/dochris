@@ -8,6 +8,8 @@ import logging
 import re
 from pathlib import Path
 
+from dochris.exceptions import TextExtractionError
+
 logger = logging.getLogger(__name__)
 
 
@@ -91,6 +93,10 @@ def parse_office_document(file_path: Path) -> str | None:
     except ImportError:
         logger.warning("markitdown 未安装，无法解析 Office 文档。安装: pip install markitdown[all]")
         return None
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError, TextExtractionError) as e:
         logger.warning(f"markitdown 解析失败 {file_path.name}: {e}")
+        return None
+    except Exception as e:
+        # 顶层兜底：捕获未预期的错误，避免整个解析流程崩溃
+        logger.warning(f"markitdown 未预期错误 {file_path.name}: {e}")
         return None

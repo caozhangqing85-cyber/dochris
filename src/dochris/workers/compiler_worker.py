@@ -21,6 +21,7 @@ sys.path.insert(0, str(scripts_dir))
 from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
 from dochris.core.quality_scorer import get_quality_threshold, score_summary_quality_v4
+from dochris.exceptions import CompilationError
 from dochris.manifest import get_default_workspace, get_manifest, update_manifest_status
 
 # 导入解析器
@@ -59,6 +60,10 @@ class CompilerWorker:
     ) -> None:
         # 从 settings 获取本地 LLM 默认配置
         settings = get_settings()
+
+        # 类型注解：LLM client 可能为 None
+        self.llm: LLMClient | None = None
+        self.fallback_llm: LLMClient | None = None
 
         # 本地 LLM 配置（如果未提供则使用 settings 中的默认值）
         if not fallback_base_url and settings.local_llm_base_url:
@@ -236,8 +241,13 @@ class CompilerWorker:
             logger.info(f"✓ Compiled {src_id} (quality: {quality_score})")
             return compile_result
 
-        except Exception as e:
+        except (CompilationError, OSError, ValueError, RuntimeError) as e:
             logger.error(f"Compilation failed for {src_id}: {e}", exc_info=True)
+            await self._mark_failed(src_id, str(e))
+            return None
+        except Exception as e:
+            # 顶层兜底：捕获未预期的错误
+            logger.error(f"Compilation 未预期错误 for {src_id}: {e}", exc_info=True)
             await self._mark_failed(src_id, str(e))
             return None
 

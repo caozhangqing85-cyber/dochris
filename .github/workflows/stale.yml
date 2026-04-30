@@ -1,0 +1,104 @@
+name: Stale Issues and PRs
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天运行
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    if: github.repository == 'your-org/knowledge-base'  # 替换为你的仓库路径，或删除此行以应用于所有分支
+
+    steps:
+      - name: Mark stale issues and PRs
+        uses: actions/stale@v9
+        with:
+          # ==================== Issues 配置 ====================
+          stale-issue-message: >
+            这个 Issue 已经 60 天没有活动了。
+
+            如果仍然相关，请添加评论以保持其活跃状态。
+            否则将在 7 天后自动关闭。
+
+            如需帮助，请随时联系维护者。
+
+          stale-issue-label: 'stale'
+          days-before-stale: 60
+          days-before-close: 7
+
+          # 不标记为 stale 的 issue 标签
+          exempt-issue-labels: >
+            pinned,
+            security,
+            enhancement,
+            bug,
+            good first issue,
+            help wanted
+
+          # ==================== PRs 配置 ====================
+          stale-pr-message: >
+            这个 PR 已经 30 天没有活动了。
+
+            如果仍在进行中，请推送新提交或添加评论以保持其活跃状态。
+            否则将在 7 天后自动关闭。
+
+            如需帮助或反馈，请随时联系维护者。
+
+          stale-pr-label: 'stale'
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+
+          # 不标记为 stale 的 PR 标签
+          exempt-pr-labels: >
+            pinned,
+            security,
+            work-in-progress,
+            under-review,
+            do-not-merge
+
+          # ==================== 其他配置 ====================
+          # 操作执行者
+          operations-per-run: 500
+
+          # 不关闭已标记为以下标签的 issue/pr
+          exempt-all-issue-labels: 'never-stale'
+          exempt-all-pr-labels: 'never-stale'
+
+          # 是否开始关闭 stale 项目（默认先标记，不立即关闭）
+          remove-stale-when-updated: true
+
+  close-stale:
+    runs-on: ubuntu-latest
+    needs: stale
+    if: github.repository == 'your-org/knowledge-base'  # 替换为你的仓库路径，或删除此行
+
+    steps:
+      - name: Close stale items
+        uses: actions/stale@v9
+        with:
+          # 立即关闭已被标记为 stale 超过关闭天数的项目
+          days-before-close: 0
+          close-issue-message: >
+            由于长时间没有活动，此 Issue 已自动关闭。
+
+            如果仍需要解决，请重新打开或创建新 Issue。
+
+          close-pr-message: >
+            由于长时间没有活动，此 PR 已自动关闭。
+
+            如果仍需要合并，请重新打开或推送新提交。
+
+          # 只处理已标记为 stale 的项目
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+
+          # 不关闭特定标签的项目
+          exempt-issue-labels: 'never-close,pinned,security'
+          exempt-pr-labels: 'never-close,pinned,security'
+
+          delete-branch: false  # 不自动删除分支

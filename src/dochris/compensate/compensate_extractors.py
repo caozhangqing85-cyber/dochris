@@ -17,6 +17,7 @@ from dochris.compensate.compensate_utils import (
     PDFTOPPM_CMD,
     TESSERACT_CMD,
 )
+from dochris.exceptions import TextExtractionError
 from dochris.settings import get_settings
 
 _s = get_settings()
@@ -49,28 +50,37 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
             if text:
                 logger.debug(f"PDF 提取成功: {file_path.name}")
                 return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
+        except TextExtractionError as e:
             logger.warning(f"PDF 提取失败 {file_path.name}: {e}")
+        except Exception as e:
+            # 顶层兜底：捕获未预期的错误
+            logger.warning(f"PDF 未预期错误 {file_path.name}: {e}")
 
     # 文档文件
     elif ext in (".md", ".txt", ".rst", ".html", ".htm", ".docx", ".doc", ".pptx", ".ppt", ".xlsx"):
         from dochris.parsers.doc_parser import parse_document
 
         try:
-            text = parse_document(file_path)
+            text: str | None = parse_document(file_path)
             if text:
                 logger.debug(f"文档提取成功: {file_path.name}")
                 return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
+        except TextExtractionError as e:
             logger.warning(f"文档提取失败 {file_path.name}: {e}")
+        except Exception as e:
+            # 顶层兜底：捕获未预期的错误
+            logger.warning(f"文档未预期错误 {file_path.name}: {e}")
 
     # 代码文件（直接读取）
     elif ext in (".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp", ".h", ".css", ".json", ".xml"):
         try:
             text = file_path.read_text(encoding="utf-8", errors="replace")
             return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
+        except (OSError, UnicodeDecodeError, TextExtractionError) as e:
             logger.warning(f"代码文件读取失败 {file_path.name}: {e}")
+        except Exception as e:
+            # 顶层兜底：捕获未预期的错误
+            logger.warning(f"代码文件未预期错误 {file_path.name}: {e}")
 
     # 默认尝试直接读取
     else:
@@ -78,7 +88,10 @@ def extract_text_from_file(file_path: Path, logger) -> str | None:
             text = file_path.read_text(encoding="utf-8", errors="replace")
             if len(text) > 100:
                 return text[:MAX_CONTENT_CHARS]
+        except (OSError, UnicodeDecodeError, TextExtractionError):
+            pass
         except Exception:
+            # 顶层兜底：静默忽略其他异常
             pass
 
     return None

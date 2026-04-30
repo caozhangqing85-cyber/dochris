@@ -41,7 +41,7 @@ class APIKeyError(ConfigurationError):
 class FileProcessingError(KnowledgeBaseError):
     """文件处理异常"""
 
-    def __init__(self, message: str = "", file_path: str = None) -> None:
+    def __init__(self, message: str = "", file_path: str | None = None) -> None:
         super().__init__(message)
         self.file_path = file_path
 
@@ -176,7 +176,7 @@ class QueryError(KnowledgeBaseError):
 class APIError(KnowledgeBaseError):
     """API 异常"""
 
-    def __init__(self, message: str = "", status_code: int = None) -> None:
+    def __init__(self, message: str = "", status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
 
@@ -189,6 +189,6 @@ class APIError(KnowledgeBaseError):
 class ValidationError(KnowledgeBaseError):
     """验证异常"""
 
-    def __init__(self, message: str = "", field: str = None) -> None:
+    def __init__(self, message: str = "", field: str | None = None) -> None:
         super().__init__(message)
         self.field = field

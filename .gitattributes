@@ -1,0 +1,35 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text diff=python
+
+# Binary files
+*.pyc binary
+*.pyo binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Test and coverage
+.coverage binary
+htmlcov/ export-ignore
+.coverage.* export-ignore
+
+# Docs
+docs/_build/ export-ignore
+*.egg-info/ export-ignore
+dist/ export-ignore
+build/ export-ignore
+
+# IDE
+.idea/ export-ignore
+.vscode/ export-ignore
+*.swp export-ignore
+*.swo export-ignore
+*~ export-ignore
+
+# OS
+.DS_Store export-ignore
+Thumbs.db export-ignore

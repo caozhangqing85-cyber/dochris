@@ -1,0 +1,18 @@
+# CODEOWNERS — PR 审核责任人
+
+# 默认所有文件
+* @caozhangqing85-cyber
+
+# 核心模块
+/src/dochris/core/ @caozhangqing85-cyber
+/src/dochris/phases/ @caozhangqing85-cyber
+/src/dochris/workers/ @caozhangqing85-cyber
+
+# CLI
+/src/dochris/cli/ @caozhangqing85-cyber
+
+# 插件系统
+/src/dochris/plugin/ @caozhangqing85-cyber
+
+# CI/CD
+/.github/workflows/ @caozhangqing85-cyber

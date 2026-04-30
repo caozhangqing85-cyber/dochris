@@ -9,7 +9,7 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 
-from dochris.exceptions import TextExtractionError
+from dochris.exceptions import FileProcessingError, TextExtractionError
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ def parse_pdf(file_path: Path) -> str:
             if text and len(text) > 100:
                 logger.info(f"✓ PDF parsed with {parser_name}")
                 return text
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError, KeyError, TextExtractionError) as e:
             error_msg = f"{parser_name}: {type(e).__name__}: {e}"
             errors.append(error_msg)
             logger.warning(
@@ -180,11 +180,20 @@ def parse_pdf(file_path: Path) -> str:
             )
             logger.debug(f"{parser_name} 错误堆栈:\n{traceback.format_exc()}")
             continue
+        except Exception as e:
+            # 顶层兜底：捕获未知异常，确保不会因为单个解析器崩溃导致整个流程失败
+            error_msg = f"{parser_name}: {type(e).__name__}: {e}"
+            errors.append(error_msg)
+            logger.warning(
+                f"⚠ {parser_name} 未预期错误: {type(e).__name__}: {e} | 文件: {file_path.name}"
+            )
+            logger.debug(f"{parser_name} 错误堆栈:\n{traceback.format_exc()}")
+            continue
 
     # 所有解析器都失败，抛出异常
     filename = Path(file_path).name if isinstance(file_path, str) else file_path.name
     error_detail = "; ".join(errors)
-    raise TextExtractionError(
+    raise FileProcessingError(
         f"所有 PDF 解析器都失败: {filename} | {error_detail}",
         file_path=str(file_path),
     )

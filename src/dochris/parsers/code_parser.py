@@ -34,7 +34,7 @@ def detect_code_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in code_extensions
 
 
-def extract_from_code(file_path: Path) -> dict[str, str] | None:
+def extract_from_code(file_path: Path) -> dict[str, str | list[str]] | None:
     """
     从代码文件提取内容 (无需 LLM)
 
