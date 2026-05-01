@@ -1,0 +1,73 @@
+site_name: dochris
+site_description: AI 驱动的个人知识库编译系统
+site_url: https://caozhangqing85-cyber.github.io/dochris
+repo_url: https://github.com/caozhangqing85-cyber/dochris
+repo_name: caozhangqing85-cyber/dochris
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到暗色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到亮色模式
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+
+nav:
+  - 首页: index.md
+  - 快速开始:
+    - 安装: getting-started/installation.md
+    - 快速上手: getting-started/quickstart.md
+    - CLI 命令: getting-started/cli.md
+  - 用户指南:
+    - 摄入文件: guide/ingestion.md
+    - 编译文档: guide/compilation.md
+    - 查询知识库: guide/query.md
+    - 质量管理: guide/quality.md
+    - 晋升到 Wiki: guide/promote.md
+  - 进阶功能:
+    - 插件系统: advanced/plugins.md
+    - 多 LLM 支持: advanced/llm-providers.md
+    - 向量数据库: advanced/vector-stores.md
+    - 结构化日志: advanced/logging.md
+    - HTTP API: advanced/api.md
+  - 开发:
+    - 项目结构: development/architecture.md
+    - 贡献指南: CONTRIBUTING.md
+    - 变更日志: CHANGELOG.md

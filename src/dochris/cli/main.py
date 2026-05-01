@@ -31,6 +31,7 @@ from dochris.cli.cli_compile import cmd_compile
 
 # 导入命令模块
 from dochris.cli.cli_completion import completion_script
+from dochris.cli.cli_serve import cmd_serve
 from dochris.cli.cli_config import cmd_config, cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
 from dochris.cli.cli_ingest import cmd_ingest
@@ -275,6 +276,22 @@ def main() -> int:
     # version 命令
     subparsers.add_parser("version", help="显示版本", description="显示版本信息")
 
+    # serve 命令
+    parser_serve = subparsers.add_parser(
+        "serve",
+        help="启动 API 服务器",
+        description="启动 FastAPI HTTP API 服务器",
+    )
+    parser_serve.add_argument(
+        "--host", default="0.0.0.0", help="监听地址（默认: 0.0.0.0）"
+    )
+    parser_serve.add_argument(
+        "--port", type=int, default=8000, help="监听端口（默认: 8000）"
+    )
+    parser_serve.add_argument(
+        "--reload", action="store_true", help="开发模式（自动重载）"
+    )
+
     # plugin 命令
     setup_plugin_parser(subparsers)
 
@@ -322,6 +339,8 @@ def main() -> int:
             return cmd_version(args)
         elif args.command == "plugin":
             return cmd_plugin(args)
+        elif args.command == "serve":
+            return cmd_serve(args)
         else:
             print(
                 format_error(

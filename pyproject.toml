@@ -40,6 +40,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+]
 audio = ["faster-whisper>=0.10.0"]
 pdf = [
     "PyPDF2>=3.0.0",
@@ -58,9 +62,10 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.5.0",
     "pre-commit>=3.0.0",
+    "httpx>=0.24.0",
 ]
 all = [
-    "dochris[audio,pdf,ocr,dev]",
+    "dochris[audio,pdf,ocr,dev,api]",
 ]
 
 [project.scripts]
