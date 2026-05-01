@@ -106,9 +106,9 @@ indent_size = 2
 ```
 
 **子任务**:
-- [ ] 创建 `.editorconfig` 文件
-- [ ] 添加 Python/YAML/JSON/TOML/Markdown/Makefile 规则
-- [ ] 安装 editorconfig-checker 验证
+- [x] 创建 `.editorconfig` 文件
+- [x] 添加 Python/YAML/JSON/TOML/Markdown/Makefile 规则
+- [x] 安装 editorconfig-checker 验证
 
 **验证**:
 ```bash
@@ -214,16 +214,16 @@ docs:  ## 生成 API 文档（如安装了 pdoc）
 ```
 
 **子任务**:
-- [ ] 创建 Makefile 文件
-- [ ] 实现 help 目标（自动显示所有命令）
-- [ ] 实现 install/install-dev/install-all/install-audio 命令
-- [ ] 实现 test/test-cov/test-fast 命令
-- [ ] 实现 lint/format/format-check/typecheck/check 命令
-- [ ] 实现 clean 命令
-- [ ] 实现 build 命令
-- [ ] 实现 docker-build/docker-up/docker-down 命令
-- [ ] 实现 docs 命令
-- [ ] 验证 `make help` 正常显示
+- [x] 创建 Makefile 文件
+- [x] 实现 help 目标（自动显示所有命令）
+- [x] 实现 install/install-dev/install-all/install-audio 命令
+- [x] 实现 test/test-cov/test-fast 命令
+- [x] 实现 lint/format/format-check/typecheck/check 命令
+- [x] 实现 clean 命令
+- [x] 实现 build 命令
+- [x] 实现 docker-build/docker-up/docker-down 命令
+- [x] 实现 docs 命令
+- [x] 验证 `make help` 正常显示
 
 **验证**:
 ```bash
@@ -300,13 +300,13 @@ dev = [
 ```
 
 **子任务**:
-- [ ] 创建 `.pre-commit-config.yaml`
-- [ ] 配置 ruff lint + format hooks
-- [ ] 配置通用文件检查（trailing-whitespace/end-of-file/check-yaml 等）
-- [ ] 配置 detect-private-key 安全检查
-- [ ] 配置 conventional-pre-commit commit 消息规范
-- [ ] 将 pre-commit 加入 dev 依赖
-- [ ] 验证 `pre-commit run --all-files` 通过
+- [x] 创建 `.pre-commit-config.yaml`
+- [x] 配置 ruff lint + format hooks
+- [x] 配置通用文件检查（trailing-whitespace/end-of-file/check-yaml 等）
+- [x] 配置 detect-private-key 安全检查
+- [x] 配置 conventional-pre-commit commit 消息规范
+- [x] 将 pre-commit 加入 dev 依赖
+- [x] 验证 `pre-commit run --all-files` 通过
 
 **收益**: 在 commit 时自动发现 90% 的格式和 lint 问题，减少 CI 失败
 
@@ -412,13 +412,13 @@ except Exception as e:
 ```
 
 **子任务**:
-- [ ] 在 cli_utils.py 新增 format_error/format_warning 函数
-- [ ] 修改 main.py 配置验证错误处理（带修复建议）
-- [ ] 修改 main.py 未知命令错误处理（提示可用命令）
-- [ ] 修改 main.py 顶层异常捕获（按异常类型分流）
-- [ ] 定义标准化退出码常量（EXIT_SUCCESS/FAILURE/USAGE/CONFIG 等）
-- [ ] 添加 verbose 模式支持（--verbose 显示完整堆栈）
-- [ ] 验证各错误场景的输出
+- [x] 在 cli_utils.py 新增 format_error/format_warning 函数
+- [x] 修改 main.py 配置验证错误处理（带修复建议）
+- [x] 修改 main.py 未知命令错误处理（提示可用命令）
+- [x] 修改 main.py 顶层异常捕获（按异常类型分流）
+- [x] 定义标准化退出码常量（EXIT_SUCCESS/FAILURE/USAGE/CONFIG 等）
+- [x] 添加 verbose 模式支持（--verbose 显示完整堆栈）
+- [x] 验证各错误场景的输出
 
 **验证**:
 ```bash
@@ -509,12 +509,12 @@ jobs:
 **移除** `--ignore=tests/test_phase3_v2.py`，改为在文件内 `@pytest.mark.skip`
 
 **子任务**:
-- [ ] 重写 ci.yml（4 个并行 job：lint/typecheck/test/security）
-- [ ] 配置 Python 3.11 + 3.12 矩阵测试
-- [ ] 集成 Codecov 覆盖率上传
-- [ ] 添加 bandit 安全扫描 job
-- [ ] 移除 --ignore=test_phase3_v2.py，改为文件内 @pytest.mark.skip
-- [ ] 验证 CI 全部通过
+- [x] 重写 ci.yml（4 个并行 job：lint/typecheck/test/security）
+- [x] 配置 Python 3.11 + 3.12 矩阵测试
+- [x] 集成 Codecov 覆盖率上传
+- [x] 添加 bandit 安全扫描 job
+- [x] 移除 --ignore=test_phase3_v2.py，改为文件内 @pytest.mark.skip
+- [x] 验证 CI 全部通过
 
 **收益**: CI 更全面，增加 Codecov 覆盖率徽章
 
@@ -580,12 +580,12 @@ eval "$(kb --completion zsh)"
 ```
 
 **子任务**:
-- [ ] 在 main.py 实现 completion_script() 函数
-- [ ] 实现 bash 补全脚本生成
-- [ ] 实现 zsh 补全脚本生成
-- [ ] 实现 fish 补全脚本生成
-- [ ] 添加 --completion 命令行参数
-- [ ] 验证三种 shell 的补全功能
+- [x] 在 main.py 实现 completion_script() 函数
+- [x] 实现 bash 补全脚本生成
+- [x] 实现 zsh 补全脚本生成
+- [x] 实现 fish 补全脚本生成
+- [x] 添加 --completion 命令行参数
+- [x] 验证三种 shell 的补全功能
 
 **收益**: Tab 补全大幅提升日常使用效率
 
@@ -782,11 +782,11 @@ from dochris.types import QualityReport  # noqa: E402
 ```
 
 **子任务**:
-- [ ] 创建 src/dochris/types.py（FileStatus/FileType/ManifestEntry 等）
-- [ ] 创建 src/dochris/protocols.py（LLMProvider/VectorStore/FileParser/QualityScorer）
-- [ ] 在 __init__.py 导出新类型
-- [ ] 编写类型单元测试
-- [ ] 验证 mypy 类型检查通过
+- [x] 创建 src/dochris/types.py（FileStatus/FileType/ManifestEntry 等）
+- [x] 创建 src/dochris/protocols.py（LLMProvider/VectorStore/FileParser/QualityScorer）
+- [x] 在 __init__.py 导出新类型
+- [x] 编写类型单元测试
+- [x] 验证 mypy 类型检查通过
 
 **迁移策略**:
 1. 先创建 types.py 和 protocols.py，不修改现有代码
@@ -874,15 +874,15 @@ CACHE_RETENTION_DAYS = 30
 ```
 
 **子任务**:
-- [ ] 创建 src/dochris/constants.py
-- [ ] 统一项目信息常量（PROJECT_NAME/VERSION/REPO_URL）
-- [ ] 统一默认配置常量（API_BASE/MODEL/THRESHOLD 等）
-- [ ] 统一文件处理常量（SUPPORTED_EXTENSIONS/MAX_FILE_SIZE 等）
-- [ ] 统一质量评分常量（QUALITY_EXCELLENT/GOOD/PASS）
-- [ ] 统一目录结构常量（DIR_DATA/RAW/OUTPUTS 等）
-- [ ] 统一 LLM/重试/缓存参数常量
-- [ ] 在现有代码中逐步替换硬编码为常量引用
-- [ ] 验证测试全部通过
+- [x] 创建 src/dochris/constants.py
+- [x] 统一项目信息常量（PROJECT_NAME/VERSION/REPO_URL）
+- [x] 统一默认配置常量（API_BASE/MODEL/THRESHOLD 等）
+- [x] 统一文件处理常量（SUPPORTED_EXTENSIONS/MAX_FILE_SIZE 等）
+- [x] 统一质量评分常量（QUALITY_EXCELLENT/GOOD/PASS）
+- [x] 统一目录结构常量（DIR_DATA/RAW/OUTPUTS 等）
+- [x] 统一 LLM/重试/缓存参数常量
+- [x] 在现有代码中逐步替换硬编码为常量引用
+- [x] 验证测试全部通过
 
 **迁移策略**:
 1. 创建 constants.py
@@ -947,10 +947,10 @@ graph TB
 ```
 
 **子任务**:
-- [ ] 在 README 顶部添加 badges 行（Python/License/CI/Coverage/Ruff/PyPI）
-- [ ] 在 README 中添加 Mermaid 架构图
-- [ ] 验证 badges 图片正常显示
-- [ ] 验证 Mermaid 图在 GitHub 正确渲染
+- [x] 在 README 顶部添加 badges 行（Python/License/CI/Coverage/Ruff/PyPI）
+- [x] 在 README 中添加 Mermaid 架构图
+- [x] 验证 badges 图片正常显示
+- [x] 验证 Mermaid 图在 GitHub 正确渲染
 
 ---
 
@@ -1013,11 +1013,11 @@ enabled = true
 ```
 
 **实施步骤**:
-- [ ] 创建 `src/dochris/plugin/registry.py` — 插件注册中心
-- [ ] 创建 `src/dochris/plugin/loader.py` — 插件加载器
-- [ ] 修改 Phase 1 摄入逻辑，优先使用注册的解析器
-- [ ] 添加 `kb plugin list` 命令查看已注册插件
-- [ ] 创建 `examples/custom_parser.py` 示例
+- [x] 创建 `src/dochris/plugin/registry.py` — 插件注册中心
+- [x] 创建 `src/dochris/plugin/loader.py` — 插件加载器
+- [x] 修改 Phase 1 摄入逻辑，优先使用注册的解析器
+- [x] 添加 `kb plugin list` 命令查看已注册插件
+- [x] 创建 `examples/custom_parser.py` 示例
 
 ---
 
@@ -1082,12 +1082,12 @@ MODEL=qwen2
 ```
 
 **实施步骤**:
-- [ ] 创建 `src/dochris/llm/` 包
-- [ ] 实现 `BaseLLMProvider` + `OpenAIProvider` + `OllamaProvider`
-- [ ] 修改 `LLMClient` 使用 Provider 抽象
-- [ ] 修改 settings.py 支持 `LLM_PROVIDER` 配置
-- [ ] 添加 `kb config provider` 命令切换提供商
-- [ ] 测试各提供商的兼容性
+- [x] 创建 `src/dochris/llm/` 包
+- [x] 实现 `BaseLLMProvider` + `OpenAIProvider` + `OllamaProvider`
+- [x] 修改 `LLMClient` 使用 Provider 抽象
+- [x] 修改 settings.py 支持 `LLM_PROVIDER` 配置
+- [x] 添加 `kb config provider` 命令切换提供商
+- [x] 测试各提供商的兼容性
 
 ---
 
@@ -1146,11 +1146,11 @@ CHROMADB_PATH=~/.knowledge-base/data/chroma
 ```
 
 **实施步骤**:
-- [ ] 创建 `src/dochris/vector/` 包
-- [ ] 实现 `BaseVectorStore` + `ChromaDBStore` + `FAISSStore`
-- [ ] 修改 `query_engine.py` 使用抽象接口
-- [ ] 添加 `kb vector index` 命令重建索引
-- [ ] 添加向量存储切换测试
+- [x] 创建 `src/dochris/vector/` 包
+- [x] 实现 `BaseVectorStore` + `ChromaDBStore` + `FAISSStore`
+- [x] 修改 `query_engine.py` 使用抽象接口
+- [x] 添加 `kb vector index` 命令重建索引
+- [x] 添加向量存储切换测试
 
 ---
 
@@ -1181,12 +1181,12 @@ class JSONFormatter(logging.Formatter):
 ```
 
 **子任务**:
-- [ ] 创建 JSONFormatter 日志格式化器
-- [ ] 修改 setup_logging 支持 --log-format json 参数
-- [ ] 确保 JSON 日志包含 timestamp/level/module/message/function/line
-- [ ] 异常信息以 JSON 格式输出
-- [ ] 验证 JSON 日志可被 jq 解析
-- [ ] 编写日志格式切换测试
+- [x] 创建 JSONFormatter 日志格式化器
+- [x] 修改 setup_logging 支持 --log-format json 参数
+- [x] 确保 JSON 日志包含 timestamp/level/module/message/function/line
+- [x] 异常信息以 JSON 格式输出
+- [x] 验证 JSON 日志可被 jq 解析
+- [x] 编写日志格式切换测试
 
 ---
 
