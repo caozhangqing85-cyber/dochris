@@ -3,6 +3,7 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from dochris.parsers.code_parser import (
     _detect_language,
@@ -179,3 +180,100 @@ class TestParseDocument:
             result = parse_document(Path(f.name))
         os.unlink(f.name)
         assert result == "content"
+
+    def test_docx_calls_office_parser(self):
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            f.write(b"PK\x03\x04fake")
+            f.flush()
+            with patch("dochris.parsers.doc_parser.parse_office_document", return_value="office text") as mock:
+                result = parse_document(Path(f.name))
+        os.unlink(f.name)
+        assert result == "office text"
+        mock.assert_called_once()
+
+    def test_unknown_ext_tries_text_read(self):
+        with tempfile.NamedTemporaryFile(suffix=".log", mode="w", delete=False, encoding="utf-8") as f:
+            f.write("log line 1\nlog line 2")
+            f.flush()
+            result = parse_document(Path(f.name))
+        os.unlink(f.name)
+        assert result is not None
+        assert "log line 1" in result
+
+
+class TestParseOfficeDocument:
+    def test_markitdown_not_installed(self):
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            f.write(b"fake")
+            f.flush()
+            # patch the import inside the function
+            with patch.dict("sys.modules", {"markitdown": None}):
+                # Force re-import to use the patched module
+                import importlib
+
+                import dochris.parsers.doc_parser as dp_mod
+                importlib.reload(dp_mod)
+                result = dp_mod.parse_office_document(Path(f.name))
+        os.unlink(f.name)
+        assert result is None
+
+    def test_markitdown_returns_long_text(self):
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            f.write(b"fake")
+            f.flush()
+            mock_md_instance = MagicMock()
+            mock_result = MagicMock()
+            mock_result.text_content = "A" * 100
+            mock_md_instance.convert.return_value = mock_result
+
+            mock_markitdown_mod = MagicMock()
+            mock_markitdown_mod.MarkItDown.return_value = mock_md_instance
+
+            with patch.dict("sys.modules", {"markitdown": mock_markitdown_mod}):
+                import importlib
+
+                import dochris.parsers.doc_parser as dp_mod
+                importlib.reload(dp_mod)
+                result = dp_mod.parse_office_document(Path(f.name))
+        os.unlink(f.name)
+        assert result is not None
+
+    def test_markitdown_short_text(self):
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            f.write(b"fake")
+            f.flush()
+            mock_md_instance = MagicMock()
+            mock_result = MagicMock()
+            mock_result.text_content = "short"
+            mock_md_instance.convert.return_value = mock_result
+
+            mock_markitdown_mod = MagicMock()
+            mock_markitdown_mod.MarkItDown.return_value = mock_md_instance
+
+            with patch.dict("sys.modules", {"markitdown": mock_markitdown_mod}):
+                import importlib
+
+                import dochris.parsers.doc_parser as dp_mod
+                importlib.reload(dp_mod)
+                result = dp_mod.parse_office_document(Path(f.name))
+        os.unlink(f.name)
+        assert result is None
+
+    def test_markitdown_exception(self):
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
+            f.write(b"fake")
+            f.flush()
+            mock_md_instance = MagicMock()
+            mock_md_instance.convert.side_effect = RuntimeError("parse error")
+
+            mock_markitdown_mod = MagicMock()
+            mock_markitdown_mod.MarkItDown.return_value = mock_md_instance
+
+            with patch.dict("sys.modules", {"markitdown": mock_markitdown_mod}):
+                import importlib
+
+                import dochris.parsers.doc_parser as dp_mod
+                importlib.reload(dp_mod)
+                result = dp_mod.parse_office_document(Path(f.name))
+        os.unlink(f.name)
+        assert result is None

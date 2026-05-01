@@ -396,3 +396,65 @@ class TestOllamaProvider:
     def test_generate_handles_empty_response(self) -> None:
         """测试处理空响应"""
         pass
+
+
+class TestOllamaProviderIntegration:
+    """测试 OllamaProvider 的 generate_with_messages 实际逻辑"""
+
+    @pytest.mark.asyncio
+    async def test_generate_with_messages_success(self) -> None:
+        """模拟 aiohttp 返回成功响应"""
+        p = OllamaProvider(model="qwen", api_base="http://localhost:11434")
+
+        mock_resp = MagicMock()
+        mock_resp.json = AsyncMock(return_value={"message": {"content": "hello response"}})
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_post_ctx = MagicMock()
+        mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_post_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.post = MagicMock(return_value=mock_post_ctx)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+
+        mock_aiohttp = MagicMock()
+        mock_aiohttp.ClientSession = MagicMock(return_value=mock_session)
+        mock_aiohttp.ClientTimeout = MagicMock(return_value=MagicMock())
+
+        with patch("dochris.llm.ollama.aiohttp", mock_aiohttp):
+            result = await p.generate_with_messages(
+                [{"role": "user", "content": "hello"}],
+                max_tokens=100,
+                temperature=0.5,
+            )
+        assert result == "hello response"
+
+    @pytest.mark.asyncio
+    async def test_generate_no_aiohttp(self) -> None:
+        """aiohttp 设为 None 时应抛出 ImportError"""
+        import dochris.llm.ollama as ollama_mod
+
+        original = ollama_mod.aiohttp
+        ollama_mod.aiohttp = None
+        try:
+            p = OllamaProvider(model="qwen")
+            with pytest.raises(ImportError, match="aiohttp"):
+                await p.generate("hello")
+        finally:
+            ollama_mod.aiohttp = original
+
+    @pytest.mark.asyncio
+    async def test_generate_with_messages_no_aiohttp(self) -> None:
+        """aiohttp 设为 None 时 generate_with_messages 也应抛出 ImportError"""
+        import dochris.llm.ollama as ollama_mod
+
+        original = ollama_mod.aiohttp
+        ollama_mod.aiohttp = None
+        try:
+            p = OllamaProvider(model="qwen")
+            with pytest.raises(ImportError, match="aiohttp"):
+                await p.generate_with_messages([{"role": "user", "content": "hi"}])
+        finally:
+            ollama_mod.aiohttp = original
