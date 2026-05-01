@@ -33,7 +33,7 @@ class TestExtractJSON:
         assert result == {"key": 'value with "quotes"'}
 
     def test_extract_single_quotes(self):
-        result = self.client._extract_json_from_text("{'key': 'value'}")
+        self.client._extract_json_from_text("{'key': 'value'}")
         # json.loads 失败后回退
         # 这个可能返回 None 因为 json 不支持单引号
 

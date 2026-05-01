@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docs
+.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docs changelog release
 
 # 默认目标
 help: ## 显示帮助信息
@@ -69,3 +69,16 @@ docker-down: ## 停止 Docker 容器
 # 文档
 docs: ## 生成 API 文档
 	pdoc dochris -o docs/html
+
+# 发布相关
+changelog: ## 生成 CHANGELOG
+	git-cliff -o CHANGELOG.md
+
+release: ## 创建发布（tag + push）
+	@echo "当前版本: $$(python -c 'import dochris; print(dochris.__version__)')"
+	@read -p "输入新版本号 (如 1.2.0): " version; \
+		sed -i "s/__version__ = \".*\"/__version__ = \"$$version\"/" src/dochris/__init__.py && \
+		sed -i "s/version = \".*\"/version = \"$$version\"/" pyproject.toml && \
+		sed -i "s/PROJECT_VERSION = \".*\"/PROJECT_VERSION = \"$$version\"/" src/dochris/constants.py && \
+		git add -A && git commit -m "chore: bump version to $$version" && \
+		git tag v$$version && git push origin main --tags

@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-01
+
+### Added
+- **插件系统**：6 个扩展点（ingest_parser, pre_compile, post_compile, quality_score, pre_query, post_query）
+- **LLM 提供商抽象层**：OpenAI 兼容 + Ollama 本地模型
+- **向量数据库抽象层**：ChromaDB + FAISS 双后端
+- **结构化日志**：JSON/text 格式，CLI `--log-format` 切换
+- **类型系统**：types.py + protocols.py（PEP 544 协议）
+- **常量模块**：constants.py（项目级 + 设置级分离）
+- **设置模块拆分**：settings.py（801 行）→ settings/ 包（6 个文件）
+- **CLI 补全**：`kb --completion bash/zsh/fish`
+- **Makefile**：18 个常用命令
+- **pre-commit hooks**：ruff + mypy
+- **.editorconfig**：统一代码风格
+- **Benchmark 测试**：parsers + quality 性能基准
+- **6 个示例插件**：epub_parser, compile_notify, query_enhance
+- **6 个使用示例**：basic_ingest 到 plugin_hooks
+- **Dockerfile** + docker_entrypoint.sh
+- **git-cliff** 自动 CHANGELOG 生成
+- **Dependabot**：pip + GitHub Actions 依赖更新
+- **Stale Bot**：自动关闭过期 Issue/PR
+- **py.typed**（PEP 561）、.gitattributes、CODEOWNERS、FUNDING.yml
+- **异常规范化**：15 种 → 具体异常类型
+- **2000+ 测试**（70% 覆盖率，2087 passed）
+
+### Changed
+- **mypy 0 errors**（从 114 个减少）
+- **ruff 0 errors**（从 528 个减少）
+- 测试覆盖率 50% → 70.01%
+- 项目重命名：kb-compiler → dochris
+- Settings 拆分为独立模块
+- CLI 入口重构：558→368 行
+- 质量门禁提升至 60%
+
+### Fixed
+- 修复 quality_scorer 首次评分 10 分问题
+- 修复 index_knowledge mock 路径
+- 修复 B904 ruff 规则（raise from）
+- 修复 chromadb 类型冲突（cast Any）
+- 修复 pdf_parser 第三方库异常处理
+
+---
+
 ## [1.0.0] - 2026-04-30
 
 ### Added

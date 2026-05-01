@@ -58,7 +58,7 @@ class TestCliPluginLoadFromSettings:
         mock_pm.load_from_directory.return_value = []
         with patch("dochris.cli.cli_plugin.get_settings", return_value=mock_settings), \
              patch("dochris.cli.cli_plugin.get_plugin_manager", return_value=mock_pm):
-            result = _load_plugins_from_settings()
+            _load_plugins_from_settings()
             mock_pm.enable_plugin.assert_called_with("test_plugin")
             mock_pm.disable_plugin.assert_called_with("disabled_plugin")
 

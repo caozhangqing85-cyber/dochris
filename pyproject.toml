@@ -80,6 +80,7 @@ where = ["src"]
 Homepage = "https://github.com/caozhangqing85-cyber/dochris"
 Repository = "https://github.com/caozhangqing85-cyber/dochris"
 Issues = "https://github.com/caozhangqing85-cyber/dochris/issues"
+Changelog = "https://github.com/caozhangqing85-cyber/dochris/blob/main/CHANGELOG.md"
 
 [tool.black]
 line-length = 100
