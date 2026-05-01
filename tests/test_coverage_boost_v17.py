@@ -672,10 +672,12 @@ class TestLLMClientInit:
             mock_get.return_value = MagicMock(return_value=mock_provider)
 
             client = LLMClient(api_key="k", base_url="http://test")
-            with patch.object(client, "_summary_generator") as mock_sg:
-                mock_sg.generate_summary = AsyncMock(return_value={"one_line": "test"})
-                result = await client.generate_summary("text", "title")
-                assert result == {"one_line": "test"}
+            mock_sg = MagicMock()
+            mock_sg.generate_summary = AsyncMock(return_value={"one_line": "test"})
+            client._summary_generator_instance = mock_sg
+
+            result = await client.generate_summary("text", "title")
+            assert result == {"one_line": "test"}
 
     @pytest.mark.asyncio
     async def test_generate_summary_smart_delegates(self):
@@ -686,11 +688,13 @@ class TestLLMClientInit:
             mock_provider.client = MagicMock()
             mock_get.return_value = MagicMock(return_value=mock_provider)
 
-            client = LLMClient(api_key="k", base_value="http://test")
-            with patch.object(client, "_summary_generator") as mock_sg:
-                mock_sg.generate_summary_smart = AsyncMock(return_value={"one_line": "smart"})
-                result = await client.generate_summary_smart("text", "title")
-                assert result == {"one_line": "smart"}
+            client = LLMClient(api_key="k", base_url="http://test")
+            mock_sg = MagicMock()
+            mock_sg.generate_summary_smart = AsyncMock(return_value={"one_line": "smart"})
+            client._summary_generator_instance = mock_sg
+
+            result = await client.generate_summary_smart("text", "title")
+            assert result == {"one_line": "smart"}
 
     @pytest.mark.asyncio
     async def test_generate_map_reduce_delegates(self):
@@ -702,10 +706,12 @@ class TestLLMClientInit:
             mock_get.return_value = MagicMock(return_value=mock_provider)
 
             client = LLMClient(api_key="k", base_url="http://test")
-            with patch.object(client, "_hierarchical_summarizer") as mock_hs:
-                mock_hs.generate_map_reduce_summary = AsyncMock(return_value={"one_line": "mr"})
-                result = await client.generate_map_reduce_summary("text", "title")
-                assert result == {"one_line": "mr"}
+            mock_hs = MagicMock()
+            mock_hs.generate_map_reduce_summary = AsyncMock(return_value={"one_line": "mr"})
+            client._hierarchical_summarizer_instance = mock_hs
+
+            result = await client.generate_map_reduce_summary("text", "title")
+            assert result == {"one_line": "mr"}
 
     @pytest.mark.asyncio
     async def test_generate_hierarchical_delegates(self):
@@ -717,10 +723,12 @@ class TestLLMClientInit:
             mock_get.return_value = MagicMock(return_value=mock_provider)
 
             client = LLMClient(api_key="k", base_url="http://test")
-            with patch.object(client, "_hierarchical_summarizer") as mock_hs:
-                mock_hs.generate_hierarchical_summary = AsyncMock(return_value={"one_line": "hi"})
-                result = await client.generate_hierarchical_summary("text", "title")
-                assert result == {"one_line": "hi"}
+            mock_hs = MagicMock()
+            mock_hs.generate_hierarchical_summary = AsyncMock(return_value={"one_line": "hi"})
+            client._hierarchical_summarizer_instance = mock_hs
+
+            result = await client.generate_hierarchical_summary("text", "title")
+            assert result == {"one_line": "hi"}
 
 
 class TestCleanupClients:

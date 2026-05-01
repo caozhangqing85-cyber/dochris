@@ -69,11 +69,13 @@ class TestConfigFromEnv:
 class TestConfigValidateEdge:
     """Test Settings.validate edge cases"""
 
-    def test_validate_empty_workspace_path(self):
-        """validate raises ValueError for empty workspace (line 416)"""
+    def test_validate_none_workspace(self):
+        """validate raises ValueError for None workspace (line 416)"""
         from dochris.settings.config import Settings
 
-        s = Settings(workspace=Path(""))
+        s = Settings()
+        # Override workspace to None to trigger the empty check
+        object.__setattr__(s, 'workspace', None)
         with pytest.raises(ValueError, match="workspace"):
             s.validate()
 
@@ -113,9 +115,7 @@ class TestQualityGateCLI:
         from dochris.quality.quality_gate import main
 
         with patch("sys.argv", ["qg.py", str(tmp_path), "scan-wiki"]):
-            with pytest.raises(SystemExit) as e:
-                main()
-            assert e.value.code == 0
+            main()  # scan-wiki does not sys.exit
 
     @patch("dochris.quality.quality_gate.append_log")
     @patch("dochris.quality.quality_gate.update_manifest_status")
@@ -277,6 +277,11 @@ class TestFAISSAddErrors:
             from dochris.vector.faiss_store import FAISSStore
 
             s = FAISSStore(persist_directory=tmp_path)
+            mock_model = MagicMock()
+            mock_model.encode.return_value = MagicMock()
+            mock_model.encode.return_value.astype.return_value = MagicMock(shape=[2, 10])
+            s._get_model = MagicMock(return_value=mock_model)
+            s._load_collection = MagicMock()
             with pytest.raises(ValueError, match="metadatas"):
                 s.add_documents("c", ["d1", "d2"], ["i1", "i2"], metadatas=[{}])
 
@@ -464,7 +469,8 @@ class TestRecompileExtra:
 
             with patch("dochris.admin.recompile.get_recoverable_failed_docs", return_value=[
                 {"id": "S1", "error_message": "llm_failed"},
-            ]):
+            ]), \
+                 patch.dict("os.environ", {}, clear=True):
                 import asyncio
 
                 from dochris.admin.recompile import recompile
