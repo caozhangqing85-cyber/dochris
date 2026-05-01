@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from dochris.core.retry_manager import RetryManager
 from dochris.core.summary_generator import SummaryGenerator
 
 
@@ -200,4 +201,131 @@ class TestRetryManagerIntegration:
         )
 
         result = await generator.generate_summary("text", "title", max_retries=2)
+        assert result is None
+
+
+# ---- RetryManager ----
+
+
+class TestRetryManager:
+    def test_get_error_type_429(self):
+        assert RetryManager.get_error_type(Exception("429 rate limit")) == "rate_limit_429"
+
+    def test_get_error_type_timeout(self):
+        assert RetryManager.get_error_type(Exception("timeout occurred")) == "timeout"
+
+    def test_get_error_type_other(self):
+        assert RetryManager.get_error_type(Exception("random error")) == "other"
+
+    def test_should_retry_within_limit(self):
+        err = Exception("429")
+        assert RetryManager.should_retry(err, 0) is True
+
+    def test_should_retry_exceeds_limit(self):
+        err = Exception("429")
+        assert RetryManager.should_retry(err, 10) is False
+
+    def test_get_retry_delay_exponential(self):
+        err = Exception("429")
+        d0 = RetryManager.get_retry_delay(0, err)
+        d1 = RetryManager.get_retry_delay(1, err)
+        assert d1 > d0
+
+    def test_get_retry_delay_without_error(self):
+        d = RetryManager.get_retry_delay(0)
+        assert d > 0
+
+    @pytest.mark.asyncio
+    async def test_retry_success_first_try(self):
+        async def ok_func():
+            return "success"
+
+        result = await RetryManager.retry(ok_func)
+        assert result == "success"
+
+    @pytest.mark.asyncio
+    async def test_retry_success_after_failure(self):
+        calls = 0
+
+        async def flaky():
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise ConnectionError("fail")
+            return "recovered"
+
+        with patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock):
+            result = await RetryManager.retry(flaky, max_attempts=5)
+        assert result == "recovered"
+
+    @pytest.mark.asyncio
+    async def test_retry_sync_function(self):
+        def sync_ok():
+            return "sync_result"
+
+        result = await RetryManager.retry(sync_ok)
+        assert result == "sync_result"
+
+    @pytest.mark.asyncio
+    async def test_retry_all_attempts_fail(self):
+        async def always_fail():
+            raise RuntimeError("always fails")
+
+        with patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(RuntimeError, match="always fails"):
+                await RetryManager.retry(always_fail, max_attempts=1)
+
+    @pytest.mark.asyncio
+    async def test_llm_retry_with_filter_content_filter(self):
+        async def trigger_filter():
+            raise Exception("content filter detected")
+
+        result = await RetryManager.llm_retry_with_filter(trigger_filter, max_retries=2)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_llm_retry_with_filter_success(self):
+        async def ok():
+            return {"data": "ok"}
+
+        result = await RetryManager.llm_retry_with_filter(ok)
+        assert result == {"data": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_llm_retry_with_filter_429_retry(self):
+        calls = 0
+
+        async def rate_limited():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise Exception("429 rate limit")
+            return "ok"
+
+        with patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock):
+            result = await RetryManager.llm_retry_with_filter(rate_limited, max_retries=3)
+        assert result == "ok"
+
+    @pytest.mark.asyncio
+    async def test_llm_retry_with_filter_connection_error(self):
+        calls = 0
+
+        async def conn_err():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise Exception("connection timeout")
+            return "ok"
+
+        with patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock):
+            result = await RetryManager.llm_retry_with_filter(conn_err, max_retries=3)
+        assert result == "ok"
+
+    @pytest.mark.asyncio
+    async def test_llm_retry_with_filter_exhausted(self):
+        async def always_fail():
+            raise RuntimeError("persistent error")
+
+        with patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock):
+            result = await RetryManager.llm_retry_with_filter(always_fail, max_retries=2)
         assert result is None
