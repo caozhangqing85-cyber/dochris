@@ -81,13 +81,15 @@ class TestCmdDoctorDiskSpace:
 class TestCmdDoctorConfigError:
     """覆盖 ConfigurationError 分支"""
 
-    @patch("dochris.cli.cli_doctor.print")
-    @pytest.mark.skip("get_settings Exception path needs investigation")
-    def test_config_error_returns_1(self, mock_print, monkeypatch):
+    def test_config_error_returns_1(self, capsys, monkeypatch):
         """配置加载失败返回 1"""
         from dochris.cli.cli_doctor import cmd_doctor
+        from dochris.exceptions import ConfigurationError
 
-        with patch("dochris.cli.cli_doctor.get_settings", side_effect=Exception("bad config")):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("WORKSPACE", raising=False)
+
+        with patch("dochris.cli.cli_doctor.get_settings", side_effect=ConfigurationError("bad config")):
             result = cmd_doctor(argparse.Namespace())
 
         assert result == 1

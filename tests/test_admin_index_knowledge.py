@@ -1,8 +1,36 @@
-"""测试 admin/index_knowledge.py — 向量索引脚本"""
+"""测试 admin/index_knowledge.py — 向量索引脚本
 
+注意: index_knowledge.py 在模块级初始化 ChromaDB 和 embedding 模型，
+所以必须在 import 之前 mock 掉 chromadb 和 chromadb.utils.embedding_functions。
+"""
+
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+# ── 在 import index_knowledge 之前 mock 掉 chromadb 依赖 ──
+@pytest.fixture(autouse=True, scope="module")
+def _mock_chromadb():
+    """mock 掉 chromadb 和 embedding_functions 模块级初始化"""
+    mock_chromadb = MagicMock()
+    mock_client = MagicMock()
+    mock_collection = MagicMock()
+    mock_client.get_or_create_collection.return_value = mock_collection
+    mock_chromadb.PersistentClient.return_value = mock_client
+
+    mock_ef = MagicMock()
+    mock_chromadb.utils = MagicMock()
+    mock_chromadb.utils.embedding_functions = MagicMock()
+    mock_chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction.return_value = MagicMock()
+
+    with patch.dict(sys.modules, {
+        "chromadb": mock_chromadb,
+        "chromadb.utils": mock_chromadb.utils,
+        "chromadb.utils.embedding_functions": mock_chromadb.utils.embedding_functions,
+    }):
+        yield mock_collection
 
 
 class TestCleanText:
@@ -70,22 +98,16 @@ class TestExtractMarkdownSummary:
 class TestIndexFile:
     """测试 index_file 函数"""
 
-    @patch("dochris.admin.index_knowledge.collection")
-    @patch("dochris.admin.index_knowledge.get_workspace")
-    @patch("dochris.admin.index_knowledge.get_settings")
-    def test_index_nonexistent_file(self, mock_settings, mock_ws, mock_collection):
+    def test_index_nonexistent_file(self, _mock_chromadb):
         """不存在的文件直接返回"""
         from dochris.admin.index_knowledge import index_file
 
         with patch("builtins.print"):
             index_file("/nonexistent/file.md", "obsidian")
 
-        mock_collection.add.assert_not_called()
+        _mock_chromadb.add.assert_not_called()
 
-    @patch("dochris.admin.index_knowledge.collection")
-    @patch("dochris.admin.index_knowledge.get_workspace")
-    @patch("dochris.admin.index_knowledge.get_settings")
-    def test_index_pdf_skipped(self, mock_settings, mock_ws, mock_collection, tmp_path):
+    def test_index_pdf_skipped(self, _mock_chromadb, tmp_path):
         """PDF 文件被跳过"""
         from dochris.admin.index_knowledge import index_file
 
@@ -95,12 +117,9 @@ class TestIndexFile:
         with patch("builtins.print"):
             index_file(pdf, "pdf")
 
-        mock_collection.add.assert_not_called()
+        _mock_chromadb.add.assert_not_called()
 
-    @patch("dochris.admin.index_knowledge.collection")
-    @patch("dochris.admin.index_knowledge.get_workspace")
-    @patch("dochris.admin.index_knowledge.get_settings")
-    def test_index_non_md_non_pdf_skipped(self, mock_settings, mock_ws, mock_collection, tmp_path):
+    def test_index_non_md_non_pdf_skipped(self, _mock_chromadb, tmp_path):
         """非 md 非 pdf 的 obsidian 文件被跳过"""
         from dochris.admin.index_knowledge import index_file
 
@@ -110,38 +129,30 @@ class TestIndexFile:
         with patch("builtins.print"):
             index_file(txt, "obsidian")
 
-        mock_collection.add.assert_not_called()
+        _mock_chromadb.add.assert_not_called()
 
-    @patch("dochris.admin.index_knowledge.collection")
-    @patch("dochris.admin.index_knowledge.get_settings")
-    @pytest.mark.skip("fixture/param issue")
-    def test_index_md_file_success(self, mock_settings, mock_get_settings, mock_collection, tmp_path):
+    def test_index_md_file_success(self, _mock_chromadb, tmp_path):
         """成功索引 markdown 文件"""
         from dochris.admin.index_knowledge import index_file
 
         md = tmp_path / "test.md"
         md.write_text("# Test Title\n\nContent here", encoding="utf-8")
 
-        mock_ws = tmp_path
-        mock_settings.return_value = tmp_path
-        mock_get_settings.return_value = MagicMock(
-            obsidian_vaults=[],
-            source_path=None,
-        )
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(obsidian_vaults=[], source_path=None)
+            with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path):
+                with patch("builtins.print"):
+                    index_file(md, "obsidian")
 
-        with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path):
-            with patch("builtins.print"):
-                index_file(md, "obsidian")
-
-        mock_collection.add.assert_called_once()
-        call_kwargs = mock_collection.add.call_args
+        _mock_chromadb.add.assert_called_once()
+        call_kwargs = _mock_chromadb.add.call_args
         assert call_kwargs[1]["metadatas"][0]["type"] == "markdown"
 
 
 class TestMainFunction:
     """测试 main 函数"""
 
-    def test_main_no_args_exits(self):
+    def test_main_no_args_exits(self, _mock_chromadb):
         """无参数时退出"""
         from dochris.admin.index_knowledge import main
 
@@ -149,41 +160,41 @@ class TestMainFunction:
             with pytest.raises(SystemExit):
                 main()
 
-    @patch("dochris.admin.index_knowledge.show_stats")
-    @patch("dochris.admin.index_knowledge.index_obsidian_priority")
-    def test_main_index_priority(self, mock_priority, mock_stats):
+    def test_main_index_priority(self, _mock_chromadb):
         """index-priority 命令"""
         from dochris.admin.index_knowledge import main
 
-        with patch("sys.argv", ["index_knowledge.py", "index-priority"]):
-            main()
+        with patch("dochris.admin.index_knowledge.index_obsidian_priority") as mock_p:
+            with patch("dochris.admin.index_knowledge.show_stats") as mock_s:
+                with patch("sys.argv", ["index_knowledge.py", "index-priority"]):
+                    main()
 
-        mock_priority.assert_called_once()
-        mock_stats.assert_called_once()
+        mock_p.assert_called_once()
+        mock_s.assert_called_once()
 
-    @patch("dochris.admin.index_knowledge.show_stats")
-    @patch("dochris.admin.index_knowledge.index_obsidian_all")
-    def test_main_index_all(self, mock_all, mock_stats):
+    def test_main_index_all(self, _mock_chromadb):
         """index-all 命令"""
         from dochris.admin.index_knowledge import main
 
-        with patch("sys.argv", ["index_knowledge.py", "index-all"]):
-            main()
+        with patch("dochris.admin.index_knowledge.index_obsidian_all") as mock_a:
+            with patch("dochris.admin.index_knowledge.show_stats") as mock_s:
+                with patch("sys.argv", ["index_knowledge.py", "index-all"]):
+                    main()
 
-        mock_all.assert_called_once_with(limit=50)
-        mock_stats.assert_called_once()
+        mock_a.assert_called_once_with(limit=50)
+        mock_s.assert_called_once()
 
-    @patch("dochris.admin.index_knowledge.show_stats")
-    def test_main_stats(self, mock_stats):
+    def test_main_stats(self, _mock_chromadb):
         """stats 命令"""
         from dochris.admin.index_knowledge import main
 
-        with patch("sys.argv", ["index_knowledge.py", "stats"]):
-            main()
+        with patch("dochris.admin.index_knowledge.show_stats") as mock_s:
+            with patch("sys.argv", ["index_knowledge.py", "stats"]):
+                main()
 
-        mock_stats.assert_called_once()
+        mock_s.assert_called_once()
 
-    def test_main_unknown_command_exits(self):
+    def test_main_unknown_command_exits(self, _mock_chromadb):
         """未知命令退出"""
         from dochris.admin.index_knowledge import main
 
@@ -191,8 +202,7 @@ class TestMainFunction:
             with pytest.raises(SystemExit):
                 main()
 
-    @patch("dochris.admin.index_knowledge.search_knowledge")
-    def test_main_search_no_query_exits(self, mock_search):
+    def test_main_search_no_query_exits(self, _mock_chromadb):
         """search 缺少查询词退出"""
         from dochris.admin.index_knowledge import main
 
@@ -200,12 +210,179 @@ class TestMainFunction:
             with pytest.raises(SystemExit):
                 main()
 
-    @patch("dochris.admin.index_knowledge.search_knowledge")
-    def test_main_search_with_query(self, mock_search):
+    def test_main_search_with_query(self, _mock_chromadb):
         """search 命令传递查询词"""
         from dochris.admin.index_knowledge import main
 
-        with patch("sys.argv", ["index_knowledge.py", "search", "test query"]):
-            main()
+        with patch("dochris.admin.index_knowledge.search_knowledge") as mock_search:
+            with patch("sys.argv", ["index_knowledge.py", "search", "test query"]):
+                main()
 
         mock_search.assert_called_once_with("test query")
+
+
+class TestIndexObsidianPriority:
+    """测试 index_obsidian_priority 函数"""
+
+    def test_no_vault_configured(self, _mock_chromadb):
+        """没有配置 Obsidian vault 时打印警告"""
+        from dochris.admin.index_knowledge import index_obsidian_priority
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(obsidian_vaults=[])
+            with patch("builtins.print") as mock_print:
+                index_obsidian_priority()
+
+        output = " ".join(str(c) for c in mock_print.call_args_list)
+        assert "未配置" in output
+
+    def test_with_vault_and_files(self, _mock_chromadb, tmp_path):
+        """有 vault 配置时索引优先文件"""
+        from dochris.admin.index_knowledge import index_obsidian_priority
+
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        # 创建一些优先文件
+        (vault / "职业规划").mkdir()
+        (vault / "职业规划" / "AI学习复利系统SOP-最终版.md").write_text("# AI学习\n内容", encoding="utf-8")
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(obsidian_vaults=[vault])
+            with patch("dochris.admin.index_knowledge.index_file") as mock_index:
+                with patch("builtins.print"):
+                    index_obsidian_priority()
+
+        mock_index.assert_called()
+
+
+class TestIndexObsidianAll:
+    """测试 index_obsidian_all 函数"""
+
+    def test_no_vault_configured(self, _mock_chromadb):
+        """没有配置 Obsidian vault 时打印警告"""
+        from dochris.admin.index_knowledge import index_obsidian_all
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(obsidian_vaults=[])
+            with patch("builtins.print") as mock_print:
+                index_obsidian_all()
+
+        output = " ".join(str(c) for c in mock_print.call_args_list)
+        assert "未配置" in output
+
+    def test_with_vault_files(self, _mock_chromadb, tmp_path):
+        """有 vault 文件时索引"""
+        from dochris.admin.index_knowledge import index_obsidian_all
+
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        (vault / "test1.md").write_text("# T1", encoding="utf-8")
+        (vault / "test2.md").write_text("# T2", encoding="utf-8")
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(obsidian_vaults=[vault])
+            with patch("dochris.admin.index_knowledge.index_file") as mock_index:
+                with patch("builtins.print"):
+                    index_obsidian_all(limit=10)
+
+        assert mock_index.call_count == 2
+
+
+class TestSearchKnowledge:
+    """测试 search_knowledge 函数"""
+
+    def test_search_no_results(self, _mock_chromadb):
+        """搜索无结果"""
+        from dochris.admin.index_knowledge import search_knowledge
+
+        _mock_chromadb.query.return_value = {"documents": [[]], "metadatas": [[]]}
+
+        with patch("builtins.print") as mock_print:
+            search_knowledge("test query")
+
+        output = " ".join(str(c) for c in mock_print.call_args_list)
+        assert "未找到" in output
+
+    def test_search_with_results(self, _mock_chromadb):
+        """搜索有结果"""
+        from dochris.admin.index_knowledge import search_knowledge
+
+        _mock_chromadb.query.return_value = {
+            "documents": [["内容片段"]],
+            "metadatas": [[{"title": "测试", "path": "/test.md", "type": "markdown", "source": "obsidian"}]],
+        }
+
+        with patch("builtins.print") as mock_print:
+            search_knowledge("测试")
+
+        output = " ".join(str(c) for c in mock_print.call_args_list)
+        assert "测试" in output
+
+
+class TestShowStats:
+    """测试 show_stats 函数"""
+
+    def test_show_stats(self, _mock_chromadb):
+        """显示统计信息"""
+        from dochris.admin.index_knowledge import show_stats
+
+        _mock_chromadb.count.return_value = 10
+        _mock_chromadb.get.return_value = {
+            "metadatas": [
+                {"source": "obsidian"},
+                {"source": "pdf"},
+                {"source": "obsidian"},
+            ]
+        }
+
+        with patch("builtins.print") as mock_print:
+            show_stats()
+
+        output = " ".join(str(c) for c in mock_print.call_args_list)
+        assert "10" in output
+
+
+class TestIndexFileWithPathFallback:
+    """覆盖 index_file 路径回退分支"""
+
+    def test_index_md_with_obsidian_vault(self, _mock_chromadb, tmp_path):
+        """文件不在 workspace 但在 obsidian_vault 下"""
+        from dochris.admin.index_knowledge import index_file
+
+        md = tmp_path / "vault" / "test.md"
+        md.parent.mkdir(exist_ok=True)
+        md.write_text("# Test Title\n\nContent here", encoding="utf-8")
+
+        vault_path = tmp_path / "vault"
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(
+                obsidian_vaults=[vault_path],
+                source_path=None,
+            )
+            with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"):
+                with patch("builtins.print"):
+                    index_file(md, "obsidian")
+
+        _mock_chromadb.add.assert_called()
+
+    def test_index_md_with_source_path(self, _mock_chromadb, tmp_path):
+        """文件不在 workspace 但在 source_path 下"""
+        from dochris.admin.index_knowledge import index_file
+
+        md = tmp_path / "source" / "test.md"
+        md.parent.mkdir(exist_ok=True)
+        md.write_text("# Test Title\n\nContent here", encoding="utf-8")
+
+        source_path = tmp_path / "source"
+
+        with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
+            mock_s.return_value = MagicMock(
+                obsidian_vaults=[],
+                source_path=source_path,
+            )
+            with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"):
+                with patch("builtins.print"):
+                    index_file(md, "obsidian")
+
+        _mock_chromadb.add.assert_called()
