@@ -1,6 +1,7 @@
 """覆盖率提升 v13 — vector/faiss_store.py + settings/config.py"""
 
 import json
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -128,9 +129,11 @@ class TestFAISSStoreAddDocuments:
     def test_length_mismatch(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
 
+        mock_faiss = MagicMock()
         store = FAISSStore(persist_directory=str(tmp_path))
-        with pytest.raises(ValueError, match="length mismatch"):
-            store.add_documents("col", ["doc1"], ["id1", "id2"])
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
+            with pytest.raises(ValueError, match="length mismatch"):
+                store.add_documents("col", ["doc1"], ["id1", "id2"])
 
     def test_metadata_length_mismatch(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
@@ -141,22 +144,28 @@ class TestFAISSStoreAddDocuments:
 
         store = FAISSStore(persist_directory=str(tmp_path))
         store._model = mock_model
-        store._indexes["col"] = None
+        mock_index = MagicMock()
+        mock_index.ntotal = 0
+        store._indexes["col"] = mock_index
         store._documents["col"] = {}
         store._metadatas["col"] = {}
 
         with patch.dict("sys.modules", {"faiss": mock_faiss}):
             with pytest.raises(ValueError, match="metadatas"):
-                store.add_documents("col", ["doc1"], ["id1"], [{}])
+                store.add_documents("col", ["doc1"], ["id1"], [{}, {}])
 
     def test_faiss_not_installed(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
 
         store = FAISSStore(persist_directory=str(tmp_path))
-        with patch.dict("sys.modules", {}, clear=True):
-            # Force re-import to fail
+        # Remove faiss from sys.modules to trigger ImportError
+        saved = sys.modules.pop("faiss", None)
+        try:
             with pytest.raises(ImportError, match="faiss not installed"):
                 store.add_documents("col", ["doc"], ["id1"])
+        finally:
+            if saved is not None:
+                sys.modules["faiss"] = saved
 
 
 class TestFAISSStoreQuery:
@@ -169,20 +178,19 @@ class TestFAISSStoreQuery:
         store._metadatas["col"] = {}
 
         mock_faiss = MagicMock()
+        mock_model = MagicMock()
+        store._model = mock_model
+
         with patch.dict("sys.modules", {"faiss": mock_faiss}):
             results = store.query("col", "search text")
         assert results == []
 
     def test_query_with_results(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
-        import numpy as np
 
         mock_index = MagicMock()
         mock_index.ntotal = 2
-        mock_index.search.return_value = (
-            np.array([[0.1, 0.5]]),
-            np.array([[0, 1]]),
-        )
+        mock_index.search.return_value = ([[0.1, 0.5]], [[0, 1]])
 
         store = FAISSStore(persist_directory=str(tmp_path))
         store._indexes["col"] = mock_index
@@ -190,7 +198,8 @@ class TestFAISSStoreQuery:
         store._metadatas["col"] = {"id1": {"tag": "a"}, "id2": {"tag": "b"}}
 
         mock_model = MagicMock()
-        mock_model.encode.return_value.astype.return_value = np.array([[1, 2, 3]])
+        mock_embedding = MagicMock()
+        mock_model.encode.return_value.astype.return_value = mock_embedding
         store._model = mock_model
 
         mock_faiss = MagicMock()
@@ -203,14 +212,10 @@ class TestFAISSStoreQuery:
 
     def test_query_with_where_filter(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
-        import numpy as np
 
         mock_index = MagicMock()
         mock_index.ntotal = 2
-        mock_index.search.return_value = (
-            np.array([[0.1, 0.5]]),
-            np.array([[0, 1]]),
-        )
+        mock_index.search.return_value = ([[0.1, 0.5]], [[0, 1]])
 
         store = FAISSStore(persist_directory=str(tmp_path))
         store._indexes["col"] = mock_index
@@ -218,7 +223,8 @@ class TestFAISSStoreQuery:
         store._metadatas["col"] = {"id1": {"tag": "a"}, "id2": {"tag": "b"}}
 
         mock_model = MagicMock()
-        mock_model.encode.return_value.astype.return_value = np.array([[1, 2, 3]])
+        mock_embedding = MagicMock()
+        mock_model.encode.return_value.astype.return_value = mock_embedding
         store._model = mock_model
 
         mock_faiss = MagicMock()
@@ -228,20 +234,74 @@ class TestFAISSStoreQuery:
         assert len(results) == 1
         assert results[0]["id"] == "id2"
 
+    def test_query_with_negative_index(self, tmp_path):
+        """FAISS may return negative indices for missing results"""
+        from dochris.vector.faiss_store import FAISSStore
+
+        mock_index = MagicMock()
+        mock_index.ntotal = 1
+        mock_index.search.return_value = ([[0.1, 0.5]], [[0, -1]])
+
+        store = FAISSStore(persist_directory=str(tmp_path))
+        store._indexes["col"] = mock_index
+        store._documents["col"] = {"id1": "doc1"}
+        store._metadatas["col"] = {"id1": {}}
+
+        mock_model = MagicMock()
+        mock_model.encode.return_value.astype.return_value = MagicMock()
+        store._model = mock_model
+
+        mock_faiss = MagicMock()
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
+            results = store.query("col", "search text")
+
+        assert len(results) == 1
+        assert results[0]["id"] == "id1"
+
+    def test_query_index_out_of_range(self, tmp_path):
+        """Index returned by FAISS exceeds doc keys"""
+        from dochris.vector.faiss_store import FAISSStore
+
+        mock_index = MagicMock()
+        mock_index.ntotal = 1
+        mock_index.search.return_value = ([[0.1]], [[5]])  # idx 5 > len(docs)
+
+        store = FAISSStore(persist_directory=str(tmp_path))
+        store._indexes["col"] = mock_index
+        store._documents["col"] = {"id1": "doc1"}
+        store._metadatas["col"] = {"id1": {}}
+
+        mock_model = MagicMock()
+        mock_model.encode.return_value.astype.return_value = MagicMock()
+        store._model = mock_model
+
+        mock_faiss = MagicMock()
+        with patch.dict("sys.modules", {"faiss": mock_faiss}):
+            results = store.query("col", "search text")
+
+        assert results == []
+
 
 class TestFAISSStoreDelete:
     def test_delete_and_rebuild(self, tmp_path):
         from dochris.vector.faiss_store import FAISSStore
 
+        mock_faiss = MagicMock()
+        # IndexFlatL2 returns a mock index with numeric ntotal
+        new_index = MagicMock()
+        new_index.ntotal = 1
+        mock_faiss.IndexFlatL2.return_value = new_index
+
+        mock_model = MagicMock()
+        mock_embedding = MagicMock()
+        mock_embedding.shape = (1, 10)
+        mock_model.encode.return_value.astype.return_value = mock_embedding
+
         store = FAISSStore(persist_directory=str(tmp_path))
-        store._indexes["col"] = None
+        store._model = mock_model
+        store._indexes["col"] = None  # Will trigger IndexFlatL2 creation
         store._documents["col"] = {"id1": "doc1", "id2": "doc2"}
         store._metadatas["col"] = {"id1": {}, "id2": {}}
-
-        mock_faiss = MagicMock()
-        mock_model = MagicMock()
-        mock_model.encode.return_value.astype.return_value = MagicMock(shape=(1, 10))
-        store._model = mock_model
 
         with patch.dict("sys.modules", {"faiss": mock_faiss}):
             store.delete("col", ["id1"])

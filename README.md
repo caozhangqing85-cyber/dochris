@@ -381,12 +381,13 @@ VECTOR_STORE=faiss
 
 | 指标 | 数值 |
 |------|------|
-| 测试 | 1544 passing |
-| 覆盖率 | 64.66% |
+| 测试 | 2147 passing |
+| 覆盖率 | 70.81% |
 | 类型检查 | mypy 0 errors |
 | 代码规范 | ruff 0 errors |
 | Python | 3.11+ |
 | 许可证 | MIT |
+| 版本 | 1.1.0 |
 
 ## 常见问题
 
