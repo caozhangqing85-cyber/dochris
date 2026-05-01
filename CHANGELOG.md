@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-02
+
+### Added
+- **API 文档站**：mkdocs-material 自动部署到 GitHub Pages
+- **HTTP API 层**：FastAPI REST 接口（查询、编译、状态）
+- **Codecov 集成**：CI 覆盖率可视化
+- **异常规范化**：38 个 `except Exception` 审查确认均为合法 fallback
+
+### Changed
+- **覆盖率**：70% → 76%（+315 tests，2087→2402）
+- **mypy**：114 errors → 0 errors
+- **测试**：18 个参数化测试类 + 14 个集成测试
+- **批量质量改进**：6 个 examples、299 新测试、uv.lock
+- **设置模块拆分**：settings.py（801行）→ settings/ 包（6个文件）
+- **异常规范化**：30+ `except Exception` → 具体异常类型
+- **Promote 质量门槛**：compile 时检查 quality_score
+
+### Fixed
+- B904 ruff 规则：所有 except 使用 `raise ... from`
+- chromadb 类型冲突：`cast(Any, ...)` 解决
+- CLI 错误处理：6 个退出码
+
 ## [1.1.0] - 2026-05-01
 
 ### Added

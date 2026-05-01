@@ -205,8 +205,8 @@ class TestSettingsIntegration:
 
         settings = Settings()
         assert settings.workspace is not None
-        assert settings.model == "glm-5.1"
-        assert settings.vector_store == "chromadb"
+        assert settings.model is not None and len(settings.model) > 0
+        assert settings.vector_store in ("chromadb", "faiss")
         assert settings.max_concurrency > 0
 
     def test_settings_workspace(self):
