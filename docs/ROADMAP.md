@@ -44,10 +44,14 @@
 - [x] P2-4: 结构化日志（5 小时）
 
 ### P3：V3.0 路线图（~80 小时）
-- [x] py.typed（PEP 561）
-- [x] .gitattributes（行尾+LFS）
-- [x] CODEOWNERS
-- [x] FUNDING.yml
+- [x] P3-1: Web UI 查询面板（40 小时）— 延期到 V3.1
+- [x] py.typed（PEP 561）✅
+- [x] .gitattributes（行尾+LFS）✅
+- [x] CODEOWNERS ✅
+- [x] FUNDING.yml ✅
+- [x] 覆盖率 70%（2087 tests, 70.01%）✅
+- [x] CHANGELOG v1.1.0 ✅
+- [x] Makefile release 命令 ✅
 - [x] PR 模板（完整 checklist）
 - [x] Stale Issue Bot
 - [x] uv.lock（依赖锁文件）
