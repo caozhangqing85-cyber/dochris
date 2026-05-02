@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docs changelog release
+.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release
 
 # 默认目标
 help: ## 显示帮助信息
@@ -56,15 +56,35 @@ clean: ## 清理临时文件和构建产物
 build: ## 构建发布包
 	python -m build
 
-# Docker 相关（预留）
-docker-build: ## 构建 Docker 镜像
+# Docker 相关
+docker-build: ## 构建 Docker 镜像（默认 core）
 	docker build -t dochris:latest .
+
+docker-all: ## 构建并启动所有服务（app + chromadb）
+	docker compose --profile api up -d --build
+
+docker-api: ## 启动 API 服务（app + api + chromadb）
+	docker compose --profile api up -d --build
+
+docker-bench: ## 在 Docker 中运行基准测试
+	docker build --build-arg BUILD_TARGET=all -t dochris:bench .
+	docker run --rm dochris:bench pytest benchmark/ --benchmark-only -v
 
 docker-up: ## 启动 Docker 容器
 	docker compose up -d
 
 docker-down: ## 停止 Docker 容器
-	docker compose down
+	docker compose --profile api down
+
+# 基准测试
+bench: ## 运行所有基准测试
+	pytest benchmark/ --benchmark-only -v
+
+bench-report: ## 运行基准测试并保存报告
+	@mkdir -p reports
+	pytest benchmark/ --benchmark-only \
+		--benchmark-json=reports/benchmark-$$(date +%Y%m%d-%H%M%S).json \
+		-v
 
 # 文档
 docs: ## 生成 API 文档

@@ -2,10 +2,12 @@
 # Knowledge Base - Docker Compose 配置
 # ============================================================
 # 使用方法:
-#   启动: docker compose up -d
-#   停止: docker compose down
-#   查看日志: docker compose logs -f
-#   执行命令: docker compose exec dochris kb status
+#   启动核心:    docker compose up -d
+#   启动 API:    docker compose --profile api up -d
+#   全部启动:    docker compose --profile api up -d
+#   停止:       docker compose down
+#   查看日志:    docker compose logs -f
+#   执行命令:    docker compose exec dochris kb status
 
 services:
   # ============================================================
@@ -17,6 +19,7 @@ services:
       dockerfile: Dockerfile
       args:
         DEBIAN_FRONTEND: noninteractive
+        BUILD_TARGET: ${BUILD_TARGET:-core}
     image: dochris:latest
     container_name: dochris
 
@@ -26,37 +29,25 @@ services:
 
     # 环境变量覆盖（Docker 特定）
     environment:
-      # 工作区路径（容器内）
       - WORKSPACE=/app
-
-      # 日志级别
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
 
     # 挂载卷
     volumes:
-      # 数据持久化
-      - ./data:/app/data
-      - ./raw:/app/raw
-      - ./outputs:/app/outputs
-      - ./wiki:/app/wiki
-      - ./curated:/app/curated
-      - ./logs:/app/logs
-      - ./manifests:/app/manifests
+      - kb-data:/app/data
+      - kb-raw:/app/raw
+      - kb-outputs:/app/outputs
+      - kb-wiki:/app/wiki
+      - kb-curated:/app/curated
+      - kb-logs:/app/logs
+      - kb-manifests:/app/manifests
+      - kb-cache:/app/cache
 
       # 源文件挂载（可选，用于 Phase 1）
       # - /path/to/your/materials:/materials:ro
 
       # Obsidian vault 挂载（可选）
       # - ~/Documents/Obsidian-Sync:/obsidian:ro
-
-    # GPU 支持（需要 nvidia-docker）
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
 
     # 资源限制
     deploy:
@@ -71,33 +62,146 @@ services:
     # 重启策略
     restart: unless-stopped
 
-    # 网络模式
-    network_mode: bridge
+    # 网络
+    networks:
+      - kb-network
 
     # 默认命令（保持容器运行）
     command: ["tail", "-f", "/dev/null"]
 
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
   # ============================================================
-  # 可选：ChromaDB 独立服务
+  # API 服务（--profile api 启动）
   # ============================================================
-  # chromadb:
-  #   image: chromadb/chroma:latest
-  #   container_name: knowledge-base-chroma
-  #
-  #   volumes:
-  #     - ./data/chroma:/chroma/chroma
-  #
-  #   ports:
-  #     - "8000:8000"
-  #
-  #   environment:
-  #     - CHROMA_SERVER_HOST=0.0.0.0
-  #     - CHROMA_SERVER_HTTP_PORT=8000
-  #     - ALLOW_RESET=TRUE
-  #
-  #   restart: unless-stopped
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DEBIAN_FRONTEND: noninteractive
+        BUILD_TARGET: api
+    image: dochris:latest
+    container_name: dochris-api
+    profiles:
+      - api
+
+    env_file:
+      - .env
+
+    environment:
+      - WORKSPACE=/app
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    volumes:
+      - kb-data:/app/data
+      - kb-raw:/app/raw
+      - kb-outputs:/app/outputs
+      - kb-wiki:/app/wiki
+      - kb-curated:/app/curated
+      - kb-logs:/app/logs
+      - kb-manifests:/app/manifests
+      - kb-cache:/app/cache
+
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+    depends_on:
+      chromadb:
+        condition: service_healthy
+      dochris:
+        condition: service_healthy
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+    restart: unless-stopped
+
+    networks:
+      - kb-network
+
+    command: ["uvicorn", "dochris.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  # ============================================================
+  # ChromaDB 向量数据库
+  # ============================================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: dochris-chroma
+
+    volumes:
+      - kb-chroma:/chroma/chroma
+
+    ports:
+      - "${CHROMA_PORT:-8100}:8000"
+
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ALLOW_RESET=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+    restart: unless-stopped
+
+    networks:
+      - kb-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
 
 # ============================================================
-# 注: 使用绑定挂载而非命名卷，便于直接访问数据
-# 如需使用命名卷，可将上方 volumes 部分修改为命名卷格式
+# 命名卷
 # ============================================================
+volumes:
+  kb-data:
+    name: dochris-data
+  kb-raw:
+    name: dochris-raw
+  kb-outputs:
+    name: dochris-outputs
+  kb-wiki:
+    name: dochris-wiki
+  kb-curated:
+    name: dochris-curated
+  kb-logs:
+    name: dochris-logs
+  kb-manifests:
+    name: dochris-manifests
+  kb-cache:
+    name: dochris-cache
+  kb-chroma:
+    name: dochris-chroma
+
+# ============================================================
+# 网络
+# ============================================================
+networks:
+  kb-network:
+    name: dochris-network
+    driver: bridge

@@ -24,6 +24,17 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+# 预编译正则表达式，避免每次调用重复编译
+_HEADER_RE = re.compile(r"^(#{1,6})\s+(.+)$")
+_NUMBERING_RE = re.compile(
+    r"^(?:"
+    r"(\d+|[一二三四五六七八九十]+)[.、]\s*(.+)"
+    r"|"
+    r"[（(]\s*\d+\s*[)）]\s*(.+)"
+    r")$"
+)
+_SENTENCE_ENDINGS_RE = re.compile(r"([。！？.!?]+)\s*")
+
 
 @dataclass
 class TextChunk:
@@ -92,9 +103,17 @@ def _split_by_markdown_headers(text: str) -> list[TextChunk]:
     current_title = ""
     current_level = 0
 
+    # 预编译正则（模块级缓存已由 re 模块自动处理）
     for line in lines:
-        # 检测 Markdown 标题
-        header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
+        # 快速路径：标题行必须以 # 开头
+        if not line or line[0] != "#":
+            current_chunk.append(line)
+            continue
+
+        header_match = _HEADER_RE.match(line)
+        if not header_match:
+            current_chunk.append(line)
+            continue
 
         if header_match:
             # 保存当前块
@@ -145,38 +164,30 @@ def _split_by_numbering(text: str) -> list[TextChunk]:
     current_title = ""
     current_index = 0
 
-    # 编号正则表达式
-    patterns = [
-        r"^(\d+|[一二三四五六七八九十]+)[.、]\s*(.+)$",  # 1. 或 一、
-        r"^[（(]\s*\d+\s*[)）]\s*(.+)$",  # （1）
-    ]
-    combined_pattern = "|".join(f"({p})" for p in patterns)
-
     for line in lines:
-        match = re.match(combined_pattern, line)
+        match = _NUMBERING_RE.match(line)
 
         if match and current_chunk:
-            # 检查是否真的是新的章节（行首，前面有空行）
             if len(current_chunk) > 0:
-                # 保存当前块
                 content = "\n".join(current_chunk).strip()
                 if content:
                     chunks.append(
                         TextChunk(content=content, title=current_title, level=1, index=len(chunks))
                     )
 
-            # 开始新块
-            # 提取标题（从各个匹配组中找到）
-            for group in match.groups()[1::2]:  # 跳过完整匹配，只看捕获组
-                if group:
-                    current_title = group.strip()
+            # 提取标题
+            groups = match.groups()
+            current_title = ""
+            for g in groups:
+                if g:
+                    current_title = g.strip()
                     break
-            else:
-                current_title = line.strip()[:50]  # 取前50字符作为标题
+            if not current_title:
+                current_title = line.strip()[:50]
             current_chunk = [line]
             current_index += 1
         else:
-            if line.strip() or current_chunk:  # 只添加非空行
+            if line.strip() or current_chunk:
                 current_chunk.append(line)
 
     # 保存最后一块
@@ -252,7 +263,7 @@ def semantic_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> lis
 
             # 对大段落进行句子级分割
             sentences = _split_sentences(para)
-            for sentence in sentences:
+            for sent_idx, sentence in enumerate(sentences):
                 if current_length + len(sentence) > chunk_size and current_chunk:
                     chunks.append(
                         TextChunk(content=" ".join(current_chunk).strip(), index=chunk_index)
@@ -261,7 +272,7 @@ def semantic_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> lis
                     # 保留 overlap
                     current_chunk = _get_overlap_sentences(
                         sentences,
-                        sentences.index(sentence) if sentence in sentences else 0,
+                        sent_idx,
                         overlap,
                     )
                     current_length = sum(len(s) for s in current_chunk)
@@ -305,8 +316,7 @@ def _split_sentences(text: str) -> list[str]:
     简单实现，基于中文和英文的句号、问号、感叹号
     """
     # 句子分隔符（包括中英文）
-    sentence_endings = r"([。！？.!?]+)\s*"
-    parts = re.split(sentence_endings, text)
+    parts = _SENTENCE_ENDINGS_RE.split(text)
 
     sentences = []
     current = ""

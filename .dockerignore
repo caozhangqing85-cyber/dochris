@@ -50,6 +50,7 @@ wiki/
 curated/
 logs/
 manifests/
+cache/
 *.sqlite3
 *.db
 
@@ -69,6 +70,7 @@ htmlcov/
 # 文档和示例
 docs/
 examples/
+benchmark/
 *.md
 !README.md
 
@@ -96,7 +98,6 @@ docker-compose*.yml
 .gitlab-ci.yml
 .travis.yml
 
-# 其他
-.editorconfig
+# Claude 配置
 .claude/
-.flask/
+.editorconfig
