@@ -22,7 +22,7 @@ class TestConstantsModule:
         )
 
         assert PROJECT_NAME == "dochris"
-        assert PROJECT_VERSION == "1.2.0"
+        assert PROJECT_VERSION == "1.3.0"
         assert isinstance(PROJECT_AUTHOR, str)
         assert isinstance(REPO_URL, str)
 

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-02
+
+### Added
+- **Gradio Web UI**：5 个功能页面（知识库查询、文件管理、编译控制、系统状态、质量仪表盘）
+- **`kb serve --web`**：启动 Gradio Web UI（端口 7860）
+- **`[web]` optional dependency**：`pip install dochris[web]`
+- **Docker 部署优化**：多阶段构建 + BUILD_TARGET 参数（core/pdf/api/web/all）
+- **docker-compose.yml**：ChromaDB 独立服务 + API 服务 + healthcheck
+- **性能基准测试**：5 个 benchmark（编译/索引/查询/向量/解析）
+- **text_chunker 优化**：减少字符串拷贝
+- **Makefile**：新增 `web`、`web-api`、`docker-all`、`bench` 等 targets
+- **测试覆盖率 80%**：2675 tests（+23 Web UI tests）
+
 ## [1.2.0] - 2026-05-02
 
 ### Added

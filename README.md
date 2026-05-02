@@ -387,7 +387,7 @@ VECTOR_STORE=faiss
 | 代码规范 | ruff 0 errors |
 | Python | 3.11+ |
 | 许可证 | MIT |
-| 版本 | 1.2.0 |
+| 版本 | 1.3.0 |
 
 ## 常见问题
 

@@ -62,7 +62,7 @@ ARG BUILD_TARGET=core
 # 元数据
 LABEL maintainer="caozhangqing85-cyber" \
       description="个人知识库编译系统 — 四阶段流水线" \
-      version="1.2.0" \
+      version="1.3.0" \
       build_target="${BUILD_TARGET}"
 
 # 设置环境变量

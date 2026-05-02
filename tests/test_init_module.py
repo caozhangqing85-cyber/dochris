@@ -11,7 +11,7 @@ class TestInitModuleAttributes:
         import dochris
 
         assert hasattr(dochris, "__version__")
-        assert dochris.__version__ == "1.2.0"
+        assert dochris.__version__ == "1.3.0"
 
     def test_author_exists(self):
         """测试作者信息存在"""
