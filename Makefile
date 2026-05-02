@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release
+.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api
 
 # 默认目标
 help: ## 显示帮助信息
@@ -102,3 +102,13 @@ release: ## 创建发布（tag + push）
 		sed -i "s/PROJECT_VERSION = \".*\"/PROJECT_VERSION = \"$$version\"/" src/dochris/constants.py && \
 		git add -A && git commit -m "chore: bump version to $$version" && \
 		git tag v$$version && git push origin main --tags
+
+# Web UI
+web: ## 启动 Gradio Web UI
+	kb serve --web
+
+web-api: ## 启动 FastAPI + Gradio
+	@echo "启动 API 服务..."
+	@kb serve --host 0.0.0.0 --port 8000 & sleep 2 && echo "API 启动完成: http://0.0.0.0:8000/docs"
+	@echo "启动 Web UI..."
+	@kb serve --web --host 0.0.0.0 --web-port 7860

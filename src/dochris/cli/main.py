@@ -280,16 +280,22 @@ def main() -> int:
     parser_serve = subparsers.add_parser(
         "serve",
         help="启动 API 服务器",
-        description="启动 FastAPI HTTP API 服务器",
+        description="启动 FastAPI HTTP API 服务器或 Gradio Web UI",
     )
     parser_serve.add_argument(
         "--host", default="0.0.0.0", help="监听地址（默认: 0.0.0.0）"
     )
     parser_serve.add_argument(
-        "--port", type=int, default=8000, help="监听端口（默认: 8000）"
+        "--port", type=int, default=8000, help="API 监听端口（默认: 8000）"
     )
     parser_serve.add_argument(
         "--reload", action="store_true", help="开发模式（自动重载）"
+    )
+    parser_serve.add_argument(
+        "--web", action="store_true", help="启动 Gradio Web UI 代替 API"
+    )
+    parser_serve.add_argument(
+        "--web-port", type=int, default=7860, help="Web UI 监听端口（默认: 7860）"
     )
 
     # plugin 命令

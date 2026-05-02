@@ -53,6 +53,9 @@ ocr = [
     "pytesseract>=0.3.10",
     "Pillow>=10.0.0",
 ]
+web = [
+    "gradio>=4.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -65,7 +68,7 @@ dev = [
     "httpx>=0.24.0",
 ]
 all = [
-    "dochris[audio,pdf,ocr,dev,api]",
+    "dochris[audio,pdf,ocr,dev,api,web]",
 ]
 
 [project.scripts]

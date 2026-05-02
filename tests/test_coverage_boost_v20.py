@@ -12,13 +12,12 @@ class TestCliServe:
     def test_serve_success(self):
         import importlib
         import dochris.cli.cli_serve as serve_mod
-        # 先确保 uvicorn 在 sys.modules
         mock_uvicorn = MagicMock()
         import sys
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 
-        args = MagicMock(host="127.0.0.1", port=9000, reload=False)
+        args = MagicMock(host="127.0.0.1", port=9000, reload=False, web=False)
         result = serve_mod.cmd_serve(args)
         assert result == 0
         mock_uvicorn.run.assert_called_once()
@@ -34,7 +33,7 @@ class TestCliServe:
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 
-        args = MagicMock(host="0.0.0.0", port=8000, reload=True)
+        args = MagicMock(host="0.0.0.0", port=8000, reload=True, web=False)
         result = serve_mod.cmd_serve(args)
         assert result == 0
         assert mock_uvicorn.run.call_args[1]["reload"] is True

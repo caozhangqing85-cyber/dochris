@@ -4,6 +4,7 @@
 # 支持 CPU 和 GPU（NVIDIA）运行环境
 # 构建: docker build -t dochris:latest .
 # API:  docker build --build-arg BUILD_TARGET=api -t dochris:api .
+# Web:  docker build --build-arg BUILD_TARGET=web -t dochris:web .
 # 全部: docker build --build-arg BUILD_TARGET=all -t dochris:full .
 # 运行: docker run --rm -it dochris:latest
 # GPU:  docker run --gpus all --rm -it dochris:latest
@@ -45,6 +46,7 @@ RUN <<EOF
     core)  pip install --no-cache-dir -e . ;;
     pdf)   pip install --no-cache-dir -e ".[pdf]" ;;
     api)   pip install --no-cache-dir -e ".[api]" ;;
+    web)   pip install --no-cache-dir -e ".[web]" ;;
     all)   pip install --no-cache-dir -e ".[all]" ;;
     *)     pip install --no-cache-dir -e . ;;
   esac
@@ -130,8 +132,8 @@ USER kbuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# 暴露端口（API 服务）
-EXPOSE 8000
+# 暴露端口（API 服务 + Web UI）
+EXPOSE 8000 7860
 
 # 设置入口点
 ENTRYPOINT ["/app/docker_entrypoint.sh"]
