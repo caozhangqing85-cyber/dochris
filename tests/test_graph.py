@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from dochris.graph.builder import build_graph
 from dochris.graph.models import GraphEdge, GraphNode, KnowledgeGraph

@@ -297,7 +297,7 @@ def _get_graph_html() -> str:
         keep_ids = {n["id"] for n in d3_data["nodes"][:max_nodes]}
         d3_data["nodes"] = d3_data["nodes"][:max_nodes]
         d3_data["links"] = [
-            l for l in d3_data["links"] if l["source"] in keep_ids and l["target"] in keep_ids
+            link for link in d3_data["links"] if link["source"] in keep_ids and link["target"] in keep_ids
         ]
 
     data_json = json.dumps(d3_data, ensure_ascii=False)

@@ -31,15 +31,15 @@ from dochris.cli.cli_compile import cmd_compile
 
 # 导入命令模块
 from dochris.cli.cli_completion import completion_script
-from dochris.cli.cli_graph import cmd_graph
-from dochris.cli.cli_serve import cmd_serve
 from dochris.cli.cli_config import cmd_config, cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
+from dochris.cli.cli_graph import cmd_graph
 from dochris.cli.cli_ingest import cmd_ingest
 from dochris.cli.cli_init import cmd_init
 from dochris.cli.cli_plugin import cmd_plugin, setup_plugin_parser
 from dochris.cli.cli_query import cmd_query
 from dochris.cli.cli_review import cmd_promote, cmd_quality, cmd_status
+from dochris.cli.cli_serve import cmd_serve
 from dochris.cli.cli_utils import (
     EXIT_CONFIG_ERROR,
     EXIT_FAILURE,

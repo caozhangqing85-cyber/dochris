@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api
+.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api graph-stats graph-export
 
 # 默认目标
 help: ## 显示帮助信息
@@ -112,3 +112,10 @@ web-api: ## 启动 FastAPI + Gradio
 	@kb serve --host 0.0.0.0 --port 8000 & sleep 2 && echo "API 启动完成: http://0.0.0.0:8000/docs"
 	@echo "启动 Web UI..."
 	@kb serve --web --host 0.0.0.0 --web-port 7860
+
+# 知识图谱
+graph-stats: ## 显示知识图谱统计
+	kb graph stats
+
+graph-export: ## 导出知识图谱为 JSON
+	kb graph export --output graph.json
