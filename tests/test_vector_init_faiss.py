@@ -1,8 +1,6 @@
 """补充测试 vector/__init__.py — 覆盖 FAISS ImportError 分支"""
 
-from unittest.mock import patch
 
-import pytest
 
 
 class TestVectorFaissFallback:

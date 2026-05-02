@@ -52,18 +52,31 @@ def _launch_api(args: Any) -> int:
 
 
 def _launch_web(args: Any) -> int:
-    """启动 Gradio Web UI"""
+    """启动 Gradio Web UI（挂载到 FastAPI 上，一个端口同时服务 API + Web UI）"""
     try:
-        from dochris.web.app import launch_web
+        import gradio as gr  # type: ignore[import-untyped]
+        import uvicorn
     except ImportError:
         print("错误: 需要安装 Web 依赖。运行: pip install dochris[web]")
         return 1
 
+    from dochris.api.app import create_app
+    from dochris.web.app import create_web_app
+
     host = getattr(args, "host", "0.0.0.0")
     port = getattr(args, "web_port", 7860)
 
-    logger.info(f"启动 dochris Web UI: http://{host}:{port}")
-    print(f"dochris Web UI: http://{host}:{port}")
+    fastapi_app = create_app()
+    gradio_app = create_web_app()
 
-    launch_web(server_name=host, server_port=port)
+    # Gradio 挂载到 FastAPI
+    gr.mount_gradio_app(fastapi_app, gradio_app, path="/ui")
+
+    logger.info(f"启动 dochris 统一服务: http://{host}:{port}")
+    print(f"dochris 统一服务: http://{host}:{port}")
+    print(f"Web UI: http://{host}:{port}/ui")
+    print(f"API 文档: http://{host}:{port}/docs")
+    print(f"健康检查: http://{host}:{port}/health")
+
+    uvicorn.run(fastapi_app, host=host, port=port)
     return 0

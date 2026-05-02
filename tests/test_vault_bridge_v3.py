@@ -1,10 +1,7 @@
 """补充测试 vault/bridge.py — 覆盖 _search_obsidian_notes + promote_to_obsidian 分支"""
 
 import re
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestSearchObsidianNotes:

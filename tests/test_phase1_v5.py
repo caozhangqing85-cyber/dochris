@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestScanSourceDirBranches:
     """覆盖 scan_source_dir 的边界条件"""

@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestChromaDBStoreExceptions:
     """覆盖异常分支"""

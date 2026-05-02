@@ -3,14 +3,10 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from dochris.cli.cli_utils import (
-    Colors,
     format_error,
     format_warning,
     show_status,
-    style,
 )
 
 

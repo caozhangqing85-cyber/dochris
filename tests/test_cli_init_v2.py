@@ -3,8 +3,6 @@
 from argparse import Namespace
 from unittest.mock import patch
 
-import pytest
-
 
 class TestCmdInitErrorBranches:
     """覆盖 cli_init.py 中未覆盖的错误分支"""

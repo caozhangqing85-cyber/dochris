@@ -1,8 +1,6 @@
 """补充测试 admin/recompile.py — 覆盖 PDF no_text 排除 (line 93-94)"""
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestRecompilePdfNoText:

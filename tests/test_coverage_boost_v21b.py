@@ -1,7 +1,7 @@
 """覆盖率提升 v21b — 散装低悬果实"""
 
 from io import StringIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

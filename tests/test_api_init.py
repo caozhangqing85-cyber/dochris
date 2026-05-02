@@ -1,8 +1,6 @@
 """补充测试 api/__init__.py — 覆盖 app import fallback"""
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestApiInitFallback:
@@ -10,14 +8,13 @@ class TestApiInitFallback:
 
     def test_app_fallback_on_exception(self):
         """app import 失败时设置为 None"""
-        import importlib
         import dochris.api
 
         # 重新加载模块以触发 fallback
         with patch("dochris.api.app.create_app", side_effect=Exception("no fastapi")):
             # 直接测试 fallback 路径
             try:
-                from dochris.api.app import app
+                pass
             except Exception:
                 # 如果直接导入成功，说明 app 已经在缓存中
                 pass

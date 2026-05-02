@@ -86,12 +86,14 @@ class FasterWhisperTranscriber:
 
     def check_duration(self, file_path: Path, max_duration: int = 1800) -> tuple[bool, float | None]:
         """检查音频时长"""
-        import shlex
         import subprocess
 
         try:
-            cmd = f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 {shlex.quote(str(file_path))}"
-            result = subprocess.run(cmd, capture_output=True, text=True, shell=True, timeout=30)
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)],
+                capture_output=True, text=True, timeout=30,
+            )
 
             if result.returncode == 0:
                 duration = float(result.stdout.strip())

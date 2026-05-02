@@ -20,7 +20,6 @@ class TestPluginInfoDetailed:
     def test_plugin_info_disabled_with_hooks(self, mock_print, reset_pm):
         """disabled 插件有 hooks，且 hookspec 存在"""
         from dochris.cli.cli_plugin import _plugin_info
-        from dochris.plugin import get_plugin_manager
 
         pm = get_plugin_manager()
 
@@ -46,7 +45,6 @@ class TestPluginInfoDetailed:
     def test_plugin_info_no_hooks(self, mock_print, reset_pm):
         """插件没有 hooks"""
         from dochris.cli.cli_plugin import _plugin_info
-        from dochris.plugin import get_plugin_manager
 
         pm = get_plugin_manager()
         pm._register_module("nohook_plugin", None, [])

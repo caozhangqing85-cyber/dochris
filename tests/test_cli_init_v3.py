@@ -3,8 +3,6 @@
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestCmdInitPythonVersion:
     """覆盖 Python 版本检查失败分支 (line 32-34)"""
@@ -25,8 +23,8 @@ class TestCmdInitPythonVersion:
         mock_vi.major = 3
         mock_vi.minor = 10
         mock_vi.micro = 0
-        mock_vi.__lt__ = lambda self, other: (3, 10) < other
-        mock_vi.__ge__ = lambda self, other: (3, 10) >= other
+        mock_vi.__lt__ = lambda self, other: other > (3, 10)
+        mock_vi.__ge__ = lambda self, other: other <= (3, 10)
 
         with patch("dochris.cli.cli_init.sys.version_info", mock_vi):
             with patch("builtins.print"):

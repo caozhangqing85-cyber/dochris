@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 
 class TestSanitizeMain:
     """覆盖 main 函数 (lines 220-225)"""

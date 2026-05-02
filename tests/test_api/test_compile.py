@@ -21,7 +21,7 @@ class TestCompileEndpoint:
     def test_compile_no_work(self, client) -> None:
         """没有待编译文档"""
         with (
-            patch("dochris.api.routes.compile.get_default_workspace") as mock_ws,
+            patch("dochris.api.routes.compile.get_default_workspace"),
             patch("dochris.api.routes.compile.get_all_manifests", return_value=[]),
         ):
             resp = client.post("/api/v1/compile", json={"concurrency": 1})

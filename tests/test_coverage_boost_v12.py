@@ -3,8 +3,6 @@
 import argparse
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 # ============================================================
 # cli/cli_doctor.py

@@ -595,8 +595,9 @@ class TestLLMClientInit:
     @pytest.mark.asyncio
     async def test_rate_limit_with_wait(self):
         """需要等待时的 rate_limit"""
-        from dochris.core.llm_client import LLMClient
         import time
+
+        from dochris.core.llm_client import LLMClient
 
         with patch("dochris.llm.get_provider") as mock_get:
             mock_provider = MagicMock()
@@ -735,13 +736,13 @@ class TestCleanupClients:
     """测试 cleanup_all_clients 函数"""
 
     def test_cleanup_empty(self):
-        from dochris.core.llm_client import cleanup_all_clients, _client_instances
+        from dochris.core.llm_client import _client_instances, cleanup_all_clients
 
         _client_instances.clear()
         cleanup_all_clients()
 
     def test_cleanup_with_clients(self):
-        from dochris.core.llm_client import cleanup_all_clients, _client_instances
+        from dochris.core.llm_client import _client_instances, cleanup_all_clients
 
         _client_instances.clear()
 
@@ -754,7 +755,7 @@ class TestCleanupClients:
 
     def test_cleanup_runtime_error(self):
         """事件循环冲突时的清理"""
-        from dochris.core.llm_client import cleanup_all_clients, _client_instances
+        from dochris.core.llm_client import _client_instances, cleanup_all_clients
 
         _client_instances.clear()
 

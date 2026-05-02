@@ -1,7 +1,6 @@
 """补充测试 compensate/compensate_failures.py — 覆盖 find_failed_manifests + compile_with_model_fallback"""
 
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -1,7 +1,6 @@
 """补充测试 retry_manager.py — 覆盖 get_retry_delay else 分支 + retry last_error"""
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

@@ -66,26 +66,26 @@ class MonitorWorker:
         """打印报告"""
         report = self.generate_progress_report()
 
-        print(f"\n{'=' * 60}")
-        print("📊 编译进度报告 - v7 (模块化重构版)")
-        print(f"{'=' * 60}")
-        print(f"总计: {report['total']}")
-        print(f"报告时间: {report['timestamp']}")
+        logger.info("=" * 60)
+        logger.info("编译进度报告 - v7 (模块化重构版)")
+        logger.info("=" * 60)
+        logger.info(f"总计: {report['total']}")
+        logger.info(f"报告时间: {report['timestamp']}")
 
-        print("\n📈 状态分布:")
+        logger.info("状态分布:")
         for status, count in sorted(report["status"].items()):
             percentage = (count / report["total"] * 100) if report["total"] > 0 else 0
-            print(f"  {status:15} {count:5} 个 ({percentage:5.1f}%)")
+            logger.info(f"  {status:15} {count:5} 个 ({percentage:5.1f}%)")
 
         if report["quality_stats"]["samples"] > 0:
-            print("\n🎯 质量评分统计:")
-            print(f"  平均分数: {report['quality_stats']['average']}/100")
-            print(f"  最高分数: {report['quality_stats']['max']}/100")
-            print(f"  最低分数: {report['quality_stats']['min']}/100")
-            print(f"  样本数量: {report['quality_stats']['samples']}")
+            logger.info("质量评分统计:")
+            logger.info(f"  平均分数: {report['quality_stats']['average']}/100")
+            logger.info(f"  最高分数: {report['quality_stats']['max']}/100")
+            logger.info(f"  最低分数: {report['quality_stats']['min']}/100")
+            logger.info(f"  样本数量: {report['quality_stats']['samples']}")
 
-        print(f"\n✅ 完成率: {report['compiled_percentage']:.1f}%")
-        print(f"{'=' * 60}\n")
+        logger.info(f"完成率: {report['compiled_percentage']:.1f}%")
+        logger.info("=" * 60)
 
     def save_report(self, report_path: Path | None = None) -> None:
         """保存报告到文件"""

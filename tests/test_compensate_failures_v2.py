@@ -1,7 +1,6 @@
 """补充测试 compensate/compensate_failures.py — 覆盖 ImportError fallback 函数"""
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

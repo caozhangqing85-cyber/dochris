@@ -14,6 +14,7 @@ Vault Bridge — Obsidian 双向联动
 """
 
 import hashlib
+import logging
 import re
 import shutil
 import sys
@@ -31,6 +32,8 @@ from dochris.manifest import (
     get_next_src_id,
 )
 from dochris.settings import get_settings as _get_settings
+
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # 常量（从配置获取）
@@ -194,12 +197,12 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
 
     notes = _search_obsidian_notes(topic)
     if not notes:
-        print(f"未找到与 '{topic}' 相关的 Obsidian 笔记")
+        logger.info(f"未找到与 '{topic}' 相关的 Obsidian 笔记")
         return []
 
-    print(f"找到 {len(notes)} 个相关笔记:")
+    logger.info(f"找到 {len(notes)} 个相关笔记:")
     for n in notes:
-        print(f"  [{n['match_type']}] {n['rel_path']}")
+        logger.info(f"  [{n['match_type']}] {n['rel_path']}")
 
     seeded = []
     for note in notes:
@@ -219,7 +222,7 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
         existing = get_all_manifests(workspace_path)
         already_exists = any(m.get("content_hash") == content_hash for m in existing)
         if already_exists:
-            print(f"  跳过（已存在）: {title}")
+            logger.info(f"  跳过（已存在）: {title}")
             continue
 
         # 复制到 inbox
@@ -256,9 +259,7 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
             }
         )
 
-        print(f"  入库: {src_id} → {title}")
-
-    # 追加日志
+        logger.info(f"  入库: {src_id} → {title}")
     if seeded:
         append_log(
             workspace_path,
@@ -296,18 +297,18 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
     manifest = get_manifest(workspace_path, src_id)
 
     if manifest is None:
-        print(f"错误：未找到 manifest {src_id}")
+        logger.error(f"未找到 manifest {src_id}")
         return False
 
     if manifest["status"] not in ("promoted", "promoted_to_wiki"):
-        print(
-            f"错误：{src_id} 当前状态为 '{manifest['status']}'，需要 'promoted' 或 'promoted_to_wiki'"
+        logger.error(
+            f"{src_id} 当前状态为 '{manifest['status']}'，需要 'promoted' 或 'promoted_to_wiki'"
         )
         return False
 
     title = manifest.get("title", "")
     if not title:
-        print(f"错误：{src_id} 缺少 title 字段")
+        logger.error(f"{src_id} 缺少 title 字段")
         return False
 
     # 查找源文件（优先 curated/promoted/，其次 wiki/summaries/）
@@ -328,14 +329,14 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
                 break
 
     if source_file is None:
-        print(f"错误：未找到 {src_id} 的产物文件")
+        logger.error(f"未找到 {src_id} 的产物文件")
         return False
 
     # 读取并清洗内容
     try:
         content = source_file.read_text(encoding="utf-8")
     except OSError as e:
-        print(f"错误：读取文件失败: {e}")
+        logger.error(f"读取文件失败: {e}")
         return False
 
     content = clean_internal_references(content)
@@ -343,7 +344,7 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
     # 写入 Obsidian 主库
     obsidian_vault = _get_obsidian_vault()
     if obsidian_vault is None or not obsidian_vault.exists():
-        print(f"错误：Obsidian 主库不存在或未配置: {obsidian_vault}")
+        logger.error(f"Obsidian 主库不存在或未配置: {obsidian_vault}")
         return False
 
     obsidian_target = obsidian_vault / "06-知识库" / source_file.name
@@ -375,8 +376,8 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
         f"{src_id} | {title} → {obsidian_target.relative_to(obsidian_vault)}",
     )
 
-    print(f"推送成功：{src_id} → Obsidian")
-    print(f"  目标: {obsidian_target.relative_to(obsidian_vault)}")
+    logger.info(f"推送成功：{src_id} → Obsidian")
+    logger.info(f"  目标: {obsidian_target.relative_to(obsidian_vault)}")
     return True
 
 
@@ -401,12 +402,12 @@ def list_associated_notes(workspace_path: Path, src_id: str) -> list[dict]:
     manifest = get_manifest(workspace_path, src_id)
 
     if manifest is None:
-        print(f"未找到 manifest: {src_id}")
+        logger.warning(f"未找到 manifest: {src_id}")
         return []
 
     title = manifest.get("title", "")
     if not title:
-        print(f"{src_id} 缺少标题，无法搜索")
+        logger.warning(f"{src_id} 缺少标题，无法搜索")
         return []
 
     # 用标题的关键词搜索
@@ -415,12 +416,12 @@ def list_associated_notes(workspace_path: Path, src_id: str) -> list[dict]:
 
     notes = _search_obsidian_notes(search_term)
     if not notes:
-        print(f"未找到与 '{title}' 关联的 Obsidian 笔记")
+        logger.info(f"未找到与 '{title}' 关联的 Obsidian 笔记")
         return []
 
-    print(f"关联笔记（{len(notes)} 个）:")
+    logger.info(f"关联笔记（{len(notes)} 个）:")
     for n in notes:
-        print(f"  [{n['match_type']}] {n['rel_path']}")
+        logger.info(f"  [{n['match_type']}] {n['rel_path']}")
 
     return notes
 

@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestDocParserErrorBranches:
     """覆盖 doc_parser 的错误处理分支"""

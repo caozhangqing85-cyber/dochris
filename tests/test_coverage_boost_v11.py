@@ -1,6 +1,6 @@
 """覆盖率提升 v11 — vault/bridge.py + vector/base.py + vector/__init__"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -51,7 +51,7 @@ class TestCleanInternalReferences:
 
         content = "a\n\n\n\n\nb"
         result = clean_internal_references(content)
-        assert "a\n\nb" == result
+        assert result == "a\n\nb"
 
     def test_strip_whitespace(self):
         from dochris.vault.bridge import clean_internal_references
@@ -196,8 +196,9 @@ class TestSeedFromObsidian:
 
     @patch("dochris.vault.bridge._search_obsidian_notes")
     def test_seed_duplicate_skipped(self, mock_search, tmp_path):
-        from dochris.vault.bridge import seed_from_obsidian
         import hashlib
+
+        from dochris.vault.bridge import seed_from_obsidian
 
         vault = tmp_path / "vault"
         vault.mkdir()

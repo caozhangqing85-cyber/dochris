@@ -99,7 +99,38 @@ def load_plugin_from_code(code: str, module_name: str) -> Any:
     sys.modules[module_name] = module
 
     try:
-        exec(code, module.__dict__)
+        safe_builtins = {
+            "print": print,
+            "range": range,
+            "len": len,
+            "dict": dict,
+            "list": list,
+            "str": str,
+            "int": int,
+            "float": float,
+            "bool": bool,
+            "True": True,
+            "False": False,
+            "None": None,
+            "tuple": tuple,
+            "set": set,
+            "frozenset": frozenset,
+            "type": type,
+            "isinstance": isinstance,
+            "issubclass": issubclass,
+            "getattr": getattr,
+            "hasattr": hasattr,
+            "setattr": setattr,
+            "Exception": Exception,
+            "ValueError": ValueError,
+            "TypeError": TypeError,
+            "KeyError": KeyError,
+            "AttributeError": AttributeError,
+            "RuntimeError": RuntimeError,
+            "NotImplementedError": NotImplementedError,
+            "ImportError": ImportError,
+        }
+        exec(code, {"__builtins__": safe_builtins}, module.__dict__)  # noqa: S102
     except Exception:
         if module_name in sys.modules:
             del sys.modules[module_name]

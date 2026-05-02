@@ -13,6 +13,7 @@
   python scripts/batch_promote.py <workspace> obsidian --min-score 95
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,8 @@ from dochris.log import append_log
 from dochris.manifest import get_all_manifests
 from dochris.promote import promote_to_curated, promote_to_wiki
 from dochris.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # 批量 promote 到 wiki
@@ -59,13 +62,13 @@ def batch_promote_to_wiki(
 
     stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
-    print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
+    logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
-        print("[DRY RUN] 仅预览，不执行")
+        logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            print(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
         if len(candidates) > 20:
-            print(f"  ... 还有 {len(candidates) - 20} 个")
+            logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats
 
     for m in candidates:
@@ -87,7 +90,7 @@ def batch_promote_to_wiki(
         f"total={stats['total']}, success={stats['success']}, failed={stats['failed']}",
     )
 
-    print(f"\n完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
+    logger.info(f"完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
     return stats
 
 
@@ -125,13 +128,13 @@ def batch_promote_to_curated(
 
     stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
-    print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
+    logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
-        print("[DRY RUN] 仅预览，不执行")
+        logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            print(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
         if len(candidates) > 20:
-            print(f"  ... 还有 {len(candidates) - 20} 个")
+            logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats
 
     for m in candidates:
@@ -153,7 +156,7 @@ def batch_promote_to_curated(
         f"total={stats['total']}, success={stats['success']}, failed={stats['failed']}",
     )
 
-    print(f"\n完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
+    logger.info(f"完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
     return stats
 
 
@@ -185,7 +188,7 @@ def batch_promote_to_obsidian(
     try:
         from dochris.vault.bridge import promote_to_obsidian
     except ImportError as e:
-        print(f"错误：无法导入 vault_bridge: {e}")
+        logger.error(f"无法导入 vault_bridge: {e}")
         return {"total": 0, "success": 0, "failed": 0}
 
     manifests = get_all_manifests(workspace_path, status="promoted")
@@ -199,13 +202,13 @@ def batch_promote_to_obsidian(
 
     stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
 
-    print(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
+    logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
-        print("[DRY RUN] 仅预览，不执行")
+        logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            print(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
         if len(candidates) > 20:
-            print(f"  ... 还有 {len(candidates) - 20} 个")
+            logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats
 
     for m in candidates:
@@ -227,7 +230,7 @@ def batch_promote_to_obsidian(
         f"total={stats['total']}, success={stats['success']}, failed={stats['failed']}",
     )
 
-    print(f"\n完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
+    logger.info(f"完成: 成功={stats['success']}, 失败={stats['failed']}, 总计={stats['total']}")
     return stats
 
 

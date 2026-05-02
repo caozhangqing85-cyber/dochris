@@ -3,8 +3,6 @@
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestConfigDotenvFallback:
     """覆盖 dotenv 未安装时的 fallback"""

@@ -1,6 +1,6 @@
 """覆盖率提升 v20a — cli_serve + api promote tests"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,6 +11,7 @@ import pytest
 class TestCliServe:
     def test_serve_success(self):
         import importlib
+
         import dochris.cli.cli_serve as serve_mod
         mock_uvicorn = MagicMock()
         import sys
@@ -27,6 +28,7 @@ class TestCliServe:
 
     def test_serve_with_reload(self):
         import importlib
+
         import dochris.cli.cli_serve as serve_mod
         mock_uvicorn = MagicMock()
         import sys
@@ -41,10 +43,11 @@ class TestCliServe:
     @pytest.mark.skip("uvicorn module removal causes side effects in test env")
     def test_serve_no_uvicorn(self):
         import importlib
-        import dochris.cli.cli_serve as serve_mod
         import sys
+
+        import dochris.cli.cli_serve as serve_mod
         # 移除 uvicorn 模拟 ImportError
-        old = sys.modules.pop("uvicorn", None)
+        sys.modules.pop("uvicorn", None)
         try:
             importlib.reload(serve_mod)
             args = MagicMock()
@@ -57,6 +60,7 @@ class TestCliServe:
 
     def test_serve_defaults(self):
         import importlib
+
         import dochris.cli.cli_serve as serve_mod
         mock_uvicorn = MagicMock()
         import sys

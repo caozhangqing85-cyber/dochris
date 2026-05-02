@@ -123,10 +123,10 @@ def index_file(file_path: str | Path, source_type: str = "obsidian") -> None:
         file_path = Path(file_path)
 
         if not file_path.exists():
-            print(f"⚠️  文件不存在: {file_path}")
+            logger.warning(f"文件不存在: {file_path}")
             return
 
-        print(f"📄 索引中: {file_path}")
+        logger.info(f"索引中: {file_path}")
 
         if source_type == "obsidian":
             # Markdown 文件
@@ -149,7 +149,7 @@ def index_file(file_path: str | Path, source_type: str = "obsidian") -> None:
 
         elif source_type == "pdf":
             # PDF 文件（暂时跳过，需要 markitdown）
-            print(f"⏭️  跳过 PDF（需要 markitdown 处理）: {file_path}")
+            logger.info(f"跳过 PDF（需要 markitdown 处理）: {file_path}")
             return
 
         # 清理和截断
@@ -188,7 +188,7 @@ def index_file(file_path: str | Path, source_type: str = "obsidian") -> None:
             ids=[doc_id],
         )
 
-        print(f"✅ 已索引: {title}")
+        logger.info(f"已索引: {title}")
 
     except (OSError, json.JSONDecodeError, KeyError, ValueError, RuntimeError) as e:
         logger.error(f"索引失败 {file_path}: {e}")
@@ -199,21 +199,21 @@ def index_obsidian_priority() -> None:
     _s = get_settings()
     obsidian_vault = _s.obsidian_vaults[0] if _s.obsidian_vaults else None
     if obsidian_vault is None:
-        print("⚠️  未配置 OBSIDIAN_VAULT，请在 .env 中设置 OBSIDIAN_VAULT")
-        print("   或使用环境变量: export OBSIDIAN_VAULT=/path/to/vault")
+        logger.warning("未配置 OBSIDIAN_VAULT，请在 .env 中设置 OBSIDIAN_VAULT")
+        logger.warning("或使用环境变量: export OBSIDIAN_VAULT=/path/to/vault")
         return
 
-    print("\n" + "=" * 60)
-    print("📚 索引 Obsidian 优先文件")
-    print(f"📁 Vault: {obsidian_vault}")
-    print("=" * 60 + "\n")
+    logger.info("=" * 60)
+    logger.info("索引 Obsidian 优先文件")
+    logger.info(f"Vault: {obsidian_vault}")
+    logger.info("=" * 60)
 
     for rel_path in PRIORITY_FILES:
         file_path = obsidian_vault / rel_path
         if file_path.exists():
             index_file(file_path, "obsidian")
         else:
-            print(f"⚠️  文件不存在: {rel_path}")
+            logger.warning(f"文件不存在: {rel_path}")
 
 
 def index_obsidian_all(limit: int = 50) -> None:
@@ -221,14 +221,14 @@ def index_obsidian_all(limit: int = 50) -> None:
     _s = get_settings()
     obsidian_vault = _s.obsidian_vaults[0] if _s.obsidian_vaults else None
     if obsidian_vault is None:
-        print("⚠️  未配置 OBSIDIAN_VAULT，请在 .env 中设置 OBSIDIAN_VAULT")
-        print("   或使用环境变量: export OBSIDIAN_VAULT=/path/to/vault")
+        logger.warning("未配置 OBSIDIAN_VAULT，请在 .env 中设置 OBSIDIAN_VAULT")
+        logger.warning("或使用环境变量: export OBSIDIAN_VAULT=/path/to/vault")
         return
 
-    print("\n" + "=" * 60)
-    print(f"📚 索引 Obsidian 所有文件（最多 {limit} 个）")
-    print(f"📁 Vault: {obsidian_vault}")
-    print("=" * 60 + "\n")
+    logger.info("=" * 60)
+    logger.info(f"索引 Obsidian 所有文件（最多 {limit} 个）")
+    logger.info(f"Vault: {obsidian_vault}")
+    logger.info("=" * 60)
 
     count = 0
     for md_file in obsidian_vault.rglob("*.md"):
@@ -240,14 +240,14 @@ def index_obsidian_all(limit: int = 50) -> None:
 
 def search_knowledge(query: str, n_results: int = 5) -> None:
     """搜索知识库"""
-    print(f"\n🔍 搜索: '{query}'\n")
-    print("=" * 60)
+    logger.info(f"搜索: '{query}'")
+    logger.info("=" * 60)
 
     results = collection.query(query_texts=[query], n_results=n_results)
 
     documents = results.get("documents")
     if not documents or not documents[0]:
-        print("未找到结果")
+        logger.info("未找到结果")
         return
 
     metadatas = results.get("metadatas")
@@ -260,21 +260,20 @@ def search_knowledge(query: str, n_results: int = 5) -> None:
         zip(documents[0], metadatas_list[0], strict=False)
     ):
         meta_dict = dict(meta) if not isinstance(meta, dict) else meta
-        print(f"\n### {i + 1}. {meta_dict.get('title', '无标题')}")
-        print(f"**路径**: `{meta_dict.get('path', '')}`")
-        print(f"**类型**: {meta_dict.get('type', '')} | **来源**: {meta_dict.get('source', '')}")
-        print("\n**内容片段**:")
-        print(f"{doc[:300]}...")
+        logger.info(f"{i + 1}. {meta_dict.get('title', '无标题')}")
+        logger.info(f"路径: {meta_dict.get('path', '')}")
+        logger.info(f"类型: {meta_dict.get('type', '')} | 来源: {meta_dict.get('source', '')}")
+        logger.info(f"内容片段: {doc[:300]}...")
 
 
 def show_stats() -> None:
     """显示统计信息"""
-    print("\n" + "=" * 60)
-    print("📊 向量数据库统计")
-    print("=" * 60 + "\n")
+    logger.info("=" * 60)
+    logger.info("向量数据库统计")
+    logger.info("=" * 60)
 
     count = collection.count()
-    print(f"总文档数: {count}")
+    logger.info(f"总文档数: {count}")
 
     # 按来源分组
     sources: dict[str, int] = {}
@@ -286,9 +285,9 @@ def show_stats() -> None:
             source = str(doc_dict.get("source", "unknown"))
             sources[source] = sources.get(source, 0) + 1
 
-    print("\n按来源分组:")
+    logger.info("按来源分组:")
     for source, cnt in sources.items():
-        print(f"  - {source}: {cnt}")
+        logger.info(f"  - {source}: {cnt}")
 
 
 def main() -> None:

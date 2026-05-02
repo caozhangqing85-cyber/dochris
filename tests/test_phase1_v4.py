@@ -1,9 +1,6 @@
 """补充测试 phase1_ingestion.py — 覆盖 get_audio_duration exception + resolve max_attempts + scan functions"""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 class TestGetAudioDurationExceptions:
@@ -12,6 +9,7 @@ class TestGetAudioDurationExceptions:
     def test_ffprobe_timeout(self, tmp_path):
         """ffprobe 超时返回 None"""
         import subprocess
+
         from dochris.phases.phase1_ingestion import get_audio_duration
 
         audio = tmp_path / "test.mp3"

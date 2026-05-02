@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestExtractTextFromFilePDF:
     """覆盖 PDF 提取分支 - 延迟导入需 patch 实际模块"""
@@ -50,8 +48,8 @@ class TestExtractTextFromFilePDF:
 
     def test_pdf_text_extraction_error(self, tmp_path):
         """PDF 提取抛出 TextExtractionError"""
-        from dochris.exceptions import TextExtractionError
         from dochris.compensate.compensate_extractors import extract_text_from_file
+        from dochris.exceptions import TextExtractionError
 
         pdf = tmp_path / "test.pdf"
         pdf.write_bytes(b"%PDF fake")
@@ -81,8 +79,8 @@ class TestExtractTextFromFileDoc:
 
     def test_html_extraction_text_extraction_error(self, tmp_path):
         """HTML 提取抛出 TextExtractionError"""
-        from dochris.exceptions import TextExtractionError
         from dochris.compensate.compensate_extractors import extract_text_from_file
+        from dochris.exceptions import TextExtractionError
 
         html = tmp_path / "test.html"
         html.write_text("<html>test</html>", encoding="utf-8")

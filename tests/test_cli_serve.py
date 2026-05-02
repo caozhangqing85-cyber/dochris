@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestCmdServe:
     """测试 cmd_serve 函数"""

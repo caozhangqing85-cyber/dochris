@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 # ============================================================
 # phases/phase3_query.py — mock query_engine / query_utils

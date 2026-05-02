@@ -1,10 +1,9 @@
 """覆盖率提升 v18 — 最后冲刺 75%"""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-
 
 # ============================================================
 # cli/cli_doctor.py — 15 miss

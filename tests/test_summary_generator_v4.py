@@ -1,6 +1,5 @@
 """补充测试 summary_generator.py — 覆盖 json_repair 和 extract_json_from_text 路径"""
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

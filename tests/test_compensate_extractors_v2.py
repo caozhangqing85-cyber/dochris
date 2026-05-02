@@ -1,6 +1,5 @@
 """补充测试 compensate_extractors.py — 覆盖更多提取分支"""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

@@ -1,8 +1,6 @@
 """补充测试 vector/base.py — 覆盖 collection_exists + __repr__"""
 
-from unittest.mock import MagicMock
 
-import pytest
 
 
 class TestBaseVectorStoreConcrete:

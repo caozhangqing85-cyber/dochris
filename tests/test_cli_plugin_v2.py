@@ -1,7 +1,7 @@
 """补充测试 cli_plugin.py — 覆盖 cmd_plugin enable/disable 分支和 setup_plugin_parser"""
 
 import argparse
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -9,7 +9,7 @@ from dochris.cli.cli_plugin import (
     cmd_plugin,
     setup_plugin_parser,
 )
-from dochris.plugin import get_plugin_manager, reset_plugin_manager
+from dochris.plugin import reset_plugin_manager
 
 
 @pytest.fixture

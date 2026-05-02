@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 # ============================================================
 # plugin/hookspec.py
@@ -35,7 +33,7 @@ class TestHookspecDecorator:
         assert my_test_hook._is_hookspec is True
 
     def test_hookspec_registers(self):
-        from dochris.plugin.hookspec import hookspec, _HOOK_SPECS
+        from dochris.plugin.hookspec import _HOOK_SPECS, hookspec
 
         @hookspec
         def unique_hook_name_for_test():

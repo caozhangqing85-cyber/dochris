@@ -1,9 +1,6 @@
 """补充测试 phase3_query.py — 覆盖 _build_manifest_index 代理"""
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestBuildManifestIndex:
@@ -21,5 +18,5 @@ class TestBuildManifestIndex:
         result = phase3_query._build_manifest_index()
 
         # 验证恢复了原始路径
-        assert phase3_query.query_utils.MANIFESTS_PATH == original_path
+        assert original_path == phase3_query.query_utils.MANIFESTS_PATH
         assert result == {"path1": "SRC-0001"}

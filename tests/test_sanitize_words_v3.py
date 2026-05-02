@@ -1,6 +1,5 @@
 """补充测试 sanitize_sensitive_words.py — 覆盖 sanitize_filename/sanitize_pdf_content/sanitize_prompt"""
 
-import pytest
 
 
 class TestSanitizeFilename:

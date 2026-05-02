@@ -1,7 +1,5 @@
 """补充测试 phase2_compilation.py — 覆盖 dry_run 估算和非 TTY 分支"""
 
-import json
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

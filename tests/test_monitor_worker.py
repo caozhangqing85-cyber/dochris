@@ -162,9 +162,10 @@ class TestMonitorWorkerPrintReport:
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_print_report(self, mock_print, mock_get_workspace, mock_get_all, sample_manifests):
+    def test_print_report(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试打印报告"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
@@ -172,17 +173,18 @@ class TestMonitorWorkerPrintReport:
 
         worker = MonitorWorker()
 
-        # 应该不抛出异常
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            worker.print_report()
 
-        # 验证 print 被调用
-        assert mock_print.call_count > 0
+        # 验证 logger 有输出
+        assert len(caplog.records) > 0
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_print_report_with_quality_stats(self, mock_print, mock_get_workspace, mock_get_all, sample_manifests):
+    def test_print_report_with_quality_stats(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试打印带质量统计的报告"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
@@ -190,17 +192,18 @@ class TestMonitorWorkerPrintReport:
 
         worker = MonitorWorker()
 
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            worker.print_report()
 
         # 验证包含质量信息
-        print_calls = [str(call) for call in mock_print.call_args_list]
-        assert any("质量" in call or "质量" in call or "quality" in str(call).lower() for call in print_calls)
+        assert any("质量" in r.message or "quality" in r.message.lower() for r in caplog.records)
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_print_report_empty_workspace(self, mock_print, mock_get_workspace, mock_get_all, mock_workspace):
+    def test_print_report_empty_workspace(self, mock_get_workspace, mock_get_all, mock_workspace, caplog):
         """测试打印空工作区报告"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
@@ -208,8 +211,9 @@ class TestMonitorWorkerPrintReport:
 
         worker = MonitorWorker()
 
-        # 应该不抛出异常
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            # 应该不抛出异常
+            worker.print_report()
 
 
 class TestMonitorWorkerSaveReport:
@@ -396,54 +400,57 @@ class TestMonitorWorkerReportFormatting:
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_report_has_header(self, mock_print, mock_get_workspace, mock_get_all, sample_manifests):
+    def test_report_has_header(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试报告有标题"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
         mock_get_all.return_value = sample_manifests
 
         worker = MonitorWorker()
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            worker.print_report()
 
-        # 检查第一行
-        first_call = mock_print.call_args_list[0]
-        assert "=" in str(first_call)
+        # 检查有分隔线输出
+        assert any("=" * 10 in r.message for r in caplog.records)
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_report_shows_total(self, mock_print, mock_get_workspace, mock_get_all, sample_manifests):
+    def test_report_shows_total(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试报告显示总数"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
         mock_get_all.return_value = sample_manifests
 
         worker = MonitorWorker()
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            worker.print_report()
 
         # 检查是否显示总数
-        print_calls = [str(call) for call in mock_print.call_args_list]
-        assert any("5" in call for call in print_calls)
+        assert any("5" in r.message for r in caplog.records)
 
     @patch('dochris.workers.monitor_worker.get_all_manifests')
     @patch('dochris.workers.monitor_worker.get_default_workspace')
-    @patch('builtins.print')
-    def test_report_shows_completion_rate(self, mock_print, mock_get_workspace, mock_get_all, sample_manifests):
+    def test_report_shows_completion_rate(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试报告显示完成率"""
+        import logging
+
         from dochris.workers.monitor_worker import MonitorWorker
 
         mock_get_workspace.return_value = mock_workspace
         mock_get_all.return_value = sample_manifests
 
         worker = MonitorWorker()
-        worker.print_report()
+        with caplog.at_level(logging.INFO, logger="dochris.workers.monitor_worker"):
+            worker.print_report()
 
         # 检查是否显示完成率
-        print_calls = [str(call) for call in mock_print.call_args_list]
-        assert any("40" in call or "40.0" in call for call in print_calls)
+        assert any("40" in r.message for r in caplog.records)
 
 
 class TestMonitorWorkerErrorHandling:

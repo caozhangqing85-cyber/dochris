@@ -6,7 +6,6 @@ Settings 配置类
 
 import logging
 import os
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,8 +17,8 @@ logger = logging.getLogger(__name__)
 try:
     from dotenv import load_dotenv
 except ImportError:
-    print("警告: python-dotenv 未安装，将只使用环境变量", file=sys.stderr)
-    print("安装命令: pip install python-dotenv", file=sys.stderr)
+    logger.warning("python-dotenv 未安装，将只使用环境变量")
+    logger.warning("安装命令: pip install python-dotenv")
 
     # 类型忽略：这是一个兼容性处理，提供默认实现
     def load_dotenv(*args: object, **kwargs: object) -> bool:  # type: ignore[misc]

@@ -1,6 +1,6 @@
 """补充测试 cli/main.py — 覆盖 serve 和 unknown command 分支"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 

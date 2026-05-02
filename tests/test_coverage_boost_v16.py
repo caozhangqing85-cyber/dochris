@@ -6,7 +6,6 @@
 - parsers/pdf_parser.py — 14 miss (88%) → pypdf2 fallback paths
 """
 
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -80,7 +79,7 @@ class TestCliMainBranches:
 
     def test_main_validation_value_error(self):
         """settings.validate() 抛出 ValueError → EXIT_CONFIG_ERROR"""
-        from dochris.cli.main import main, EXIT_CONFIG_ERROR
+        from dochris.cli.main import EXIT_CONFIG_ERROR, main
 
         settings = MagicMock()
         settings.validate.side_effect = ValueError("bad config")
@@ -92,7 +91,7 @@ class TestCliMainBranches:
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_api_key_error(self):
-        from dochris.cli.main import main, EXIT_CONFIG_ERROR
+        from dochris.cli.main import EXIT_CONFIG_ERROR, main
         from dochris.exceptions import APIKeyError
 
         with patch("sys.argv", ["kb", "ingest"]), \
@@ -101,7 +100,7 @@ class TestCliMainBranches:
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_configuration_error(self):
-        from dochris.cli.main import main, EXIT_CONFIG_ERROR
+        from dochris.cli.main import EXIT_CONFIG_ERROR, main
         from dochris.exceptions import ConfigurationError
 
         with patch("sys.argv", ["kb", "ingest"]), \
@@ -110,7 +109,7 @@ class TestCliMainBranches:
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_llm_connection_error(self):
-        from dochris.cli.main import main, EXIT_NETWORK_ERROR
+        from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMConnectionError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -119,7 +118,7 @@ class TestCliMainBranches:
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_timeout_error(self):
-        from dochris.cli.main import main, EXIT_NETWORK_ERROR
+        from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMTimeoutError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -128,7 +127,7 @@ class TestCliMainBranches:
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_rate_limit_error(self):
-        from dochris.cli.main import main, EXIT_NETWORK_ERROR
+        from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMRateLimitError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -137,7 +136,7 @@ class TestCliMainBranches:
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_content_filter_error(self):
-        from dochris.cli.main import main, EXIT_FAILURE
+        from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import LLMContentFilterError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -146,7 +145,7 @@ class TestCliMainBranches:
             assert main() == EXIT_FAILURE
 
     def test_main_llm_generic_error(self):
-        from dochris.cli.main import main, EXIT_FAILURE
+        from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import LLMError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -155,7 +154,7 @@ class TestCliMainBranches:
             assert main() == EXIT_FAILURE
 
     def test_main_file_processing_error(self):
-        from dochris.cli.main import main, EXIT_FAILURE
+        from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import FileProcessingError
 
         with patch("sys.argv", ["kb", "compile"]), \
@@ -164,7 +163,7 @@ class TestCliMainBranches:
             assert main() == EXIT_FAILURE
 
     def test_main_kb_error(self):
-        from dochris.cli.main import main, EXIT_FAILURE
+        from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import KnowledgeBaseError
 
         with patch("sys.argv", ["kb", "compile"]), \

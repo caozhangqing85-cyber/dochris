@@ -61,7 +61,7 @@ class TestCmdDoctorDiskSpace:
         m.free = 3 * (1024**3)  # 3GB < 5GB
         mock_disk.return_value = m
 
-        result = cmd_doctor(argparse.Namespace())
+        cmd_doctor(argparse.Namespace())
         output = " ".join(str(c) for c in mock_print.call_args_list)
         assert "偏低" in output
 
@@ -73,7 +73,7 @@ class TestCmdDoctorDiskSpace:
 
         mock_disk.side_effect = OSError("permission denied")
 
-        result = cmd_doctor(argparse.Namespace())
+        cmd_doctor(argparse.Namespace())
         output = " ".join(str(c) for c in mock_print.call_args_list)
         assert "无法检查" in output
 
@@ -111,7 +111,7 @@ class TestCmdDoctorDependency:
             return original_import(name, *args, **kwargs)
 
         with patch("builtins.__import__", side_effect=mock_import):
-            result = cmd_doctor(argparse.Namespace())
+            cmd_doctor(argparse.Namespace())
 
         output = " ".join(str(c) for c in mock_print.call_args_list)
         assert "openai" in output

@@ -1,8 +1,6 @@
 """补充测试 text_chunker.py — 覆盖 line 175 非 markdown 标题分支"""
 
-from unittest.mock import MagicMock
 
-import pytest
 
 
 class TestStructureAwareSplitFallback:

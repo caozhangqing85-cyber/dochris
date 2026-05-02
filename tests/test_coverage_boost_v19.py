@@ -1,6 +1,5 @@
 """覆盖率提升 v19 — settings/config edge cases + quality_gate CLI + faiss_store + batch_promote CLI"""
 
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -304,14 +303,16 @@ class TestBatchPromoteExtra:
     @patch("dochris.admin.batch_promote.get_all_manifests")
     @patch("dochris.admin.batch_promote.promote_to_wiki")
     @patch("dochris.admin.batch_promote.append_log")
-    def test_wiki_dry_many(self, mock_log, mock_p, mock_m, tmp_path, capsys):
+    def test_wiki_dry_many(self, mock_log, mock_p, mock_m, tmp_path, caplog):
         """wiki dry_run >20 (line 68)"""
+        import logging
         mock_m.return_value = [{"id": f"SRC-{i:04d}", "quality_score": 90, "title": f"D{i}"} for i in range(25)]
         from dochris.admin.batch_promote import batch_promote_to_wiki
 
-        r = batch_promote_to_wiki(tmp_path, dry_run=True)
+        with caplog.at_level(logging.INFO, logger="dochris.admin.batch_promote"):
+            r = batch_promote_to_wiki(tmp_path, dry_run=True)
         assert r["total"] == 25
-        assert "还有 5" in capsys.readouterr().out
+        assert "还有 5" in caplog.text
 
     @patch("dochris.admin.batch_promote.get_all_manifests")
     @patch("dochris.admin.batch_promote.promote_to_curated")
