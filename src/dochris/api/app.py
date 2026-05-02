@@ -30,7 +30,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="dochris API",
         description="知识库编译系统 REST API",
-        version="1.3.0",
+        version="1.3.1",
     )
 
     application.add_middleware(

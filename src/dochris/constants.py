@@ -11,7 +11,7 @@ from pathlib import Path
 # ============================================================
 
 PROJECT_NAME = "dochris"
-PROJECT_VERSION = "1.3.0"
+PROJECT_VERSION = "1.3.1"
 PROJECT_AUTHOR = "caozhangqing85-cyber"
 REPO_URL = "https://github.com/caozhangqing85-cyber/dochris"
 

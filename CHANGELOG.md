@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-05-02
+
+### Fixed
+- **知识图谱可视化**：D3.js 力导向图（Web UI Tab 6）+ API + CLI
+- **CORS 安全**：`allow_origins` 从 `DOCHRIS_CORS_ORIGINS` 环境变量配置
+- **API 认证**：`DOCHRIS_API_KEY` 中间件（未设置时跳过）
+- **Logger 迁移**：非 CLI 模块 199 个 `print()` 替换为 `logger`
+- **subprocess 安全**：`shell=True` 改为列表形式
+- **Plugin 安全**：`exec()` 添加 safe builtins 限制
+- **Gradio + FastAPI 统一**：`kb serve` 单端口同时服务 API + Web UI
+- **ruff lint**：0 errors
+
 ## [1.3.0] - 2026-05-02
 
 ### Added
