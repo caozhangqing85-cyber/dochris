@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     )
 
     from dochris.api.routes.compile import router as compile_router
+    from dochris.api.routes.graph import router as graph_router
     from dochris.api.routes.promote import router as promote_router
     from dochris.api.routes.query import router as query_router
     from dochris.api.routes.status import router as status_router
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     application.include_router(compile_router, prefix="/api/v1")
     application.include_router(status_router, prefix="/api/v1")
     application.include_router(promote_router, prefix="/api/v1")
+    application.include_router(graph_router, prefix="/api/v1")
 
     @application.get("/health")
     async def health() -> dict[str, str]:

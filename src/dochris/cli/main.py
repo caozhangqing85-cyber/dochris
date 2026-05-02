@@ -31,6 +31,7 @@ from dochris.cli.cli_compile import cmd_compile
 
 # 导入命令模块
 from dochris.cli.cli_completion import completion_script
+from dochris.cli.cli_graph import cmd_graph
 from dochris.cli.cli_serve import cmd_serve
 from dochris.cli.cli_config import cmd_config, cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
@@ -301,6 +302,19 @@ def main() -> int:
     # plugin 命令
     setup_plugin_parser(subparsers)
 
+    # graph 命令
+    parser_graph = subparsers.add_parser(
+        "graph",
+        help="知识图谱操作",
+        description="构建和查询知识图谱",
+    )
+    graph_subparsers = parser_graph.add_subparsers(dest="graph_command")
+    graph_subparsers.add_parser("stats", help="显示图谱统计")
+    parser_graph_export = graph_subparsers.add_parser("export", help="导出图谱为 JSON")
+    parser_graph_export.add_argument("--output", "-o", default="graph.json", help="输出文件路径")
+    parser_graph_search = graph_subparsers.add_parser("search", help="搜索图谱节点")
+    parser_graph_search.add_argument("query", help="搜索关键词")
+
     # 解析参数
     args = parser.parse_args()
 
@@ -347,6 +361,8 @@ def main() -> int:
             return cmd_plugin(args)
         elif args.command == "serve":
             return cmd_serve(args)
+        elif args.command == "graph":
+            return cmd_graph(args)
         else:
             print(
                 format_error(
