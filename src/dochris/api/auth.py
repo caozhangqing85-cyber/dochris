@@ -19,10 +19,7 @@ async def verify_api_key(request: Request) -> None:
     if not api_key:
         return  # 开发模式，无需认证
 
-    client_key = (
-        request.headers.get("X-API-Key")
-        or request.query_params.get("api_key", "")
-    )
+    client_key = request.headers.get("X-API-Key") or request.query_params.get("api_key", "")
     # 长度不同可直接返回，无需常数时间比较
     if len(client_key) != len(api_key):
         raise HTTPException(status_code=401, detail="Invalid API key")

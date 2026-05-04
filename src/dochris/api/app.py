@@ -8,6 +8,7 @@ import os
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dochris import __version__
 from dochris.api.auth import verify_api_key
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="dochris API",
         description="知识库编译系统 REST API",
-        version="1.3.1",
+        version=__version__,
     )
 
     application.add_middleware(

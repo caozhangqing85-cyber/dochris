@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from dochris.settings import INFO_KEYWORDS, LEARNING_KEYWORDS, TEMPLATE_PATTERNS
+from dochris.settings import INFO_KEYWORDS, LEARNING_KEYWORDS, TEMPLATE_DEDUCTION, TEMPLATE_PATTERNS
 from dochris.settings.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ def _score_concepts(concepts: list) -> DimensionScore:
 def _detect_template(text: str) -> DimensionScore:
     """模板文字检测 (-10)"""
     detected = any(pattern in text for pattern in TEMPLATE_PATTERNS)
-    points = -10 if detected else 0
+    points = -TEMPLATE_DEDUCTION if detected else 0
     return DimensionScore(
         name="template",
         points=points,
