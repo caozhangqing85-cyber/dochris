@@ -16,10 +16,24 @@ from dochris.manifest import (
     update_manifest_status,
 )
 
-# 配置
-WORKSPACE = Path.home() / ".openclaw/knowledge-base"
-TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
-LOGS_PATH = WORKSPACE / "logs"
+# 延迟初始化的路径常量（由 _init_paths() 在 main() 中设置）
+WORKSPACE: Path
+TRANSCRIPTS_DIR: Path
+LOGS_PATH: Path
+
+# 延迟初始化的 logger（避免导入时创建日志文件）
+logger: logging.Logger
+
+# 延迟检查的依赖状态
+FASTER_WHISPER_AVAILABLE: bool = False
+
+
+def _init_paths() -> None:
+    """延迟初始化路径常量"""
+    global WORKSPACE, TRANSCRIPTS_DIR, LOGS_PATH
+    WORKSPACE = Path.home() / ".openclaw/knowledge-base"
+    TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
+    LOGS_PATH = WORKSPACE / "logs"
 
 
 # 日志配置
@@ -38,26 +52,26 @@ def setup_logging() -> logging.Logger:
         ],
     )
 
-    logger = logging.getLogger(__name__)
-    logger.info(f"📝 日志文件: {log_file}")
+    _logger = logging.getLogger(__name__)
+    _logger.info(f"📝 日志文件: {log_file}")
 
-    return logger
+    return _logger
 
 
-logger = setup_logging()
+def _check_whisper_available() -> bool:
+    """延迟检查 faster-whisper 是否可用"""
+    global FASTER_WHISPER_AVAILABLE
+    try:
+        from faster_whisper import WhisperModel  # noqa: F401
 
-# 检查 faster-whisper 是否可用
-try:
-    from faster_whisper import WhisperModel
-
-    FASTER_WHISPER_AVAILABLE = True
-    logger.info("✅ faster-whisper 已安装")
-except ImportError:
-    FASTER_WHISPER_AVAILABLE = False
-    logger.error("❌ faster-whisper 未安装")
-    logger.error("请安装音频处理依赖: pip install dochris[audio]")
-    logger.error("或: pip install faster-whisper>=0.10.0")
-    sys.exit(1)
+        FASTER_WHISPER_AVAILABLE = True
+        logger.info("✅ faster-whisper 已安装")
+        return True
+    except ImportError:
+        logger.error("❌ faster-whisper 未安装")
+        logger.error("请安装音频处理依赖: pip install dochris[audio]")
+        logger.error("或: pip install faster-whisper>=0.10.0")
+        return False
 
 
 class FasterWhisperTranscriber:
@@ -67,6 +81,8 @@ class FasterWhisperTranscriber:
         self, model_size: str = "small", device: str = "cpu", compute_type: str = "int8"
     ) -> None:
         """初始化转录器"""
+        from faster_whisper import WhisperModel
+
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
@@ -337,6 +353,13 @@ def update_manifest_with_transcript(src_id: str, transcript_text: str) -> bool:
 
 def main() -> None:
     """主函数"""
+    global logger
+    _init_paths()
+    logger = setup_logging()
+
+    if not _check_whisper_available():
+        sys.exit(1)
+
     logger.info(f"\n{'=' * 60}")
     logger.info("🚀 转录失败状态的音频文件")
     logger.info(f"{'=' * 60}\n")

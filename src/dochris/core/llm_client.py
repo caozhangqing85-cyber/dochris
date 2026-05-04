@@ -289,22 +289,15 @@ class LLMClient:
                             # 继续尝试下一个可能的 JSON 对象
                             continue
 
-        # 如果使用栈方法失败，尝试从第一个 { 开始逐步匹配最近的 }
-        # 比 find/rfind 更精确：优先匹配短跨度的有效 JSON
-        start = text.find("{")
-        if start == -1:
-            return None
+        # 如果栈方法失败，用 json_repair 修复尝试
+        try:
+            import json_repair
 
-        for end in range(len(text) - 1, start, -1):
-            if text[end] != "}":
-                continue
-            json_str = text[start : end + 1]
-            try:
-                result = json.loads(json_str)
-                if isinstance(result, dict):
-                    return cast(dict[str, Any] | None, result)
-            except json.JSONDecodeError:
-                continue
+            repaired = json_repair.loads(text)
+            if isinstance(repaired, dict):
+                return cast(dict[str, Any] | None, repaired)
+        except Exception:
+            pass
 
         return None
 

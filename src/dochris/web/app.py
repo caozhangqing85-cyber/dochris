@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import platform
@@ -841,6 +842,18 @@ def _get_graph_html() -> str:
             for link in d3_data["links"]
             if link["source"] in keep_ids and link["target"] in keep_ids
         ]
+
+    # 转义节点数据中的 HTML 特殊字符，防止 XSS（JS 通过 innerHTML 插入 label/id/metadata）
+    for node in d3_data["nodes"]:
+        if "label" in node and isinstance(node["label"], str):
+            node["label"] = html.escape(node["label"], quote=True)
+        if "id" in node and isinstance(node["id"], str):
+            node["id"] = html.escape(node["id"], quote=True)
+        metadata = node.get("metadata")
+        if isinstance(metadata, dict):
+            for k, v in metadata.items():
+                if isinstance(v, str):
+                    metadata[k] = html.escape(v, quote=True)
 
     # json.dumps 已处理引号和反斜牌转义，额外转义 </script> 防止 HTML 注入
     data_json = json.dumps(d3_data, ensure_ascii=False).replace("</script", "<\\/script")

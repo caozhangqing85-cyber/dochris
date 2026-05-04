@@ -13,10 +13,23 @@ from pathlib import Path
 
 from dochris.manifest import get_all_manifests, get_default_workspace, update_manifest_status
 
-WORKSPACE = Path.home() / ".openclaw/knowledge-base"
-TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
-RAW_DIR = WORKSPACE / "raw"
-LOGS_PATH = WORKSPACE / "logs"
+# 延迟初始化的路径常量（由 _init_paths() 在 __main__ 或 main() 中设置）
+WORKSPACE: Path
+TRANSCRIPTS_DIR: Path
+RAW_DIR: Path
+LOGS_PATH: Path
+
+# 延迟初始化的 logger（避免导入时创建日志文件）
+logger: logging.Logger
+
+
+def _init_paths() -> None:
+    """延迟初始化路径常量"""
+    global WORKSPACE, TRANSCRIPTS_DIR, RAW_DIR, LOGS_PATH
+    WORKSPACE = Path.home() / ".openclaw/knowledge-base"
+    TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
+    RAW_DIR = WORKSPACE / "raw"
+    LOGS_PATH = WORKSPACE / "logs"
 
 
 def setup_logging() -> logging.Logger:
@@ -31,9 +44,6 @@ def setup_logging() -> logging.Logger:
         ],
     )
     return logging.getLogger()
-
-
-logger = setup_logging()
 
 
 def get_failed_pdf_manifests() -> list[dict]:
@@ -169,6 +179,10 @@ def find_existing_transcript(manifest: dict) -> Path | None:
 
 
 def main() -> None:
+    global logger
+    _init_paths()
+    logger = setup_logging()
+
     manifests = get_failed_pdf_manifests()
     if not manifests:
         logger.info("没有需要处理的PDF文件")
