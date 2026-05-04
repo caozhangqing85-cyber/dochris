@@ -151,6 +151,14 @@ def _get_file_table(search: str = "", status_filter: str = "全部") -> list[lis
     return rows
 
 
+def _sanitize_path(p: Path) -> str:
+    """脱敏路径，只显示最后两级目录"""
+    parts = p.parts
+    if len(parts) >= 2:
+        return str(Path(*parts[-2:]))
+    return p.name
+
+
 def _get_system_status() -> str:
     """获取系统状态文本"""
     settings = get_settings()
@@ -161,7 +169,7 @@ def _get_system_status() -> str:
         f"- **版本:** {__version__}",
         f"- **Python:** {platform.python_version()}",
         f"- **平台:** {platform.platform()}",
-        f"- **工作区:** `{settings.workspace}`",
+        f"- **工作区:** `{_sanitize_path(settings.workspace)}`",
         f"- **LLM 模型:** {settings.model}",
         f"- **查询模型:** {settings.query_model}",
         f"- **API Base:** `{settings.api_base}`",
@@ -229,7 +237,12 @@ def _get_system_status() -> str:
     if chroma_path.exists():
         size_mb = chroma_path.stat().st_size / (1024 * 1024)
         lines.extend(
-            ["", "## 向量数据库", f"- **路径:** `{data_dir}`", f"- **大小:** {size_mb:.1f} MB"]
+            [
+                "",
+                "## 向量数据库",
+                f"- **路径:** `{_sanitize_path(data_dir)}`",
+                f"- **大小:** {size_mb:.1f} MB",
+            ]
         )
     else:
         lines.extend(["", "## 向量数据库", "- **状态:** 未初始化"])
@@ -829,8 +842,11 @@ def _get_graph_html() -> str:
             if link["source"] in keep_ids and link["target"] in keep_ids
         ]
 
-    data_json = json.dumps(d3_data, ensure_ascii=False)
-    stats_json = json.dumps(graph_stats, ensure_ascii=False, indent=2)
+    # json.dumps 已处理引号和反斜牌转义，额外转义 </script> 防止 HTML 注入
+    data_json = json.dumps(d3_data, ensure_ascii=False).replace("</script", "<\\/script")
+    stats_json = json.dumps(graph_stats, ensure_ascii=False, indent=2).replace(
+        "</script", "<\\/script"
+    )
 
     return _GRAPH_HTML_TEMPLATE.replace("{{GRAPH_DATA}}", data_json).replace(
         "{{GRAPH_STATS}}", stats_json

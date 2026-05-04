@@ -19,6 +19,9 @@ def _get_cors_origins() -> list[str]:
     env_origins = os.environ.get("DOCHRIS_CORS_ORIGINS", "")
     if env_origins:
         return [o.strip() for o in env_origins.split(",") if o.strip()]
+    logger.warning(
+        "CORS 使用默认 localhost 配置。生产环境请设置 DOCHRIS_CORS_ORIGINS 环境变量指定允许的来源。"
+    )
     return [
         "http://localhost:8000",
         "http://localhost:7860",

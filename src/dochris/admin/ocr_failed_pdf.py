@@ -11,9 +11,6 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-scripts_dir = Path(__file__).parent
-sys.path.insert(0, str(scripts_dir))
-
 from dochris.manifest import get_all_manifests, get_default_workspace, update_manifest_status
 
 WORKSPACE = Path.home() / ".openclaw/knowledge-base"

@@ -9,6 +9,7 @@
 
 import argparse
 import asyncio
+import contextlib
 import datetime
 import json
 import logging
@@ -19,10 +20,6 @@ import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import contextlib
 
 # 内容清洗函数统一从 sanitize_sensitive_words 导入
 from dochris.admin.sanitize_sensitive_words import (
@@ -47,12 +44,23 @@ MAX_CONCURRENCY = 8
 BATCH_DELAY = 5  # 批间延迟秒数
 MAX_FILES = 0  # 0 = 不限
 
-# 从 settings 获取配置
-_settings = get_settings()
-KB_PATH = _settings.workspace
-MIN_AUDIO_TEXT_LENGTH = _settings.min_text_length
-MAX_CONTENT_CHARS = _settings.max_content_chars
-MAX_RETRIES = _settings.max_retries
+# 延迟初始化的配置变量（由 _init_config() 在 __main__ 中设置）
+_settings: Settings
+KB_PATH: Path
+MIN_AUDIO_TEXT_LENGTH: int
+MAX_CONTENT_CHARS: int
+MAX_RETRIES: int
+
+
+def _init_config() -> None:
+    """延迟初始化模块配置（避免导入时副作用）"""
+    global _settings, KB_PATH, MIN_AUDIO_TEXT_LENGTH, MAX_CONTENT_CHARS, MAX_RETRIES
+    _settings = get_settings()
+    KB_PATH = _settings.workspace
+    MIN_AUDIO_TEXT_LENGTH = _settings.min_text_length
+    MAX_CONTENT_CHARS = _settings.max_content_chars
+    MAX_RETRIES = _settings.max_retries
+
 
 # ============================================================
 # 日志
@@ -330,7 +338,13 @@ async def recompile_single(
 # ============================================================
 
 
-async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) -> None:
+async def run_recompile(
+    logger: Any,
+    stats: CompileStats,
+    max_files: int = 0,
+    batch_size: int = BATCH_SIZE,
+    concurrency: int = MAX_CONCURRENCY,
+) -> None:
     """主重新编译流程"""
     # 1. 筛选
     logger.info("=" * 60)
@@ -359,9 +373,9 @@ async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) ->
 
     # 3. 分批
     total = len(manifests)
-    total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
-    logger.info(f"分批策略: {total} 个文件, {total_batches} 批, 每批 {BATCH_SIZE} 个")
-    logger.info(f"并发数: {MAX_CONCURRENCY}, 批间延迟: {BATCH_DELAY}s")
+    total_batches = (total + batch_size - 1) // batch_size
+    logger.info(f"分批策略: {total} 个文件, {total_batches} 批, 每批 {batch_size} 个")
+    logger.info(f"并发数: {concurrency}, 批间延迟: {BATCH_DELAY}s")
 
     # 4. 创建 CompilerWorker
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -376,7 +390,7 @@ async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) ->
     )
 
     # 5. 逐批编译
-    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+    semaphore = asyncio.Semaphore(concurrency)
     adaptive_delay = 2.0
     shutdown_event = asyncio.Event()
 
@@ -396,8 +410,8 @@ async def run_recompile(logger: Any, stats: CompileStats, max_files: int = 0) ->
             logger.info("用户中断，停止编译")
             break
 
-        batch_start = batch_idx * BATCH_SIZE
-        batch_end = min(batch_start + BATCH_SIZE, total)
+        batch_start = batch_idx * batch_size
+        batch_end = min(batch_start + batch_size, total)
         batch = manifests[batch_start:batch_end]
         batch_num = batch_idx + 1
 
@@ -667,6 +681,7 @@ def generate_report(stats: CompileStats, verify_result: dict, logger: Any) -> st
 # ============================================================
 
 if __name__ == "__main__":
+    _init_config()
     logger = setup_logging()
 
     parser = argparse.ArgumentParser(description="重新编译缺少 concepts_data 的 manifest")
@@ -676,15 +691,18 @@ if __name__ == "__main__":
     parser.add_argument("--skip-compile", action="store_true", help="跳过编译，只生成报告")
     args = parser.parse_args()
 
-    if args.batch_size != BATCH_SIZE:
-        BATCH_SIZE = args.batch_size
-    if args.concurrency != MAX_CONCURRENCY:
-        MAX_CONCURRENCY = args.concurrency
-
     stats = CompileStats()
 
     if not args.skip_compile:
-        asyncio.run(run_recompile(logger, stats, max_files=args.max_files))
+        asyncio.run(
+            run_recompile(
+                logger,
+                stats,
+                max_files=args.max_files,
+                batch_size=args.batch_size,
+                concurrency=args.concurrency,
+            )
+        )
 
     # 验证
     verify_result = verify_results(logger, sample_size=10)

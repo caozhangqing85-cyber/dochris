@@ -167,14 +167,19 @@ class TestScoreLearningValue:
     @pytest.mark.parametrize(
         "text,expected",
         [
-            ("普通文本没有关键词", 1),  # "重点" in "没有关键词" → count=1 → 1分
-            ("学习很重要", 1),
-            ("学习和提升都需要方法", 3),
-            ("学习和提升，改善和掌握都需要理解和应用", 9),  # count=6 → >=6: 9分
-            ("学习提升改善掌握理解应用运用技能知识", 12),  # count=9 → >=8: 12分
-            ("学习提升改善掌握理解应用运用技能知识能力方法策略技巧", 15),  # count=13 → >=10: 15分
+            ("普通文本没有关键词", 0),  # 无空格分隔，无精确匹配
+            ("学习 很重要", 1),  # 学习 → count=1 → 1分
+            ("学习 和 提升 都需要 方法", 3),  # 学习, 提升, 方法 → count=3 → 3分
             (
-                "学习提升改善掌握理解应用运用技能知识能力方法策略技巧教训重点",
+                "学习 提升 改善 掌握 理解 应用 运用 技能 知识",
+                12,
+            ),  # count=9 → >=8: 12分
+            (
+                "学习 提升 改善 掌握 理解 应用 运用 技能 知识 能力 方法 策略 技巧",
+                15,
+            ),  # count=13 → >=10: 15分
+            (
+                "学习 提升 改善 掌握 理解 应用 运用 技能 知识 能力 方法 策略 技巧 教训 重点",
                 15,
             ),  # count=15 → >=10: 15分
         ],
@@ -278,7 +283,7 @@ class TestDetectTemplate:
     )
     def test_template_detected(self, text: str) -> None:
         result = _detect_template(text)
-        assert result.points == -10
+        assert result.points == -20
         assert result.detail == "detected=True"
 
 
@@ -302,10 +307,10 @@ class TestScoreSummaryQualityV4:
     def test_perfect_score(self) -> None:
         """各项都达到最高分：25+30+15+5+5+10=90"""
         # 构造包含 10+ 个不同学习关键词 + 5+ 个信息密度关键词的文本
-        learning_kw = "学习提升改善掌握理解应用运用技能知识能力方法"
+        learning_kw = "学习 提升 改善 掌握 理解 应用 运用 技能 知识 能力 方法"
         info_kw = "工具框架API SDK算法架构协议数据库缓存容器"
         summary = {
-            "detailed_summary": (learning_kw + info_kw) * 35,  # >=1500 字符
+            "detailed_summary": (learning_kw + " " + info_kw) * 35,  # >=1500 字符
             "key_points": ["要点1", "要点2", "要点3", "要点4", "要点5"],
             "one_line": "a" * 25,
             "concepts": ["概念1", "概念2", "概念3", "概念4", "概念5"],

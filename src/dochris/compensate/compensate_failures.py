@@ -15,15 +15,11 @@
 
 import argparse
 import asyncio
+import contextlib
 import signal
-import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import contextlib
 
 # 内容清洗函数统一从 sanitize_sensitive_words 导入
 from dochris.admin.sanitize_sensitive_words import (
@@ -49,10 +45,21 @@ from dochris.manifest import (
 )
 from dochris.settings import get_settings
 
-_s = get_settings()
-KB_PATH = _s.workspace
-MAX_CONTENT_CHARS = _s.max_content_chars
-MIN_AUDIO_TEXT_LENGTH = _s.min_text_length
+# 延迟初始化的配置变量（由 _init_config() 在 __main__ 中设置）
+KB_PATH: Path
+MAX_CONTENT_CHARS: int
+MIN_AUDIO_TEXT_LENGTH: int
+
+
+def _init_config() -> None:
+    """延迟初始化模块配置（避免导入时副作用）"""
+    global KB_PATH, MAX_CONTENT_CHARS, MIN_AUDIO_TEXT_LENGTH
+    _s = get_settings()
+    KB_PATH = _s.workspace
+    MAX_CONTENT_CHARS = _s.max_content_chars
+    MIN_AUDIO_TEXT_LENGTH = _s.min_text_length
+
+
 from dochris.core.quality_scorer import score_summary_quality_v4 as score_summary_quality
 
 # ============================================================
@@ -398,7 +405,12 @@ def find_failed_manifests(compensate_type: str, logger: Any) -> list[dict]:
 # ============================================================
 
 
-async def run_compensate(logger: Any, compensate_type: str, max_files: int = 0) -> None:
+async def run_compensate(
+    logger: Any,
+    compensate_type: str,
+    max_files: int = 0,
+    concurrency: int = MAX_CONCURRENCY,
+) -> None:
     """主补偿流程"""
     manifests = find_failed_manifests(compensate_type, logger)
 
@@ -423,7 +435,7 @@ async def run_compensate(logger: Any, compensate_type: str, max_files: int = 0) 
         logger.error("OPENAI_API_KEY 未设置（环境变量或 settings）")
         return
 
-    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+    semaphore = asyncio.Semaphore(concurrency)
     adaptive_delay = 2.0
     shutdown_event = asyncio.Event()
 
@@ -449,7 +461,7 @@ async def run_compensate(logger: Any, compensate_type: str, max_files: int = 0) 
 
     # 分批
     total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
-    logger.info(f"分批: {total_batches} 批, 每批 {BATCH_SIZE} 个, 并发 {MAX_CONCURRENCY}")
+    logger.info(f"分批: {total_batches} 批, 每批 {BATCH_SIZE} 个, 并发 {concurrency}")
 
     for batch_idx in range(total_batches):
         if shutdown_event.is_set():
@@ -529,6 +541,7 @@ async def run_compensate(logger: Any, compensate_type: str, max_files: int = 0) 
 # ============================================================
 
 if __name__ == "__main__":
+    _init_config()
     logger = setup_logging()
 
     parser = argparse.ArgumentParser(description="失败文件补偿重试")
@@ -539,9 +552,6 @@ if __name__ == "__main__":
     parser.add_argument("--concurrency", type=int, default=MAX_CONCURRENCY, help="并发数")
     parser.add_argument("--dry-run", action="store_true", help="只分析不执行")
     args = parser.parse_args()
-
-    if args.concurrency != MAX_CONCURRENCY:
-        MAX_CONCURRENCY = args.concurrency
 
     if args.dry_run:
         manifests = find_failed_manifests(args.type, logger)
@@ -554,4 +564,11 @@ if __name__ == "__main__":
         if len(manifests) > 20:
             logger.info(f"  ... 还有 {len(manifests) - 20} 个")
     else:
-        asyncio.run(run_compensate(logger, args.type, max_files=args.max_files))
+        asyncio.run(
+            run_compensate(
+                logger,
+                args.type,
+                max_files=args.max_files,
+                concurrency=args.concurrency,
+            )
+        )

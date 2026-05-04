@@ -25,8 +25,6 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
-import httpx
-
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 else:
@@ -144,23 +142,12 @@ class LLMClient:
 
         # 向后兼容：对于 openai_compat，暴露底层的 AsyncOpenAI 客户端
         if provider == "openai_compat" and hasattr(self.provider, "client"):
+            # client 和 provider 共享同一个 AsyncOpenAI 实例
             self.client = self.provider.client
         else:
-            # 对于其他提供商，创建一个兼容的 client 属性
-            # 注意：这不会完全兼容所有用法，但能防止 AttributeError
-            if AsyncOpenAI is None:
-                raise ImportError("openai package not installed")
-
-            self.client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=base_url,
-                timeout=120.0,
-                http_client=httpx.AsyncClient(
-                    limits=httpx.Limits(max_connections=1),
-                    timeout=120.0,
-                ),
-                max_retries=0,
-            )
+            # 对于其他提供商（如 ollama），不创建冗余的 AsyncOpenAI 实例
+            # client 属性设为 None，避免资源浪费
+            self.client = None  # type: ignore[assignment]
 
         self.model = model
         self.max_tokens = max_tokens
@@ -212,8 +199,15 @@ class LLMClient:
         if hasattr(self, "provider") and self.provider is not None:
             await self.provider.close()
 
-        # 关闭 client（向后兼容）
-        if hasattr(self, "client") and self.client is not None:
+        # 关闭 client（仅当 client 是独立实例，不是 provider 的代理时）
+        if (
+            hasattr(self, "client")
+            and self.client is not None
+            and (
+                not hasattr(self, "provider")
+                or self.client is not getattr(self.provider, "client", None)
+            )
+        ):
             await self.client.close()
 
         logger.debug("LLMClient 已关闭")
@@ -295,18 +289,24 @@ class LLMClient:
                             # 继续尝试下一个可能的 JSON 对象
                             continue
 
-        # 如果使用栈方法失败，回退到简单方法
+        # 如果使用栈方法失败，尝试从第一个 { 开始逐步匹配最近的 }
+        # 比 find/rfind 更精确：优先匹配短跨度的有效 JSON
         start = text.find("{")
-        end = text.rfind("}")
-
-        if start == -1 or end == -1 or end <= start:
+        if start == -1:
             return None
 
-        json_str = text[start : end + 1]
-        try:
-            return cast(dict[str, Any] | None, json.loads(json_str))
-        except json.JSONDecodeError:
-            return None
+        for end in range(len(text) - 1, start, -1):
+            if text[end] != "}":
+                continue
+            json_str = text[start : end + 1]
+            try:
+                result = json.loads(json_str)
+                if isinstance(result, dict):
+                    return cast(dict[str, Any] | None, result)
+            except json.JSONDecodeError:
+                continue
+
+        return None
 
     # ============================================================
     # 向后兼容：摘要生成方法（委托给 SummaryGenerator）

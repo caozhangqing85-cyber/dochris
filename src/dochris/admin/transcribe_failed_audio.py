@@ -9,11 +9,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# 添加路径
-scripts_dir = Path(__file__).parent
-sys.path.insert(0, str(scripts_dir))
-
-# 导入 manifest 管理
 from dochris.manifest import (
     get_all_manifests,
     get_default_workspace,

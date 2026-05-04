@@ -13,14 +13,11 @@
   python scripts/batch_promote.py <workspace> obsidian --min-score 95
 """
 
+import argparse
 import logging
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-
-# 确保 scripts 包可导入
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dochris.log import append_log
 from dochris.manifest import get_all_manifests
@@ -186,47 +183,33 @@ def batch_promote_to_obsidian(
 
 
 def main() -> None:
-    if len(sys.argv) < 3:
-        print(__doc__)
-        print("用法:")
-        print(f"  python {sys.argv[0]} <workspace> wiki --min-score 85 --limit 100")
-        print(f"  python {sys.argv[0]} <workspace> curated --min-score 90")
-        print(f"  python {sys.argv[0]} <workspace> obsidian --min-score 95")
-        print(f"  python {sys.argv[0]} <workspace> wiki --dry-run")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="批量 Promote 脚本 — 批量晋升知识库产物",
+    )
+    parser.add_argument("workspace", type=Path, help="工作区路径")
+    parser.add_argument(
+        "target",
+        choices=["wiki", "curated", "obsidian"],
+        help="目标层（wiki/curated/obsidian）",
+    )
+    parser.add_argument(
+        "--min-score",
+        type=int,
+        default=None,
+        help="最低质量分数（默认: 从配置读取）",
+    )
+    parser.add_argument("--limit", type=int, default=0, help="最大处理数量（0 = 不限）")
+    parser.add_argument("--dry-run", action="store_true", help="仅预览，不执行")
+    args = parser.parse_args()
 
-    workspace = Path(sys.argv[1])
-    target = sys.argv[2].lower()
+    min_score = args.min_score if args.min_score is not None else get_settings().min_quality_score
 
-    # 解析参数
-    min_score = get_settings().min_quality_score
-    limit = 0
-    dry_run = False
-
-    args = sys.argv[3:]
-    i = 0
-    while i < len(args):
-        if args[i] == "--min-score" and i + 1 < len(args):
-            min_score = int(args[i + 1])
-            i += 2
-        elif args[i] == "--limit" and i + 1 < len(args):
-            limit = int(args[i + 1])
-            i += 2
-        elif args[i] == "--dry-run":
-            dry_run = True
-            i += 1
-        else:
-            i += 1
-
-    if target == "wiki":
-        batch_promote_to_wiki(workspace, min_score, limit, dry_run)
-    elif target == "curated":
-        batch_promote_to_curated(workspace, min_score, limit, dry_run)
-    elif target == "obsidian":
-        batch_promote_to_obsidian(workspace, min_score, limit, dry_run)
-    else:
-        print(f"未知目标: {target}，支持: wiki / curated / obsidian")
-        sys.exit(1)
+    if args.target == "wiki":
+        batch_promote_to_wiki(args.workspace, min_score, args.limit, args.dry_run)
+    elif args.target == "curated":
+        batch_promote_to_curated(args.workspace, min_score, args.limit, args.dry_run)
+    elif args.target == "obsidian":
+        batch_promote_to_obsidian(args.workspace, min_score, args.limit, args.dry_run)
 
 
 if __name__ == "__main__":

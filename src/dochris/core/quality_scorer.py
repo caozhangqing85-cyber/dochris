@@ -13,6 +13,7 @@
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -78,6 +79,27 @@ def _tiered_score(value: int, tiers: list[tuple[int, int]], default: int = 0) ->
     return default
 
 
+# 常见构词后缀：当这些字紧跟在关键词后时，关键词可能是更长词的组成部分
+_COMPOUND_SUFFIXES = frozenset("词性化者论学法术理式量度型级人家物图库树点面线体")
+
+
+def _count_keyword_matches(text: str, keywords: list[str]) -> int:
+    """计算关键词命中数，避免中文子串误判
+
+    例如 "关键" 不会匹配 "关键词"（"词" 是构词后缀），但会匹配 "关键的方法"。
+    """
+    count = 0
+    for kw in keywords:
+        for m in re.finditer(re.escape(kw), text):
+            end = m.end()
+            # 如果关键词后面紧跟构词后缀字符，视为更长词的组成部分，跳过
+            if end < len(text) and text[end] in _COMPOUND_SUFFIXES:
+                continue
+            count += 1
+            break  # 每个关键词只计一次
+    return count
+
+
 # ============================================================
 # 维度子函数
 # ============================================================
@@ -125,8 +147,8 @@ def _score_key_points(kp: list) -> DimensionScore:
 
 
 def _score_learning_value(text: str) -> DimensionScore:
-    """学习价值关键词评分 (0-15)"""
-    count = sum(1 for kw in LEARNING_KEYWORDS if kw in text)
+    """学习价值关键词评分 (0-15)，使用精确匹配避免子串误判"""
+    count = _count_keyword_matches(text, LEARNING_KEYWORDS)
     tiers = [
         (10, 15),
         (8, 12),
@@ -145,8 +167,8 @@ def _score_learning_value(text: str) -> DimensionScore:
 
 
 def _score_info_density(text: str) -> DimensionScore:
-    """信息密度关键词评分 (0-5)"""
-    count = sum(1 for kw in INFO_KEYWORDS if kw in text)
+    """信息密度关键词评分 (0-5)，使用精确匹配避免子串误判"""
+    count = _count_keyword_matches(text, INFO_KEYWORDS)
     tiers = [
         (5, 5),
         (3, 4),
@@ -243,6 +265,33 @@ def _log_quality_result(
 # ============================================================
 
 
+def _compute_dimensions(summary: dict[str, Any]) -> tuple[list[DimensionScore], int]:
+    """计算各维度评分（内部共享函数）
+
+    Returns:
+        (dimensions, total) 评分维度列表和总分
+    """
+    ds = _safe_str(summary.get("detailed_summary"))
+    ds_lower = ds.lower()
+
+    # 超长文本惩罚
+    overflow = len(ds) - 3000
+    penalty = min(10, overflow // 500) if overflow > 0 else 0
+
+    dimensions = [
+        _score_detail_length(ds),
+        _score_key_points(_safe_list(summary.get("key_points"))),
+        _score_learning_value(ds_lower),
+        _score_info_density(ds_lower),
+        _score_one_line(_safe_str(summary.get("one_line"))),
+        _score_concepts(_safe_list(summary.get("concepts"))),
+        _detect_template(ds_lower),
+    ]
+
+    total = max(0, min(sum(d.points for d in dimensions) - penalty, 100))
+    return dimensions, total
+
+
 def score_summary_quality_v4(summary: dict[str, Any] | None) -> int:
     """全面优化版质量评分（v4）- 返回总分
 
@@ -258,28 +307,7 @@ def score_summary_quality_v4(summary: dict[str, Any] | None) -> int:
         logger.debug("summary is not dict, returning 0")
         return 0
 
-    ds = _safe_str(summary.get("detailed_summary"))
-    ds_lower = ds.lower()
-
-    # 超长文本惩罚
-    overflow = len(ds) - 3000
-    if overflow > 0:
-        penalty = min(10, overflow // 500)
-        logger.debug(f"超长文本惩罚: -{penalty} 分 (len={len(ds)})")
-    else:
-        penalty = 0
-
-    dimensions = [
-        _score_detail_length(ds),
-        _score_key_points(_safe_list(summary.get("key_points"))),
-        _score_learning_value(ds_lower),
-        _score_info_density(ds_lower),
-        _score_one_line(_safe_str(summary.get("one_line"))),
-        _score_concepts(_safe_list(summary.get("concepts"))),
-        _detect_template(ds_lower),
-    ]
-
-    total = max(0, min(sum(d.points for d in dimensions) - penalty, 100))
+    dimensions, total = _compute_dimensions(summary)
     _log_quality_result(summary, total, dimensions)
     return total
 
@@ -298,23 +326,7 @@ def score_summary_quality_v4_report(
     if not isinstance(summary, dict):
         return QualityReport(total=0)
 
-    ds = _safe_str(summary.get("detailed_summary"))
-    ds_lower = ds.lower()
-
-    overflow = len(ds) - 3000
-    penalty = min(10, overflow // 500) if overflow > 0 else 0
-
-    dimensions = [
-        _score_detail_length(ds),
-        _score_key_points(_safe_list(summary.get("key_points"))),
-        _score_learning_value(ds_lower),
-        _score_info_density(ds_lower),
-        _score_one_line(_safe_str(summary.get("one_line"))),
-        _score_concepts(_safe_list(summary.get("concepts"))),
-        _detect_template(ds_lower),
-    ]
-
-    total = max(0, min(sum(d.points for d in dimensions) - penalty, 100))
+    dimensions, total = _compute_dimensions(summary)
     template_detected = any(d.name == "template" and d.points < 0 for d in dimensions)
     _log_quality_result(summary, total, dimensions)
 
