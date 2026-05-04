@@ -2,436 +2,38 @@
 
 from __future__ import annotations
 
-import html
-import json
 import logging
-import platform
-import shutil
-import tempfile
 import time
-from collections import Counter
-from datetime import datetime
-from pathlib import Path
-from typing import Any
 
 import gradio as gr  # type: ignore[import-untyped]
-import pandas as pd  # type: ignore[import-untyped]
 
 from dochris import __version__
-from dochris.manifest import get_all_manifests
-from dochris.settings import get_settings
+
+from .graph_tab import _handle_graph_refresh
+from .quality_tab import (
+    _get_low_quality_table,
+    _get_quality_dashboard,
+    _get_quality_distribution_df,
+    _get_status_distribution_df,
+    _get_type_distribution_df,
+    _handle_recompile_low_quality,
+)
+from .utils import (
+    _EMPTY_QUALITY_DF,
+    _EMPTY_STATUS_DF,
+    _EMPTY_TYPE_DF,
+    _QUERY_MODE_LABELS,
+    _STATUS_FILTER_LABELS,
+    _do_query,
+    _export_markdown,
+    _format_query_results,
+    _get_compile_info,
+    _get_file_table,
+    _get_system_status,
+    handle_upload,
+)
 
 logger = logging.getLogger(__name__)
-
-# ── 常量 ──────────────────────────────────────────────────────
-
-_QUERY_MODE_LABELS: dict[str, str] = {
-    "combined": "综合查询（推荐）",
-    "concept": "概念搜索",
-    "summary": "摘要搜索",
-    "vector": "向量检索",
-    "all": "全量搜索",
-}
-_STATUS_FILTERS = ["全部", "compiled", "ingested", "failed", "promoted_to_wiki", "promoted"]
-
-_STATUS_LABELS: dict[str, str] = {
-    "compiled": "✅ 已编译",
-    "ingested": "📥 已摄入",
-    "failed": "❌ 失败",
-    "promoted_to_wiki": "🌟 已推广(Wiki)",
-    "promoted": "🔒 已推广(Curated)",
-    "unknown": "❓ 未知",
-}
-
-_STATUS_FILTER_LABELS = ["全部"] + [_STATUS_LABELS.get(s, s) for s in _STATUS_FILTERS[1:]]
-_STATUS_LABEL_REVERSE = {v: k for k, v in _STATUS_LABELS.items()}
-
-
-# ============================================================
-# 数据获取辅助函数
-# ============================================================
-
-
-def _get_manifest_data() -> tuple[list[dict], Counter[str], Counter[str]]:
-    """获取 manifest 列表及统计"""
-    settings = get_settings()
-    manifests = get_all_manifests(settings.workspace)
-    status_counter: Counter[str] = Counter(m.get("status", "unknown") for m in manifests)
-    type_counter: Counter[str] = Counter(m.get("type", "unknown") for m in manifests)
-    return manifests, status_counter, type_counter
-
-
-def _do_query(query_str: str, top_k: int, mode: str = "combined") -> dict[str, Any]:
-    """执行查询"""
-    from dochris.phases.phase3_query import query
-
-    return query(query_str, mode=mode, top_k=top_k)
-
-
-def _format_query_results(result: dict[str, Any]) -> str:
-    """格式化查询结果为 Markdown"""
-    lines: list[str] = []
-    elapsed = result.get("time_seconds", 0)
-    mode = result.get("mode", "combined")
-    lines.append(f"**查询耗时:** {elapsed:.2f}s | **模式:** {_QUERY_MODE_LABELS.get(mode, mode)}\n")
-
-    answer = result.get("answer")
-    if answer:
-        lines.append("## AI 回答\n")
-        lines.append(f"{answer}\n")
-
-    vector_results = result.get("vector_results", [])
-    if vector_results:
-        lines.append("## 向量搜索结果\n")
-        for i, r in enumerate(vector_results, 1):
-            score = r.get("score", 0)
-            title = r.get("title", "无标题")
-            content = r.get("content", "")
-            source = r.get("source", "")
-            src_id = r.get("manifest_id", "")
-            lines.append(f"### {i}. {title} (相似度: {score:.3f})")
-            if source:
-                lines.append(f"**来源:** `{source}`\n")
-            if src_id:
-                lines.append(f"**Manifest:** `{src_id}`\n")
-            if content:
-                display = content[:500] + "..." if len(content) > 500 else content
-                lines.append(f"> {display}\n")
-
-    concepts = result.get("concepts", [])
-    if concepts:
-        lines.append("## 概念匹配\n")
-        for i, c in enumerate(concepts, 1):
-            name = c.get("name", c.get("title", ""))
-            lines.append(f"{i}. **{name}**")
-
-    summaries = result.get("summaries", [])
-    if summaries:
-        lines.append("## 摘要匹配\n")
-        for i, s in enumerate(summaries, 1):
-            title = s.get("title", "无标题")
-            source = s.get("source", "")
-            lines.append(f"{i}. **{title}**")
-            if source:
-                lines.append(f"   - 来源: `{source}`")
-
-    if not vector_results and not concepts and not summaries and not answer:
-        lines.append("*未找到相关结果*")
-
-    return "\n".join(lines)
-
-
-def _get_file_table(search: str = "", status_filter: str = "全部") -> list[list[str]]:
-    """获取文件列表（用于 Dataframe 展示），支持搜索和过滤"""
-    # 将中文标签还原为内部值
-    internal_filter = _STATUS_LABEL_REVERSE.get(status_filter, status_filter)
-    manifests, _, _ = _get_manifest_data()
-    rows: list[list[str]] = []
-    search_lower = search.lower().strip()
-
-    for m in manifests:
-        name = m.get("original_filename", m.get("source_file", "unknown"))
-        file_type = m.get("type", "unknown")
-        status = m.get("status", "unknown")
-        quality = str(m.get("quality_score", "-"))
-        manifest_id = m.get("id", "")
-
-        if internal_filter != "全部" and status != internal_filter:
-            continue
-        if (
-            search_lower
-            and search_lower not in name.lower()
-            and search_lower not in manifest_id.lower()
-            and search_lower not in file_type.lower()
-        ):
-            continue
-
-        rows.append([manifest_id, name, file_type, status, quality])
-        if len(rows) >= 200:
-            break
-    return rows
-
-
-def _sanitize_path(p: Path) -> str:
-    """脱敏路径，只显示最后两级目录"""
-    parts = p.parts
-    if len(parts) >= 2:
-        return str(Path(*parts[-2:]))
-    return p.name
-
-
-def _get_system_status() -> str:
-    """获取系统状态文本"""
-    settings = get_settings()
-    manifests, status_counter, type_counter = _get_manifest_data()
-
-    lines = [
-        "## 系统信息",
-        f"- **版本:** {__version__}",
-        f"- **Python:** {platform.python_version()}",
-        f"- **平台:** {platform.platform()}",
-        f"- **工作区:** `{_sanitize_path(settings.workspace)}`",
-        f"- **LLM 模型:** {settings.model}",
-        f"- **查询模型:** {settings.query_model}",
-        f"- **API Base:** `{settings.api_base}`",
-        f"- **API Key:** {'已配置' if settings.api_key else '未配置'}",
-    ]
-
-    try:
-        disk = shutil.disk_usage(str(settings.workspace))
-        total_gb = disk.total / (1024**3)
-        used_gb = disk.used / (1024**3)
-        free_gb = disk.free / (1024**3)
-        pct = disk.used / disk.total * 100
-        lines.append(
-            f"- **磁盘:** {used_gb:.1f}/{total_gb:.1f}GB ({pct:.0f}%) — 剩余 {free_gb:.1f}GB"
-        )
-    except (OSError, ValueError):
-        pass
-
-    lines.extend(
-        [
-            "",
-            "## 文件统计",
-            f"- **总计:** {len(manifests)}",
-            f"- **已摄入:** {status_counter.get('ingested', 0)}",
-            f"- **已编译:** {status_counter.get('compiled', 0)}",
-            f"- **已推广 (wiki):** {status_counter.get('promoted_to_wiki', 0)}",
-            f"- **已推广 (curated):** {status_counter.get('promoted', 0)}",
-            f"- **失败:** {status_counter.get('failed', 0)}",
-        ]
-    )
-
-    # 知识库统计（概念数、摘要数）
-    wiki_dir = settings.workspace / "wiki"
-    concepts_count = 0
-    summaries_count = 0
-    try:
-        concepts_dir = wiki_dir / "concepts"
-        if concepts_dir.exists():
-            concepts_count = sum(1 for p in concepts_dir.iterdir() if p.is_file())
-        summaries_dir = wiki_dir / "summaries"
-        if summaries_dir.exists():
-            summaries_count = sum(1 for p in summaries_dir.iterdir() if p.is_file())
-    except OSError:
-        pass
-    lines.extend(
-        [
-            "",
-            "## 知识库统计",
-            f"- **概念数:** {concepts_count}",
-            f"- **摘要数:** {summaries_count}",
-        ]
-    )
-
-    lines.extend(
-        [
-            "",
-            "## 文件类型分布",
-        ]
-    )
-    for ft, count in type_counter.most_common():
-        lines.append(f"- **{ft}:** {count}")
-
-    data_dir = settings.data_dir
-    chroma_path = data_dir / "chroma.sqlite3"
-    if chroma_path.exists():
-        size_mb = chroma_path.stat().st_size / (1024 * 1024)
-        lines.extend(
-            [
-                "",
-                "## 向量数据库",
-                f"- **路径:** `{_sanitize_path(data_dir)}`",
-                f"- **大小:** {size_mb:.1f} MB",
-            ]
-        )
-    else:
-        lines.extend(["", "## 向量数据库", "- **状态:** 未初始化"])
-
-    lines.extend(["", "## 关键依赖"])
-    for pkg in [
-        "gradio",
-        "chromadb",
-        "pandas",
-        "openai",
-        "sentence_transformers",
-        "markitdown",
-        "json_repair",
-        "rich",
-    ]:
-        try:
-            mod = __import__(pkg)
-            ver = getattr(mod, "__version__", "未知")
-            display_name = pkg.replace("_", "-")
-            lines.append(f"- **{display_name}:** {ver}")
-        except ImportError:
-            display_name = pkg.replace("_", "-")
-            lines.append(f"- **{display_name}:** 未安装")
-
-    return "\n".join(lines)
-
-
-def _get_quality_dashboard() -> str:
-    """获取质量仪表盘数据"""
-    manifests, _, _ = _get_manifest_data()
-
-    scores: list[int] = []
-    low_quality: list[str] = []
-    settings = get_settings()
-    threshold = settings.min_quality_score
-
-    for m in manifests:
-        qs = m.get("quality_score")
-        if qs is not None and isinstance(qs, (int, float)):
-            score_int = int(qs)
-            scores.append(score_int)
-            if score_int < threshold:
-                name = m.get("original_filename", m.get("source_file", "unknown"))
-                low_quality.append(f"- `{name}` — 分数: {score_int}")
-
-    if not scores:
-        return "*暂无质量评分数据*"
-
-    avg_score = sum(scores) / len(scores)
-    below_threshold = len(low_quality)
-    above_threshold = len(scores) - below_threshold
-
-    buckets: dict[str, int] = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
-    for s in scores:
-        if s <= 20:
-            buckets["0-20"] += 1
-        elif s <= 40:
-            buckets["21-40"] += 1
-        elif s <= 60:
-            buckets["41-60"] += 1
-        elif s <= 80:
-            buckets["61-80"] += 1
-        else:
-            buckets["81-100"] += 1
-
-    lines = [
-        "## 质量概览",
-        f"- **已评分文件数:** {len(scores)}",
-        f"- **平均分:** {avg_score:.1f}",
-        f"- **最高分:** {max(scores)}",
-        f"- **最低分:** {min(scores)}",
-        f"- **中位数:** {sorted(scores)[len(scores) // 2]}",
-        f"- **达标 (≥{threshold}):** {above_threshold}",
-        f"- **未达标 (<{threshold}):** {below_threshold}",
-        f"- **优良率:** {above_threshold / len(scores) * 100:.1f}%",
-        "",
-        "## 质量分布",
-    ]
-    for bucket, count in buckets.items():
-        bar = "█" * count if count < 50 else "█" * 50
-        lines.append(f"- **{bucket}:** {bar} ({count})")
-
-    # 质量总结
-    excellent = buckets["81-100"]
-    good = buckets["61-80"]
-    poor = buckets["0-20"] + buckets["21-40"]
-    lines.extend(
-        [
-            "",
-            "## 质量总结",
-            f"- **优秀 (81-100):** {excellent} 个文件",
-            f"- **良好 (61-80):** {good} 个文件",
-            f"- **较差 (<40):** {poor} 个文件",
-        ]
-    )
-    if avg_score >= 80:
-        lines.append("- **评级:** 🟢 整体质量优秀")
-    elif avg_score >= 60:
-        lines.append("- **评级:** 🟡 整体质量良好，仍有提升空间")
-    else:
-        lines.append("- **评级:** 🔴 整体质量偏低，建议重新编译低分文件")
-
-    if low_quality:
-        lines.extend(["", f"## 未达标文件 (<{threshold})", *low_quality[:50]])
-
-    return "\n".join(lines)
-
-
-# ============================================================
-# 图表数据辅助函数
-# ============================================================
-
-_EMPTY_TYPE_DF = pd.DataFrame({"类型": ["暂无数据"], "数量": [0]})
-_EMPTY_STATUS_DF = pd.DataFrame({"状态": ["暂无数据"], "数量": [0]})
-_EMPTY_QUALITY_DF = pd.DataFrame({"分数段": ["暂无数据"], "文件数": [0]})
-
-
-def _get_type_distribution_df() -> pd.DataFrame:
-    """获取文件类型分布 DataFrame"""
-    _, _, type_counter = _get_manifest_data()
-    if not type_counter:
-        return _EMPTY_TYPE_DF
-    return pd.DataFrame(
-        {"类型": list(type_counter.keys()), "数量": list(type_counter.values())}
-    ).sort_values("数量", ascending=False)
-
-
-def _get_status_distribution_df() -> pd.DataFrame:
-    """获取文件状态分布 DataFrame"""
-    _, status_counter, _ = _get_manifest_data()
-    if not status_counter:
-        return _EMPTY_STATUS_DF
-    return pd.DataFrame(
-        {"状态": list(status_counter.keys()), "数量": list(status_counter.values())}
-    ).sort_values("数量", ascending=False)
-
-
-def _get_quality_distribution_df() -> pd.DataFrame:
-    """获取质量评分分布 DataFrame"""
-    manifests, _, _ = _get_manifest_data()
-    buckets: dict[str, int] = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
-    for m in manifests:
-        qs = m.get("quality_score")
-        if qs is not None and isinstance(qs, (int, float)):
-            s = int(qs)
-            if s <= 20:
-                buckets["0-20"] += 1
-            elif s <= 40:
-                buckets["21-40"] += 1
-            elif s <= 60:
-                buckets["41-60"] += 1
-            elif s <= 80:
-                buckets["61-80"] += 1
-            else:
-                buckets["81-100"] += 1
-    total = sum(buckets.values())
-    if total == 0:
-        return _EMPTY_QUALITY_DF
-    return pd.DataFrame({"分数段": list(buckets.keys()), "文件数": list(buckets.values())})
-
-
-def _get_low_quality_table() -> list[list[str]]:
-    """获取低质量文件列表"""
-    manifests, _, _ = _get_manifest_data()
-    settings = get_settings()
-    threshold = settings.min_quality_score
-    rows: list[list[str]] = []
-    for m in manifests:
-        qs = m.get("quality_score")
-        if qs is not None and isinstance(qs, (int, float)) and int(qs) < threshold:
-            name = m.get("original_filename", m.get("source_file", "unknown"))
-            status = m.get("status", "unknown")
-            rows.append([m.get("id", ""), name, str(int(qs)), _STATUS_LABELS.get(status, status)])
-            if len(rows) >= 100:
-                break
-    return rows
-
-
-def _get_compile_info() -> str:
-    """获取编译预览信息"""
-    manifests, status_counter, _ = _get_manifest_data()
-    pending = status_counter.get("ingested", 0)
-    compiled = status_counter.get("compiled", 0)
-    failed = status_counter.get("failed", 0)
-    return (
-        f"**待编译:** {pending} | **已编译:** {compiled} | **失败:** {failed}"
-        f" | **总计:** {len(manifests)}"
-    )
 
 
 # ============================================================
@@ -449,7 +51,6 @@ def handle_query(query_str: str, top_k: int) -> str:
         result["time_seconds"] = result.get("time_seconds", time.time() - t0)
         return _format_query_results(result)
     except Exception as e:
-        # UI 事件处理器顶层守卫：调用链深，需捕获所有异常防止页面崩溃
         logger.error(f"查询失败: {e}")
         return f"**查询出错:** {e}"
 
@@ -460,7 +61,6 @@ def handle_refresh_files() -> tuple[list[list[str]], str]:
         rows = _get_file_table()
         return rows, f"共 {len(rows)} 条记录（最多显示 200 条）"
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"刷新文件列表失败: {e}")
         return [], f"刷新失败: {e}"
 
@@ -470,7 +70,6 @@ def handle_refresh_status() -> str:
     try:
         return _get_system_status()
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"获取系统状态失败: {e}")
         return f"**获取状态失败:** {e}"
 
@@ -480,30 +79,8 @@ def handle_refresh_quality() -> str:
     try:
         return _get_quality_dashboard()
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"获取质量数据失败: {e}")
         return f"**获取质量数据失败:** {e}"
-
-
-def handle_upload(files: list[Any]) -> str:
-    """处理文件上传"""
-    if not files:
-        return "*未选择文件*"
-    settings = get_settings()
-    raw_dir = settings.raw_dir
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for f in files:
-        try:
-            src = Path(f.name)
-            dst = raw_dir / src.name
-            if not dst.exists():
-                shutil.copy2(src, dst)
-                count += 1
-        except Exception as e:
-            # 文件上传守卫：单个文件失败不应中断整个上传批次
-            logger.warning(f"上传文件 {f.name} 失败: {e}")
-    return f"已上传 {count}/{len(files)} 个文件到 raw/ 目录"
 
 
 def handle_compile(limit: int) -> str:
@@ -516,7 +93,6 @@ def handle_compile(limit: int) -> str:
         asyncio.run(compile_all(limit=limit))
         return f"编译完成: 已处理最多 {limit} 个文件"
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"编译失败: {e}")
         return f"**编译出错:** {e}"
 
@@ -542,7 +118,7 @@ def _handle_query_v2(
         result["time_seconds"] = result.get("time_seconds", time.time() - t0)
         formatted = _format_query_results(result)
 
-        now = datetime.now().strftime("%H:%M:%S")
+        now = time.strftime("%H:%M:%S")
         total_results = (
             len(result.get("vector_results", []))
             + len(result.get("concepts", []))
@@ -559,7 +135,6 @@ def _handle_query_v2(
         export_path = _export_markdown(formatted, f"query_{now.replace(':', '')}")
         return formatted, new_history, _history_to_table(new_history), export_path
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"查询失败: {e}")
         return f"**查询出错:** {e}", history_state, _history_to_table(history_state), None
 
@@ -572,26 +147,6 @@ def _history_to_table(history: list[dict[str, str]]) -> list[list[str]]:
     ]
 
 
-def _export_markdown(content: str, prefix: str = "export") -> str | None:
-    """将 Markdown 内容导出到临时文件"""
-    if not content or content.startswith("*"):
-        return None
-    try:
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", prefix=prefix, delete=False, encoding="utf-8"
-        )
-        tmp.write(
-            f"# 知识库查询结果\n\n导出时间:"
-            f" {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n---\n\n{content}"
-        )
-        tmp.close()
-        return tmp.name
-    except Exception as e:
-        # 临时文件创建守卫：导出失败不应影响主流程
-        logger.warning(f"导出失败: {e}")
-        return None
-
-
 def _handle_filter_files(search: str, status_filter: str) -> tuple[list[list[str]], str]:
     """带过滤的文件列表刷新"""
     try:
@@ -599,7 +154,6 @@ def _handle_filter_files(search: str, status_filter: str) -> tuple[list[list[str
         filter_desc = f"搜索='{search or '全部'}' 状态='{status_filter}'"
         return rows, f"{filter_desc} — 共 {len(rows)} 条记录（最多 200 条）"
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"刷新文件列表失败: {e}")
         return [], f"刷新失败: {e}"
 
@@ -612,7 +166,9 @@ def _handle_compile_v2(limit: int, concurrency: int, dry_run: bool) -> tuple[str
     """
     try:
         if dry_run:
-            manifests, status_counter, _ = _get_manifest_data()
+            from .utils import _get_manifest_data
+
+            _, status_counter, _ = _get_manifest_data()
             pending = status_counter.get("ingested", 0)
             to_compile = min(pending, limit) if limit else pending
             msg = f"**模拟运行** — 将编译 {to_compile} 个文件（并发: {concurrency}）"
@@ -626,244 +182,8 @@ def _handle_compile_v2(limit: int, concurrency: int, dry_run: bool) -> tuple[str
         result_msg = f"**编译完成** — 已处理最多 {limit} 个文件（并发: {concurrency}）"
         return result_msg, _get_compile_info()
     except Exception as e:
-        # UI 事件处理器顶层守卫
         logger.error(f"编译失败: {e}")
         return f"**编译出错:** {e}", _get_compile_info()
-
-
-def _handle_recompile_low_quality() -> str:
-    """重新编译低质量文件：重置状态为 ingested"""
-    try:
-        settings = get_settings()
-        manifests_dir = settings.workspace / "manifests" / "sources"
-        manifests = get_all_manifests(settings.workspace)
-        threshold = settings.min_quality_score
-        reset_count = 0
-
-        for m in manifests:
-            qs = m.get("quality_score")
-            status = m.get("status", "")
-            if (
-                qs is not None
-                and isinstance(qs, (int, float))
-                and int(qs) < threshold
-                and status == "compiled"
-            ):
-                m["status"] = "ingested"
-                m_id = m.get("id", "")
-                if m_id:
-                    manifest_path = manifests_dir / f"{m_id}.json"
-                    if manifest_path.exists():
-                        manifest_path.write_text(
-                            json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8"
-                        )
-                        reset_count += 1
-
-        if reset_count == 0:
-            return "没有需要重新编译的低质量文件"
-        return f"已将 {reset_count} 个低质量文件重置为待编译状态。请在「编译控制」Tab 中点击「开始编译」。"
-    except Exception as e:
-        # UI 事件处理器顶层守卫
-        logger.error(f"重新编译准备失败: {e}")
-        return f"**操作失败:** {e}"
-
-
-def _handle_graph_refresh() -> str:
-    """刷新知识图谱"""
-    try:
-        return _get_graph_html()
-    except Exception as e:
-        # UI 事件处理器顶层守卫
-        logger.error(f"获取知识图谱失败: {e}")
-        return f"<p style='color:red;'>获取知识图谱失败: {e}</p>"
-
-
-# ============================================================
-# 知识图谱 D3.js 模板
-# ============================================================
-
-_GRAPH_HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<style>
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; }
-  .container { display: flex; height: 100vh; }
-  .sidebar { width: 280px; padding: 16px; overflow-y: auto; background: #16213e; border-right: 1px solid #0f3460; }
-  .sidebar h3 { color: #e94560; margin-top: 0; }
-  .stats { font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #a0a0b0; }
-  #search { width: 100%; padding: 8px; border: 1px solid #0f3460; border-radius: 4px; background: #1a1a2e; color: #e0e0e0; margin-bottom: 12px; box-sizing: border-box; }
-  #detail { margin-top: 12px; font-size: 13px; color: #c0c0d0; }
-  .detail-label { color: #e94560; font-weight: bold; }
-  #graph-container { flex: 1; position: relative; }
-  svg { width: 100%; height: 100%; }
-  .tooltip { position: absolute; padding: 8px 12px; background: rgba(22,33,62,0.95); border: 1px solid #e94560; border-radius: 6px; font-size: 12px; pointer-events: none; color: #e0e0e0; z-index: 10; display: none; }
-  .legend { position: absolute; bottom: 16px; left: 16px; background: rgba(22,33,62,0.9); padding: 12px; border-radius: 6px; font-size: 12px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="sidebar">
-    <h3>🕸️ 知识图谱</h3>
-    <input id="search" type="text" placeholder="搜索节点..." />
-    <div class="stats" id="stats">{{GRAPH_STATS}}</div>
-    <div id="detail"></div>
-  </div>
-  <div id="graph-container">
-    <div class="tooltip" id="tooltip"></div>
-    <svg id="graph-svg"></svg>
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#4fc3f7"></div>源文件 (source)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#81c784"></div>概念 (concept)</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#ffb74d"></div>摘要 (summary)</div>
-    </div>
-  </div>
-</div>
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script>
-const data = {{GRAPH_DATA}};
-const colors = { source: '#4fc3f7', concept: '#81c784', summary: '#ffb74d' };
-const width = document.getElementById('graph-container').clientWidth;
-const height = document.getElementById('graph-container').clientHeight;
-
-const svg = d3.select('#graph-svg').attr('viewBox', [0, 0, width, height]);
-
-svg.append('defs').append('marker')
-  .attr('id', 'arrowhead')
-  .attr('viewBox', '0 -5 10 10')
-  .attr('refX', 20).attr('refY', 0)
-  .attr('markerWidth', 6).attr('markerHeight', 6)
-  .attr('orient', 'auto')
-  .append('path').attr('d', 'M0,-5L10,0L0,5').attr('fill', '#555');
-
-const simulation = d3.forceSimulation(data.nodes)
-  .force('link', d3.forceLink(data.links).id(d => d.id).distance(80))
-  .force('charge', d3.forceManyBody().strength(-200))
-  .force('center', d3.forceCenter(width / 2, height / 2))
-  .force('collision', d3.forceCollide().radius(20));
-
-const link = svg.append('g')
-  .selectAll('line')
-  .data(data.links)
-  .join('line')
-  .attr('stroke', '#333')
-  .attr('stroke-opacity', 0.4)
-  .attr('stroke-width', d => Math.max(0.5, d.weight || 1))
-  .attr('marker-end', 'url(#arrowhead)');
-
-const node = svg.append('g')
-  .selectAll('circle')
-  .data(data.nodes)
-  .join('circle')
-  .attr('r', d => Math.max(4, Math.min(16, (d._degree || 3) * 1.5)))
-  .attr('fill', d => colors[d.group] || '#888')
-  .attr('stroke', '#222')
-  .attr('stroke-width', 1.5)
-  .call(d3.drag()
-    .on('start', dragstarted)
-    .on('drag', dragged)
-    .on('end', dragended));
-
-const tooltip = document.getElementById('tooltip');
-
-node.on('mouseover', function(event, d) {
-  tooltip.style.display = 'block';
-  tooltip.innerHTML = '<b>' + d.label + '</b><br>类型: ' + d.group;
-  tooltip.style.left = (event.offsetX + 15) + 'px';
-  tooltip.style.top = (event.offsetY - 10) + 'px';
-  d3.select(this).attr('stroke', '#e94560').attr('stroke-width', 3);
-})
-.on('mouseout', function() {
-  tooltip.style.display = 'none';
-  d3.select(this).attr('stroke', '#222').attr('stroke-width', 1.5);
-})
-.on('click', function(event, d) {
-  const detail = document.getElementById('detail');
-  let html = '<p><span class="detail-label">ID:</span> ' + d.id + '</p>';
-  html += '<p><span class="detail-label">标签:</span> ' + d.label + '</p>';
-  html += '<p><span class="detail-label">类型:</span> ' + d.group + '</p>';
-  if (d.metadata) {
-    for (const [k, v] of Object.entries(d.metadata)) {
-      if (v !== null && v !== undefined) html += '<p><span class="detail-label">' + k + ':</span> ' + v + '</p>';
-    }
-  }
-  detail.innerHTML = html;
-});
-
-simulation.on('tick', () => {
-  link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-  node.attr('cx', d => d.x).attr('cy', d => d.y);
-});
-
-function dragstarted(event, d) { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; }
-function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
-function dragended(event, d) { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }
-
-document.getElementById('search').addEventListener('input', function(e) {
-  const q = e.target.value.toLowerCase();
-  node.attr('opacity', d => !q || d.label.toLowerCase().includes(q) || d.id.toLowerCase().includes(q) ? 1 : 0.15);
-  link.attr('stroke-opacity', function(l) {
-    const s = l.source, t = l.target;
-    const ms = !q || s.label.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-    const mt = !q || t.label.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
-    return (!q || ms || mt) ? 0.4 : 0.05;
-  });
-});
-</script>
-</body>
-</html>"""
-
-
-def _get_graph_html() -> str:
-    """获取知识图谱 D3.js 可视化 HTML"""
-    from dochris.graph.builder import build_graph
-
-    settings = get_settings()
-    graph = build_graph(settings.workspace)
-    graph_stats = graph.stats()
-    d3_data = graph.to_d3()
-
-    max_nodes = 200
-    if len(d3_data["nodes"]) > max_nodes:
-        degree: dict[str, int] = {}
-        for link in d3_data["links"]:
-            degree[link["source"]] = degree.get(link["source"], 0) + 1
-            degree[link["target"]] = degree.get(link["target"], 0) + 1
-        for n in d3_data["nodes"]:
-            n["_degree"] = degree.get(n["id"], 0)
-        d3_data["nodes"].sort(key=lambda x: x["_degree"], reverse=True)
-        keep_ids = {n["id"] for n in d3_data["nodes"][:max_nodes]}
-        d3_data["nodes"] = d3_data["nodes"][:max_nodes]
-        d3_data["links"] = [
-            link
-            for link in d3_data["links"]
-            if link["source"] in keep_ids and link["target"] in keep_ids
-        ]
-
-    # 转义节点数据中的 HTML 特殊字符，防止 XSS（JS 通过 innerHTML 插入 label/id/metadata）
-    for node in d3_data["nodes"]:
-        if "label" in node and isinstance(node["label"], str):
-            node["label"] = html.escape(node["label"], quote=True)
-        if "id" in node and isinstance(node["id"], str):
-            node["id"] = html.escape(node["id"], quote=True)
-        metadata = node.get("metadata")
-        if isinstance(metadata, dict):
-            for k, v in metadata.items():
-                if isinstance(v, str):
-                    metadata[k] = html.escape(v, quote=True)
-
-    # json.dumps 已处理引号和反斜牌转义，额外转义 </script> 防止 HTML 注入
-    data_json = json.dumps(d3_data, ensure_ascii=False).replace("</script", "<\\/script")
-    stats_json = json.dumps(graph_stats, ensure_ascii=False, indent=2).replace(
-        "</script", "<\\/script"
-    )
-
-    return _GRAPH_HTML_TEMPLATE.replace("{{GRAPH_DATA}}", data_json).replace(
-        "{{GRAPH_STATS}}", stats_json
-    )
 
 
 # ============================================================
