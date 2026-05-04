@@ -3,7 +3,13 @@
 from .cache import cache_dir, clear_cache, file_hash, load_cached, save_cached
 from .hierarchical_summarizer import HierarchicalSummarizer
 from .llm_client import LLMClient
-from .quality_scorer import get_quality_threshold, score_summary_quality_v4
+from .quality_scorer import (
+    DimensionScore,
+    QualityReport,
+    get_quality_threshold,
+    score_summary_quality_v4,
+    score_summary_quality_v4_report,
+)
 from .retry_manager import RetryManager
 from .summary_generator import SummaryGenerator
 from .utils import (
@@ -30,7 +36,10 @@ __all__ = [
     "HierarchicalSummarizer",
     # quality_scorer
     "score_summary_quality_v4",
+    "score_summary_quality_v4_report",
     "get_quality_threshold",
+    "DimensionScore",
+    "QualityReport",
     # retry_manager
     "RetryManager",
     # utils

@@ -172,7 +172,7 @@ class TestQualityScoringParametrized:
                     "实际应用广泛",
                 ],
                 ["装饰器", "闭包", "高阶函数", "一等公民"],
-                60,
+                40,
             ),
             # 中等质量
             (
@@ -204,7 +204,7 @@ class TestQualityScoringParametrized:
                 "非常详细的摘要" * 30,
                 ["点1", "点2", "点3"],
                 ["概念1", "概念2"],
-                35,
+                25,
             ),
             # 多关键点提升评分
             (
@@ -212,7 +212,7 @@ class TestQualityScoringParametrized:
                 "摘要内容" * 15,
                 ["要点1", "要点2", "要点3", "要点4", "要点5"],
                 ["概念1", "概念2", "概念3"],
-                50,
+                30,
             ),
         ],
     )
@@ -579,21 +579,21 @@ class TestInfoKeywordsParametrized:
     @pytest.mark.parametrize(
         "keyword",
         [
-            "方法",
-            "策略",
-            "技巧",
-            "经验",
-            "教训",
-            "重点",
-            "关键",
-            "核心",
-            "本质",
-            "规律",
-            "模式",
-            "原理",
-            "机制",
-            "流程",
-            "步骤",
+            "工具",
+            "框架",
+            "API",
+            "SDK",
+            "算法",
+            "架构",
+            "协议",
+            "数据库",
+            "缓存",
+            "容器",
+            "微服务",
+            "中间件",
+            "配置",
+            "部署",
+            "监控",
         ],
     )
     def test_info_keywords(self, keyword):

@@ -118,15 +118,31 @@ class TestPhase2Compilation(unittest.TestCase):
         from dochris.core.quality_scorer import score_summary_quality_v4
 
         # 完整摘要 - 需要更详细的内容来达到85分
-        # 添加学习价值关键词以提高评分
+        # 添加学习价值关键词和信息密度关键词以提高评分
         learning_text = (
             "学习" * 20
             + "理解" * 20
             + "掌握" * 20
             + "应用" * 20
-            + "方法" * 20
-            + "策略" * 20
-            + "技巧" * 20
+            + "运用" * 20
+            + "技能" * 20
+            + "知识" * 20
+            + "能力" * 20
+            + "提升" * 20
+            + "改善" * 20
+            + "工具" * 20
+            + "框架" * 20
+            + "API" * 20
+            + "算法" * 20
+            + "架构" * 20
+            + "数据库" * 20
+            + "缓存" * 20
+            + "容器" * 20
+            + "微服务" * 20
+            + "中间件" * 20
+            + "配置" * 20
+            + "部署" * 20
+            + "监控" * 20
         )
         summary = {
             "one_line": "这是一篇关于深度学习与自然语言处理的研究论文",
@@ -141,13 +157,13 @@ class TestPhase2Compilation(unittest.TestCase):
             * 3,
             "detailed_summary": "这是一篇详细的研究论文摘要..." * 50 + learning_text,
             "concepts": [
-                {"name": "Transformer", "description": "注意力机制架构"},
-                {"name": "BERT", "description": "双向编码器表示"},
-                {"name": "GPT", "description": "生成式预训练模型"},
-                {"name": "Attention", "description": "注意力机制"},
-                {"name": "深度学习", "description": "学习方法和策略"},
-            ]
-            * 2,
+                "Transformer",
+                "BERT",
+                "GPT",
+                "Attention",
+                "深度学习",
+                "自然语言处理",
+            ],
         }
 
         score = score_summary_quality_v4(summary)
