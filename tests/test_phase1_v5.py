@@ -117,7 +117,7 @@ class TestScanObsidianOSError:
 
         original_stat = Path.stat
 
-        def selective_stat(self):
+        def selective_stat(self, **kwargs):
             if "test.md" in str(self):
                 raise OSError("stat error")
             return original_stat(self)

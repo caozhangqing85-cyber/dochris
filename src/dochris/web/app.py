@@ -132,7 +132,6 @@ def _get_file_table(search: str = "", status_filter: str = "全部") -> list[lis
         name = m.get("original_filename", m.get("source_file", "unknown"))
         file_type = m.get("type", "unknown")
         status = m.get("status", "unknown")
-        status_label = _STATUS_LABELS.get(status, status)
         quality = str(m.get("quality_score", "-"))
         manifest_id = m.get("id", "")
 
@@ -146,7 +145,7 @@ def _get_file_table(search: str = "", status_filter: str = "全部") -> list[lis
         ):
             continue
 
-        rows.append([manifest_id, name, file_type, status_label, quality])
+        rows.append([manifest_id, name, file_type, status, quality])
         if len(rows) >= 200:
             break
     return rows
