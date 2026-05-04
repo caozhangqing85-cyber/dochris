@@ -12,6 +12,7 @@ class TestExtractJSON:
     def setup_method(self):
         # 不需要真正初始化 LLMClient，直接测试方法
         from dochris.core.llm_client import LLMClient
+
         # 只设置必要属性，跳过 __init__
         self.client = object.__new__(LLMClient)
         self.client.no_think = False
@@ -46,7 +47,7 @@ class TestExtractJSON:
         assert result is None
 
     def test_extract_empty_json(self):
-        result = self.client._extract_json_from_text('{}')
+        result = self.client._extract_json_from_text("{}")
         assert result == {}
 
     def test_extract_escaped_braces_in_string(self):
@@ -65,12 +66,14 @@ class TestExtractJSON:
         assert result == {"outer": {"inner": "value"}}
 
     def test_extract_complex_json(self):
-        text = json.dumps({
-            "one_line": "test",
-            "key_points": ["point1", "point2"],
-            "detailed_summary": "long text here",
-            "concepts": [{"name": "concept1"}, {"name": "concept2"}],
-        })
+        text = json.dumps(
+            {
+                "one_line": "test",
+                "key_points": ["point1", "point2"],
+                "detailed_summary": "long text here",
+                "concepts": [{"name": "concept1"}, {"name": "concept2"}],
+            }
+        )
         result = self.client._extract_json_from_text(f"prefix {text} suffix")
         assert result is not None
         assert "one_line" in result
@@ -81,6 +84,7 @@ class TestNoThink:
 
     def setup_method(self):
         from dochris.core.llm_client import LLMClient
+
         self.client = object.__new__(LLMClient)
         self.client.no_think = True
 
@@ -145,6 +149,7 @@ class TestLLMClientInit:
         import inspect
 
         from dochris.core.llm_client import LLMClient
+
         sig = inspect.signature(LLMClient.__init__)
         assert sig.parameters["model"].default == "glm-5.1"
         assert sig.parameters["max_tokens"].default == 40000
@@ -158,6 +163,7 @@ class TestAsyncContextManager:
     @pytest.mark.asyncio
     async def test_aenter_aexit(self):
         from dochris.core.llm_client import LLMClient
+
         client = object.__new__(LLMClient)
         client.close = AsyncMock()
         client.provider = MagicMock()

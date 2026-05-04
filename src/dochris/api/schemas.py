@@ -11,7 +11,9 @@ class QueryRequest(BaseModel):
     """查询请求"""
 
     q: str = Field(..., min_length=1, description="查询关键词")
-    mode: str = Field(default="combined", description="查询模式: concept|summary|vector|combined|all")
+    mode: str = Field(
+        default="combined", description="查询模式: concept|summary|vector|combined|all"
+    )
     top_k: int = Field(default=5, ge=1, le=50, description="返回结果数量")
 
 

@@ -88,11 +88,7 @@ def get_default_workspace() -> Path:
     return Path.home() / ".openclaw/knowledge-base"
 
 
-def append_log_to_file(
-    workspace: Path | None,
-    message: str,
-    log_type: str = "system"
-) -> None:
+def append_log_to_file(workspace: Path | None, message: str, log_type: str = "system") -> None:
     """追加日志条目到系统日志文件（JSON 格式）
 
     Args:
@@ -104,11 +100,7 @@ def append_log_to_file(
     log_dir = get_default_workspace() / "logs" if workspace is None else workspace / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    log_entry = {
-        "timestamp": datetime.now().isoformat(),
-        "type": log_type,
-        "message": message
-    }
+    log_entry = {"timestamp": datetime.now().isoformat(), "type": log_type, "message": message}
 
     log_file = log_dir / f"{log_type}_{datetime.now().strftime('%Y%m%d')}.json"
 
@@ -127,11 +119,7 @@ def append_log_to_file(
         json.dump(logs, f, ensure_ascii=False, indent=2)
 
 
-def append_log_to_markdown(
-    workspace_path: Path | None,
-    operation: str,
-    detail: str
-) -> None:
+def append_log_to_markdown(workspace_path: Path | None, operation: str, detail: str) -> None:
     """追加日志到 log.md（Markdown 格式）
 
     Args:
@@ -148,9 +136,7 @@ def append_log_to_markdown(
 
 
 def append_log_multi_to_markdown(
-    workspace_path: Path | None,
-    operation: str,
-    details: list[str]
+    workspace_path: Path | None, operation: str, details: list[str]
 ) -> None:
     """批量追加日志到 log.md（同一操作，多条 detail）
 

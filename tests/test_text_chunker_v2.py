@@ -121,32 +121,19 @@ class TestStructureAwareSplitEdgeCases:
 
     def test_nested_headers(self):
         """嵌套标题"""
-        text = (
-            "# 第一章\n内容1\n\n"
-            "## 第一节\n内容2\n\n"
-            "### 第一小节\n内容3\n\n"
-            "# 第二章\n内容4"
-        )
+        text = "# 第一章\n内容1\n\n## 第一节\n内容2\n\n### 第一小节\n内容3\n\n# 第二章\n内容4"
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         assert len(chunks) >= 2
 
     def test_chinese_numbering(self):
         """中文编号"""
-        text = (
-            "一、第一部分\n内容1\n\n"
-            "二、第二部分\n内容2\n\n"
-            "三、第三部分\n内容3"
-        )
+        text = "一、第一部分\n内容1\n\n二、第二部分\n内容2\n\n三、第三部分\n内容3"
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         assert len(chunks) >= 2
 
     def test_arabic_numbering(self):
         """阿拉伯数字编号"""
-        text = (
-            "1. 第一条\n内容1\n\n"
-            "2. 第二条\n内容2\n\n"
-            "3. 第三条\n内容3"
-        )
+        text = "1. 第一条\n内容1\n\n2. 第二条\n内容2\n\n3. 第三条\n内容3"
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         assert len(chunks) >= 2
 
@@ -159,13 +146,7 @@ class TestStructureAwareSplitEdgeCases:
 
     def test_mixed_markdown_and_numbering(self):
         """混合 Markdown 标题和编号"""
-        text = (
-            "# 大标题\n"
-            "1. 编号1\n内容\n"
-            "2. 编号2\n内容\n\n"
-            "## 小标题\n"
-            "更多内容"
-        )
+        text = "# 大标题\n1. 编号1\n内容\n2. 编号2\n内容\n\n## 小标题\n更多内容"
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         assert len(chunks) >= 2
 
@@ -382,14 +363,7 @@ class TestMarkdownInlineCode:
 
     def test_code_block_with_hash_comments(self):
         """代码块中的 # 注释不当作标题"""
-        text = (
-            "# 真正的标题\n\n"
-            "```python\n"
-            "# 这是代码注释\n"
-            "x = 1\n"
-            "```\n\n"
-            "正文内容" * 10
-        )
+        text = "# 真正的标题\n\n```python\n# 这是代码注释\nx = 1\n```\n\n正文内容" * 10
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         # 应至少有一个标题块
         assert len(chunks) >= 1
@@ -409,11 +383,7 @@ class TestChineseNoPunctuation:
 
     def test_chinese_idiomatic_numbering(self):
         """中文括号编号（一）（二）"""
-        text = (
-            "（一）第一条\n内容一\n\n"
-            "（二）第二条\n内容二\n\n"
-            "（三）第三条\n内容三"
-        )
+        text = "（一）第一条\n内容一\n\n（二）第二条\n内容二\n\n（三）第三条\n内容三"
         chunks = structure_aware_split(text, chunk_size=1000, overlap=50)
         assert isinstance(chunks, list)
 
@@ -476,4 +446,3 @@ class TestFixedSizeChunkOverlap:
         text = "a" * 200
         chunks = fixed_size_chunk(text, chunk_size=100, overlap=0)
         assert len(chunks) == 2
-

@@ -13,12 +13,14 @@ class TestBatchPromoteLimitAndOverflow:
 
         manifests = []
         for i in range(5):
-            manifests.append({
-                "id": f"SRC-{i+1:04d}",
-                "status": "compiled",
-                "title": f"测试文档{i+1}",
-                "quality_score": 90,
-            })
+            manifests.append(
+                {
+                    "id": f"SRC-{i + 1:04d}",
+                    "status": "compiled",
+                    "title": f"测试文档{i + 1}",
+                    "quality_score": 90,
+                }
+            )
 
         with patch("dochris.admin.batch_promote.get_all_manifests", return_value=manifests):
             with patch("dochris.admin.batch_promote.promote_to_wiki") as mock_promote:
@@ -34,12 +36,14 @@ class TestBatchPromoteLimitAndOverflow:
 
         manifests = []
         for i in range(25):
-            manifests.append({
-                "id": f"SRC-{i+1:04d}",
-                "status": "compiled",
-                "title": f"测试文档{i+1}",
-                "quality_score": 90,
-            })
+            manifests.append(
+                {
+                    "id": f"SRC-{i + 1:04d}",
+                    "status": "compiled",
+                    "title": f"测试文档{i + 1}",
+                    "quality_score": 90,
+                }
+            )
 
         with patch("dochris.admin.batch_promote.get_all_manifests", return_value=manifests):
             with caplog.at_level(logging.INFO, logger="dochris.admin.batch_promote"):

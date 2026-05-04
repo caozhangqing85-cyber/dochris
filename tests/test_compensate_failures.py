@@ -13,11 +13,11 @@ import pytest
 def setup_and_teardown_module_mocks():
     """设置测试前 mock，测试后清理"""
     # Mock phase2_compilation functions since compensate_failures.py imports them
-    sys.modules['dochris.phases.phase2_compilation'] = MagicMock()
+    sys.modules["dochris.phases.phase2_compilation"] = MagicMock()
     yield
     # 测试结束后清理 mock，恢复真实模块
-    if 'dochris.phases.phase2_compilation' in sys.modules:
-        del sys.modules['dochris.phases.phase2_compilation']
+    if "dochris.phases.phase2_compilation" in sys.modules:
+        del sys.modules["dochris.phases.phase2_compilation"]
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ class TestCompensateFailuresFunctions:
         pdf_file.write_bytes(b"%PDF")
         assert pdf_file.exists()
 
-    @patch('dochris.manifest.get_all_manifests')
+    @patch("dochris.manifest.get_all_manifests")
     def test_find_failed_manifests(self, mock_get, sample_failed_manifests):
         """测试查找失败 manifest"""
         mock_get.return_value = sample_failed_manifests

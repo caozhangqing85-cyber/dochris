@@ -1,4 +1,5 @@
 """测试 CLI 补全生成"""
+
 from dochris.cli.cli_completion import completion_script
 
 

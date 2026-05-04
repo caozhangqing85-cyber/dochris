@@ -50,9 +50,11 @@ class TestBatchPromote:
         from dochris.admin.batch_promote import batch_promote_to_wiki
 
         manifests = self._make_manifests(2)
-        with patch("dochris.admin.batch_promote.get_all_manifests", return_value=manifests), \
-             patch("dochris.admin.batch_promote.promote_to_wiki", side_effect=[True, False]), \
-             patch("dochris.admin.batch_promote.append_log"):
+        with (
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=manifests),
+            patch("dochris.admin.batch_promote.promote_to_wiki", side_effect=[True, False]),
+            patch("dochris.admin.batch_promote.append_log"),
+        ):
             result = batch_promote_to_wiki(tmp_path)
             assert result["success"] == 1
             assert result["failed"] == 1
@@ -83,6 +85,7 @@ class TestBatchPromote:
             import importlib
 
             import dochris.admin.batch_promote
+
             importlib.reload(dochris.admin.batch_promote)
             result = batch_promote_to_obsidian(tmp_path)
             assert result["total"] == 0
@@ -107,34 +110,49 @@ class TestBatchPromoteCLI:
     def test_wiki_target(self, tmp_path):
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["batch_promote.py", str(tmp_path), "wiki", "--dry-run"]), \
-             patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]):
+        with (
+            patch("sys.argv", ["batch_promote.py", str(tmp_path), "wiki", "--dry-run"]),
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]),
+        ):
             main()  # dry-run 不会 sys.exit
 
     def test_curated_target(self, tmp_path):
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["batch_promote.py", str(tmp_path), "curated", "--dry-run"]), \
-             patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]):
+        with (
+            patch("sys.argv", ["batch_promote.py", str(tmp_path), "curated", "--dry-run"]),
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]),
+        ):
             main()
 
     def test_obsidian_target(self, tmp_path):
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["batch_promote.py", str(tmp_path), "obsidian", "--dry-run"]), \
-             patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]):
+        with (
+            patch("sys.argv", ["batch_promote.py", str(tmp_path), "obsidian", "--dry-run"]),
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]),
+        ):
             main()
 
     def test_min_score_arg(self, tmp_path):
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["batch_promote.py", str(tmp_path), "wiki", "--min-score", "90", "--dry-run"]), \
-             patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]):
+        with (
+            patch(
+                "sys.argv",
+                ["batch_promote.py", str(tmp_path), "wiki", "--min-score", "90", "--dry-run"],
+            ),
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]),
+        ):
             main()
 
     def test_limit_arg(self, tmp_path):
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["batch_promote.py", str(tmp_path), "wiki", "--limit", "5", "--dry-run"]), \
-             patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]):
+        with (
+            patch(
+                "sys.argv", ["batch_promote.py", str(tmp_path), "wiki", "--limit", "5", "--dry-run"]
+            ),
+            patch("dochris.admin.batch_promote.get_all_manifests", return_value=[]),
+        ):
             main()

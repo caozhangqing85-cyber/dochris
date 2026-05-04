@@ -154,7 +154,7 @@ def cmd_init(args: Any) -> int:
     print("   1. 将源文件放入工作区或配置 SOURCE_PATH")
     print("   2. 运行: kb ingest <源文件目录>")
     print("   3. 运行: kb compile")
-    print("   4. 运行: kb query \"关键词\"")
+    print('   4. 运行: kb query "关键词"')
     print("\n💡 提示:")
     print("   - 使用 kb --help 查看所有可用命令")
     print("   - 使用 kb config 查看当前配置")

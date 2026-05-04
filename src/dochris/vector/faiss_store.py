@@ -68,8 +68,7 @@ class FAISSStore(BaseVectorStore):
                 from sentence_transformers import SentenceTransformer
             except ImportError as e:
                 raise ImportError(
-                    "sentence-transformers not installed. "
-                    "Run: pip install sentence-transformers"
+                    "sentence-transformers not installed. Run: pip install sentence-transformers"
                 ) from e
 
             self._model = SentenceTransformer(self._embedding_model_name)

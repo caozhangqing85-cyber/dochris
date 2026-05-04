@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """测试向量存储抽象层"""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -181,7 +182,9 @@ class TestChromaDBStore:
             )
 
             mock_collection.add.assert_called_once_with(
-                documents=["doc1", "doc2"], ids=["id1", "id2"], metadatas=[{"key": "value1"}, {"key": "value2"}]
+                documents=["doc1", "doc2"],
+                ids=["id1", "id2"],
+                metadatas=[{"key": "value1"}, {"key": "value2"}],
             )
 
     def test_add_documents_without_metadatas(self) -> None:
@@ -277,7 +280,12 @@ class TestChromaDBStore:
         """测试带 where 过滤的查询"""
         mock_client = MagicMock()
         mock_collection = MagicMock()
-        mock_collection.query.return_value = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+        mock_collection.query.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+        }
         mock_client.get_collection.return_value = mock_collection
         mock_chromadb = MagicMock()
         mock_chromadb.PersistentClient.return_value = mock_client
@@ -430,7 +438,9 @@ class TestFAISSStore:
             model = store._get_model()
 
             assert model == mock_model
-            mock_sentence_transformers.SentenceTransformer.assert_called_once_with("all-MiniLM-L6-v2")
+            mock_sentence_transformers.SentenceTransformer.assert_called_once_with(
+                "all-MiniLM-L6-v2"
+            )
             assert store._model == mock_model
 
     def test_get_index_path(self) -> None:
@@ -477,7 +487,9 @@ class TestFAISSStore:
         mock_faiss = MagicMock()
         mock_faiss.IndexFlatL2.return_value = mock_index
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}):
+        with patch.dict(
+            "sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}
+        ):
             store = FAISSStore()
             store.add_documents(
                 collection="test_col",
@@ -499,7 +511,9 @@ class TestFAISSStore:
         mock_transformer.SentenceTransformer.return_value = mock_model
         mock_faiss = MagicMock()
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}):
+        with patch.dict(
+            "sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}
+        ):
             store = FAISSStore()
 
             with pytest.raises(ValueError, match="documents.*and ids.*length mismatch"):
@@ -512,7 +526,9 @@ class TestFAISSStore:
         mock_transformer.SentenceTransformer.return_value = mock_model
         mock_faiss = MagicMock()
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}):
+        with patch.dict(
+            "sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_transformer}
+        ):
             store = FAISSStore()
             results = store.query("empty_col", "search query")
 
@@ -539,7 +555,10 @@ class TestFAISSStore:
         mock_faiss = MagicMock()
         mock_faiss.IndexFlatL2.return_value = mock_index
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers}):
+        with patch.dict(
+            "sys.modules",
+            {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers},
+        ):
             store = FAISSStore()
             # 模拟已加载的文档
             store._documents["test_col"] = {"id1": "doc1", "id2": "doc2"}
@@ -574,10 +593,16 @@ class TestFAISSStore:
         mock_faiss = MagicMock()
         mock_faiss.IndexFlatL2.return_value = mock_index
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers}):
+        with patch.dict(
+            "sys.modules",
+            {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers},
+        ):
             store = FAISSStore()
             store._documents["test_col"] = {"id1": "doc1", "id2": "doc2"}
-            store._metadatas["test_col"] = {"id1": {"category": "tech"}, "id2": {"category": "other"}}
+            store._metadatas["test_col"] = {
+                "id1": {"category": "tech"},
+                "id2": {"category": "other"},
+            }
             store._indexes["test_col"] = mock_index
 
             results = store.query("test_col", "search query", where={"category": "tech"})
@@ -602,7 +627,10 @@ class TestFAISSStore:
         mock_faiss = MagicMock()
         mock_faiss.IndexFlatL2.return_value = mock_index
 
-        with patch.dict("sys.modules", {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers}):
+        with patch.dict(
+            "sys.modules",
+            {"faiss": mock_faiss, "sentence_transformers": mock_sentence_transformers},
+        ):
             store = FAISSStore()
             store._documents["test_col"] = {"id1": "doc1", "id2": "doc2", "id3": "doc3"}
             store._metadatas["test_col"] = {

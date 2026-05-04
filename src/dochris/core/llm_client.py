@@ -329,7 +329,9 @@ class LLMClient:
             self._hierarchical_summarizer_instance = HierarchicalSummarizer(self)
         return self._hierarchical_summarizer_instance
 
-    async def generate_summary(self, text: str, title: str, max_retries: int = 8) -> dict[str, Any] | None:
+    async def generate_summary(
+        self, text: str, title: str, max_retries: int = 8
+    ) -> dict[str, Any] | None:
         """生成结构化摘要（委托给 SummaryGenerator）
 
         Args:
@@ -361,7 +363,12 @@ class LLMClient:
         )
 
     async def generate_map_reduce_summary(
-        self, text: str, title: str, max_retries: int = 8, chunk_size: int = 4000, overlap: int = 200
+        self,
+        text: str,
+        title: str,
+        max_retries: int = 8,
+        chunk_size: int = 4000,
+        overlap: int = 200,
     ) -> dict[str, Any] | None:
         """Map-Reduce 摘要（委托给 HierarchicalSummarizer）
 
@@ -380,7 +387,12 @@ class LLMClient:
         )
 
     async def generate_hierarchical_summary(
-        self, text: str, title: str, max_retries: int = 8, chunk_size: int = 4000, overlap: int = 200
+        self,
+        text: str,
+        title: str,
+        max_retries: int = 8,
+        chunk_size: int = 4000,
+        overlap: int = 200,
     ) -> dict[str, Any] | None:
         """分层摘要（委托给 HierarchicalSummarizer）
 

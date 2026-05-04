@@ -77,9 +77,7 @@ class TestTypesModule:
         """测试 CompilationResult 数据类"""
         from dochris.types import CompilationResult
 
-        result = CompilationResult(
-            source_id="SRC-0001", success=True, quality_score=85.0
-        )
+        result = CompilationResult(source_id="SRC-0001", success=True, quality_score=85.0)
 
         assert result.source_id == "SRC-0001"
         assert result.success is True
@@ -92,9 +90,7 @@ class TestTypesModule:
         """测试编译失败结果"""
         from dochris.types import CompilationResult
 
-        result = CompilationResult(
-            source_id="SRC-0002", success=False, error="API error"
-        )
+        result = CompilationResult(source_id="SRC-0002", success=False, error="API error")
 
         assert result.success is False
         assert result.error == "API error"

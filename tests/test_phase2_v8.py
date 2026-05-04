@@ -19,10 +19,10 @@ def _make_manifests(count=3, size_bytes=None):
     manifests = []
     for i in range(count):
         m = {
-            "id": f"SRC-{i+1:04d}",
+            "id": f"SRC-{i + 1:04d}",
             "status": "ingested",
-            "title": f"测试文档 {i+1}",
-            "file_path": f"raw/test{i+1}.pdf",
+            "title": f"测试文档 {i + 1}",
+            "file_path": f"raw/test{i + 1}.pdf",
             "type": "pdf",
             "created_at": "2026-04-16T10:00:00",
         }
@@ -40,14 +40,15 @@ class TestPhase2DryRunEstimates:
         """50-100KB 文件估算 2 次 API 调用"""
         monkeypatch.setenv("WORKSPACE", str(mock_workspace))
 
-        with patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(1, 60000)):
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests",
+            return_value=_make_manifests(1, 60000),
+        ):
             with patch("dochris.phases.phase2_compilation.setup_logging"):
                 with patch("builtins.print"):
                     from dochris.phases.phase2_compilation import compile_all
 
-                    result = await compile_all(
-                        limit=None, max_concurrent=1, dry_run=True
-                    )
+                    result = await compile_all(limit=None, max_concurrent=1, dry_run=True)
 
         assert result is None
 
@@ -56,14 +57,15 @@ class TestPhase2DryRunEstimates:
         """>100KB 文件估算 3 次 API 调用"""
         monkeypatch.setenv("WORKSPACE", str(mock_workspace))
 
-        with patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(1, 200000)):
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests",
+            return_value=_make_manifests(1, 200000),
+        ):
             with patch("dochris.phases.phase2_compilation.setup_logging"):
                 with patch("builtins.print"):
                     from dochris.phases.phase2_compilation import compile_all
 
-                    result = await compile_all(
-                        limit=None, max_concurrent=1, dry_run=True
-                    )
+                    result = await compile_all(limit=None, max_concurrent=1, dry_run=True)
 
         assert result is None
 
@@ -80,17 +82,21 @@ class TestPhase2ProgressBranch:
         mock_worker.compile_document = AsyncMock(return_value={"status": "compiled"})
         mock_monitor = MagicMock()
 
-        with patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(2)):
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(2)
+        ):
             with patch("dochris.phases.phase2_compilation.setup_logging"):
-                with patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker):
-                    with patch("dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor):
+                with patch(
+                    "dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker
+                ):
+                    with patch(
+                        "dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor
+                    ):
                         with patch("dochris.phases.phase2_compilation.clear_cache", return_value=0):
                             with patch("sys.stdout.isatty", return_value=False):
                                 from dochris.phases.phase2_compilation import compile_all
 
-                                await compile_all(
-                                    limit=None, max_concurrent=1, dry_run=False
-                                )
+                                await compile_all(limit=None, max_concurrent=1, dry_run=False)
 
         # 验证 worker 被调用编译文档
         assert mock_worker.compile_document.call_count == 2
@@ -109,17 +115,21 @@ class TestPhase2TTYProgress:
         mock_worker.compile_document = AsyncMock(return_value={"status": "compiled"})
         mock_monitor = MagicMock()
 
-        with patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(2)):
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(2)
+        ):
             with patch("dochris.phases.phase2_compilation.setup_logging"):
-                with patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker):
-                    with patch("dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor):
+                with patch(
+                    "dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker
+                ):
+                    with patch(
+                        "dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor
+                    ):
                         with patch("dochris.phases.phase2_compilation.clear_cache", return_value=0):
                             with patch("sys.stdout.isatty", return_value=True):
                                 from dochris.phases.phase2_compilation import compile_all
 
-                                await compile_all(
-                                    limit=None, max_concurrent=1, dry_run=False
-                                )
+                                await compile_all(limit=None, max_concurrent=1, dry_run=False)
 
         assert mock_worker.compile_document.call_count == 2
         mock_monitor.print_report.assert_called_once()
@@ -133,16 +143,20 @@ class TestPhase2TTYProgress:
         mock_worker.compile_document = AsyncMock(side_effect=RuntimeError("API error"))
         mock_monitor = MagicMock()
 
-        with patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(1)):
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(1)
+        ):
             with patch("dochris.phases.phase2_compilation.setup_logging"):
-                with patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker):
-                    with patch("dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor):
+                with patch(
+                    "dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker
+                ):
+                    with patch(
+                        "dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor
+                    ):
                         with patch("dochris.phases.phase2_compilation.clear_cache", return_value=0):
                             with patch("sys.stdout.isatty", return_value=True):
                                 from dochris.phases.phase2_compilation import compile_all
 
-                                await compile_all(
-                                    limit=None, max_concurrent=1, dry_run=False
-                                )
+                                await compile_all(limit=None, max_concurrent=1, dry_run=False)
 
         mock_monitor.print_report.assert_called_once()

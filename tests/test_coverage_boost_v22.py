@@ -76,9 +76,13 @@ class TestKnowledgeGraphModels:
         from dochris.graph.models import GraphEdge, GraphNode, KnowledgeGraph
 
         graph = KnowledgeGraph()
-        graph.add_node(GraphNode(id="src-1", label="文件1", node_type="source", metadata={"type": "pdf"}))
+        graph.add_node(
+            GraphNode(id="src-1", label="文件1", node_type="source", metadata={"type": "pdf"})
+        )
         graph.add_node(GraphNode(id="concept:AI", label="AI", node_type="concept"))
-        graph.add_edge(GraphEdge(source="src-1", target="concept:AI", relation="contains_concept", weight=1.0))
+        graph.add_edge(
+            GraphEdge(source="src-1", target="concept:AI", relation="contains_concept", weight=1.0)
+        )
 
         d3 = graph.to_d3()
         assert len(d3["nodes"]) == 2
@@ -136,7 +140,9 @@ class TestKnowledgeGraphModels:
         from dochris.graph.models import GraphNode, KnowledgeGraph
 
         graph = KnowledgeGraph()
-        graph.add_node(GraphNode(id="1", label="X", node_type="source", metadata={"desc": "人工智能"}))
+        graph.add_node(
+            GraphNode(id="1", label="X", node_type="source", metadata={"desc": "人工智能"})
+        )
 
         results = graph.search("人工智能")
         assert len(results) == 1
@@ -251,7 +257,9 @@ class TestGraphBuilder:
         graph = build_graph(tmp_path)
         assert "summary:test-doc" in graph.nodes
         # source → summary edge
-        compiled_edges = [e for e in graph.edges if e.source == "SRC-0001" and e.relation == "compiled_to"]
+        compiled_edges = [
+            e for e in graph.edges if e.source == "SRC-0001" and e.relation == "compiled_to"
+        ]
         assert len(compiled_edges) == 1
 
     def test_build_graph_corrupted_manifest(self, tmp_path):
@@ -331,12 +339,14 @@ class TestWebAppHandlers:
         """有向量结果的格式化"""
         from dochris.web.app import _format_query_results
 
-        result = _format_query_results({
-            "time_seconds": 0.1,
-            "vector_results": [
-                {"score": 0.95, "title": "测试", "content": "内容", "source": "/test.md"}
-            ],
-        })
+        result = _format_query_results(
+            {
+                "time_seconds": 0.1,
+                "vector_results": [
+                    {"score": 0.95, "title": "测试", "content": "内容", "source": "/test.md"}
+                ],
+            }
+        )
         assert "测试" in result
         assert "0.950" in result
 
@@ -344,20 +354,24 @@ class TestWebAppHandlers:
         """有概念匹配的格式化"""
         from dochris.web.app import _format_query_results
 
-        result = _format_query_results({
-            "time_seconds": 0.1,
-            "concepts": [{"name": "AI"}],
-        })
+        result = _format_query_results(
+            {
+                "time_seconds": 0.1,
+                "concepts": [{"name": "AI"}],
+            }
+        )
         assert "AI" in result
 
     def test_format_query_results_with_answer(self):
         """有 AI 回答的格式化"""
         from dochris.web.app import _format_query_results
 
-        result = _format_query_results({
-            "time_seconds": 1.0,
-            "answer": "这是AI回答",
-        })
+        result = _format_query_results(
+            {
+                "time_seconds": 1.0,
+                "answer": "这是AI回答",
+            }
+        )
         assert "AI 回答" in result
         assert "这是AI回答" in result
 
@@ -420,7 +434,9 @@ class TestWebAppHandlers:
         (concepts_dir / "ML.md").write_text("# ML\n", encoding="utf-8")
 
         graph = build_graph(tmp_path)
-        concept_edges = [e for e in graph.edges if e.source == "SRC-0001" and e.relation == "contains_concept"]
+        concept_edges = [
+            e for e in graph.edges if e.source == "SRC-0001" and e.relation == "contains_concept"
+        ]
         assert len(concept_edges) == 2
 
     def test_build_graph_same_type_edges(self, tmp_path):
@@ -464,7 +480,8 @@ class TestWebAppHandlers:
         graph = build_graph(tmp_path)
         # summary:doc1 → summary:doc2 related_to edge (via shared concept AI)
         related_edges = [
-            e for e in graph.edges
+            e
+            for e in graph.edges
             if e.relation == "related_to"
             and e.source.startswith("summary:")
             and e.target.startswith("summary:")

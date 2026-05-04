@@ -46,13 +46,12 @@ class TestRetryBranches:
     @pytest.mark.asyncio
     async def test_llm_retry_returns_none_on_max_retries(self):
         """llm_retry_with_filter 达到最大重试返回 None"""
+
         async def always_fail():
             raise RuntimeError("API error")
 
         with patch("dochris.core.retry_manager.RetryManager.should_retry", return_value=True):
             with patch("dochris.core.retry_manager.RetryManager.get_retry_delay", return_value=0):
-                result = await RetryManager.llm_retry_with_filter(
-                    always_fail, max_retries=1
-                )
+                result = await RetryManager.llm_retry_with_filter(always_fail, max_retries=1)
 
         assert result is None

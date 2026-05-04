@@ -337,15 +337,30 @@ class TestCLIUtils:
                         with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                             with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                                 with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                    with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
-                                        mock_ws.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda p: [])
+                                    with patch(
+                                        "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                    ):
+                                        mock_ws.return_value = MagicMock(
+                                            exists=lambda: True,
+                                            is_dir=lambda: True,
+                                            rglob=lambda p: [],
+                                        )
                                         mock_s.return_value = MagicMock(
-                                            source_path=None, obsidian_vaults=[],
-                                            api_key=None, api_base="http://test", model="test-model",
-                                            max_concurrency=3, min_quality_score=85, max_content_chars=20000,
+                                            source_path=None,
+                                            obsidian_vaults=[],
+                                            api_key=None,
+                                            api_base="http://test",
+                                            model="test-model",
+                                            max_concurrency=3,
+                                            min_quality_score=85,
+                                            max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda p: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: True,
+                                                is_dir=lambda: True,
+                                                rglob=lambda p: [],
+                                            )
                                         rc = show_status()
         assert rc == 0
 
@@ -361,14 +376,25 @@ class TestCLIUtils:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     mock_s.return_value = MagicMock(
-                                        source_path=None, obsidian_vaults=[],
-                                        api_key=None, api_base="http://test", model="test-model",
-                                        max_concurrency=3, min_quality_score=85, max_content_chars=20000,
+                                        source_path=None,
+                                        obsidian_vaults=[],
+                                        api_key=None,
+                                        api_base="http://test",
+                                        model="test-model",
+                                        max_concurrency=3,
+                                        min_quality_score=85,
+                                        max_content_chars=20000,
                                     )
                                     for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                        p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda p: [])
+                                        p.return_value = MagicMock(
+                                            exists=lambda: True,
+                                            is_dir=lambda: True,
+                                            rglob=lambda p: [],
+                                        )
                                     ws = Path("/tmp/test-workspace")
                                     rc = show_status(ws)
         assert rc == 0
@@ -389,10 +415,17 @@ class TestCLIConfig:
         with patch("dochris.cli.cli_config.get_settings") as mock_s:
             mock_s.return_value = MagicMock(
                 workspace=MagicMock(),
-                logs_dir=MagicMock(), wiki_dir=MagicMock(), outputs_dir=MagicMock(),
-                source_path=None, obsidian_vaults=[], api_key=None,
-                api_base="http://test", model="test-model",
-                max_concurrency=3, min_quality_score=85, max_content_chars=20000,
+                logs_dir=MagicMock(),
+                wiki_dir=MagicMock(),
+                outputs_dir=MagicMock(),
+                source_path=None,
+                obsidian_vaults=[],
+                api_key=None,
+                api_base="http://test",
+                model="test-model",
+                max_concurrency=3,
+                min_quality_score=85,
+                max_content_chars=20000,
             )
             args = MagicMock()
             rc = cmd_config(args)
@@ -404,11 +437,18 @@ class TestCLIConfig:
 
         with patch("dochris.cli.cli_config.get_settings") as mock_s:
             mock_s.return_value = MagicMock(
-                workspace=MagicMock(), logs_dir=MagicMock(), wiki_dir=MagicMock(),
-                outputs_dir=MagicMock(), source_path=None, obsidian_vaults=[],
+                workspace=MagicMock(),
+                logs_dir=MagicMock(),
+                wiki_dir=MagicMock(),
+                outputs_dir=MagicMock(),
+                source_path=None,
+                obsidian_vaults=[],
                 api_key="sk-1234567890abcdef",
-                api_base="http://test", model="test-model",
-                max_concurrency=3, min_quality_score=85, max_content_chars=20000,
+                api_base="http://test",
+                model="test-model",
+                max_concurrency=3,
+                min_quality_score=85,
+                max_content_chars=20000,
             )
             args = MagicMock()
             with patch("builtins.print") as mock_print:
@@ -534,9 +574,14 @@ class TestCLIIngest:
         args = MagicMock()
 
         with patch("dochris.phases.phase1_ingestion.setup_logging"):
-            with patch("dochris.phases.phase1_ingestion.run_phase1", return_value={
-                "total": 10, "linked": 5, "skipped": 5,
-            }) as mock_run:
+            with patch(
+                "dochris.phases.phase1_ingestion.run_phase1",
+                return_value={
+                    "total": 10,
+                    "linked": 5,
+                    "skipped": 5,
+                },
+            ) as mock_run:
                 with patch("builtins.print"):
                     rc = cmd_ingest(args)
         assert rc == 0
@@ -570,9 +615,12 @@ class TestCLIQuery:
 
         mock_logger = MagicMock()
         with patch("dochris.phases.phase3_query.setup_logging", return_value=mock_logger):
-            with patch("dochris.phases.phase3_query.query", return_value={
-                "answer": "结果内容",
-            }) as mock_query:
+            with patch(
+                "dochris.phases.phase3_query.query",
+                return_value={
+                    "answer": "结果内容",
+                },
+            ) as mock_query:
                 with patch("dochris.phases.phase3_query.print_result"):
                     rc = cmd_query(args)
         assert rc == 0
@@ -627,7 +675,10 @@ class TestCLIReview:
         args = MagicMock(src_id="SRC-001", to="wiki")
         with (
             patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
-            patch("dochris.quality.quality_gate.quality_gate", return_value={"passed": True, "quality_score": 90}),
+            patch(
+                "dochris.quality.quality_gate.quality_gate",
+                return_value={"passed": True, "quality_score": 90},
+            ),
             patch("dochris.promote.promote_to_wiki", return_value=True),
             patch("builtins.print"),
         ):
@@ -641,7 +692,10 @@ class TestCLIReview:
         args = MagicMock(src_id="SRC-001", to="wiki")
         with (
             patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
-            patch("dochris.quality.quality_gate.quality_gate", return_value={"passed": False, "reason": "低质量"}),
+            patch(
+                "dochris.quality.quality_gate.quality_gate",
+                return_value={"passed": False, "reason": "低质量"},
+            ),
             patch("builtins.print"),
         ):
             rc = cmd_promote(args)
@@ -654,7 +708,10 @@ class TestCLIReview:
         args = MagicMock(src_id="SRC-001", to="curated")
         with (
             patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
-            patch("dochris.quality.quality_gate.quality_gate", return_value={"passed": True, "quality_score": 90}),
+            patch(
+                "dochris.quality.quality_gate.quality_gate",
+                return_value={"passed": True, "quality_score": 90},
+            ),
             patch("dochris.promote.promote_to_curated", return_value=True),
             patch("builtins.print"),
         ):
@@ -668,7 +725,10 @@ class TestCLIReview:
         args = MagicMock(src_id="SRC-001", to="obsidian")
         with (
             patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
-            patch("dochris.quality.quality_gate.quality_gate", return_value={"passed": True, "quality_score": 90}),
+            patch(
+                "dochris.quality.quality_gate.quality_gate",
+                return_value={"passed": True, "quality_score": 90},
+            ),
             patch("dochris.vault.bridge.promote_to_obsidian", return_value=True),
             patch("builtins.print"),
         ):
@@ -682,7 +742,10 @@ class TestCLIReview:
         args = MagicMock(report=False, check_pollution=False, src_id=None)
         with (
             patch("dochris.cli.cli_review.get_default_workspace", return_value=MagicMock()),
-            patch("dochris.quality.quality_gate.scan_wiki", return_value={"wiki_summaries": 10, "wiki_concepts": 5, "wiki_total": 15}),
+            patch(
+                "dochris.quality.quality_gate.scan_wiki",
+                return_value={"wiki_summaries": 10, "wiki_concepts": 5, "wiki_total": 15},
+            ),
             patch("builtins.print"),
         ):
             rc = cmd_quality(args)
@@ -738,9 +801,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(seed_from_obsidian=mock_seed),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(seed_from_obsidian=mock_seed),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 0
@@ -755,9 +821,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(seed_from_obsidian=mock_seed),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(seed_from_obsidian=mock_seed),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 1
@@ -782,9 +851,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(promote_to_obsidian=mock_promote),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(promote_to_obsidian=mock_promote),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 0
@@ -809,9 +881,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(promote_to_obsidian=mock_promote),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(promote_to_obsidian=mock_promote),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 1
@@ -826,9 +901,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(list_associated_notes=mock_list),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(list_associated_notes=mock_list),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 0
@@ -843,9 +921,12 @@ class TestCLIVault:
         mock_settings = MagicMock(return_value=MagicMock())
 
         with patch("dochris.cli.cli_vault.get_default_workspace", mock_settings):
-            with patch.dict("sys.modules", {
-                "dochris.vault.bridge": MagicMock(list_associated_notes=mock_list),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "dochris.vault.bridge": MagicMock(list_associated_notes=mock_list),
+                },
+            ):
                 with patch("builtins.print"):
                     rc = cmd_vault(args)
         assert rc == 1

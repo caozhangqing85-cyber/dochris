@@ -148,7 +148,10 @@ def check_process_status() -> dict:
 
 
 def check_alerts(
-    progress_info: dict[str, Any], log_info: dict[str, Any], quality_info: dict[str, Any], process_info: dict[str, Any]
+    progress_info: dict[str, Any],
+    log_info: dict[str, Any],
+    quality_info: dict[str, Any],
+    process_info: dict[str, Any],
 ) -> list[str]:
     """检查告警条件"""
     alerts = []
@@ -177,7 +180,10 @@ def check_alerts(
 
 
 def generate_report(
-    progress_info: dict[str, Any], log_info: dict[str, Any], quality_info: dict[str, Any], process_info: dict[str, Any]
+    progress_info: dict[str, Any],
+    log_info: dict[str, Any],
+    quality_info: dict[str, Any],
+    process_info: dict[str, Any],
 ) -> str:
     """生成监控报告"""
     report = []

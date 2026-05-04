@@ -61,12 +61,14 @@ class TestSummaryGeneratorGenerate:
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "test",
-            "key_points": ["a"],
-            "detailed_summary": "summary",
-            "concepts": [{"name": "c1", "explanation": "exp"}],
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {
+                "one_line": "test",
+                "key_points": ["a"],
+                "detailed_summary": "summary",
+                "concepts": [{"name": "c1", "explanation": "exp"}],
+            }
+        )
 
         client.client = MagicMock()
         client.client.chat.completions.create = AsyncMock(return_value=mock_response)
@@ -94,9 +96,7 @@ class TestSummaryGeneratorGenerate:
         # 返回非法 JSON
         client.client.chat.completions.create = AsyncMock(
             return_value=MagicMock(
-                choices=[MagicMock(
-                    message=MagicMock(content='{"one_line": "ok", invalid json}')
-                )]
+                choices=[MagicMock(message=MagicMock(content='{"one_line": "ok", invalid json}'))]
             )
         )
         # json_repair 能修复
@@ -112,9 +112,7 @@ class TestSummaryGeneratorGenerate:
     async def test_generate_summary_all_fail_returns_none(self):
         """所有重试失败返回 None"""
         client = self._make_llm_client()
-        client.client.chat.completions.create = AsyncMock(
-            side_effect=Exception("API error")
-        )
+        client.client.chat.completions.create = AsyncMock(side_effect=Exception("API error"))
 
         from dochris.core.summary_generator import SummaryGenerator
 
@@ -141,7 +139,9 @@ class TestSummaryGeneratorSmart:
 
         gen = SummaryGenerator(self._make_llm_client())
 
-        with patch.object(gen, "generate_summary", new_callable=AsyncMock, return_value={"one_line": "ok"}) as mock_direct:
+        with patch.object(
+            gen, "generate_summary", new_callable=AsyncMock, return_value={"one_line": "ok"}
+        ) as mock_direct:
             result = await gen.generate_summary_smart("short text", "title", direct_limit=10000)
             mock_direct.assert_awaited_once()
             assert result is not None

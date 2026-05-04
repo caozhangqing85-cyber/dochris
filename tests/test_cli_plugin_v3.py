@@ -75,7 +75,9 @@ test_hook._is_hookimpl = True
             encoding="utf-8",
         )
 
-        with patch("dochris.cli.cli_plugin.load_plugin_module", side_effect=Exception("generic error")):
+        with patch(
+            "dochris.cli.cli_plugin.load_plugin_module", side_effect=Exception("generic error")
+        ):
             args = argparse.Namespace(path=str(plugin_file))
             result = _plugin_load(args)
 

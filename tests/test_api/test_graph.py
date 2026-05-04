@@ -39,9 +39,7 @@ def _setup_workspace(workspace: Path) -> None:
         json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
     )
 
-    (workspace / "wiki" / "concepts" / "神经网络.md").write_text(
-        "# 神经网络\n", encoding="utf-8"
-    )
+    (workspace / "wiki" / "concepts" / "神经网络.md").write_text("# 神经网络\n", encoding="utf-8")
 
 
 class TestGraphAPI:

@@ -15,7 +15,9 @@ class TestGetAudioDurationExceptions:
         audio = tmp_path / "test.mp3"
         audio.write_bytes(b"\xff\xfb" + b"\x00" * 100)
 
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="ffprobe", timeout=5)):
+        with patch(
+            "subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="ffprobe", timeout=5)
+        ):
             result = get_audio_duration(audio)
 
         assert result is None

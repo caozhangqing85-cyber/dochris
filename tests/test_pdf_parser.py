@@ -313,10 +313,13 @@ class TestParseWithPdfplumberMocked:
         mock_parse.return_value = "a" * 200
 
         from dochris.parsers.pdf_parser import parse_pdf
-        with patch("dochris.parsers.pdf_parser.parse_with_pymupdf") as m2, \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2"), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown"), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"):
+
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf") as m2,
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2"),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown"),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"),
+        ):
             result = parse_pdf(pdf_file)
         assert result == "a" * 200
         m2.assert_not_called()
@@ -329,11 +332,15 @@ class TestParseWithPdfplumberMocked:
         mock_parse.return_value = "a" * 100
 
         from dochris.parsers.pdf_parser import parse_pdf
-        with patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             from dochris.exceptions import FileProcessingError
+
             with pytest.raises(FileProcessingError):
                 parse_pdf(pdf_file)
 
@@ -345,10 +352,13 @@ class TestParseWithPdfplumberMocked:
         mock_parse.return_value = "a" * 101
 
         from dochris.parsers.pdf_parser import parse_pdf
-        with patch("dochris.parsers.pdf_parser.parse_with_pymupdf"), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2"), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown"), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"):
+
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf"),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2"),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown"),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"),
+        ):
             result = parse_pdf(pdf_file)
         assert len(result) == 101
 
@@ -386,6 +396,7 @@ class TestParseWithPymupdfMocked:
         mock_pymupdf.side_effect = RuntimeError("损坏的 PDF")
 
         from dochris.exceptions import FileProcessingError
+
         with pytest.raises(FileProcessingError):
             parse_pdf(pdf_file)
 
@@ -422,6 +433,7 @@ class TestMarkitdownEdgeCases:
 
         result = parse_with_markitdown(pdf_file)
         assert result is not None
+
 
 class TestParsePdfErrorDetails:
     """测试 parse_pdf 错误信息包含解析器详情"""

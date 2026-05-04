@@ -73,7 +73,20 @@ def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
             logger.warning(f"文档未预期错误 {file_path.name}: {e}")
 
     # 代码文件（直接读取）
-    elif ext in (".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp", ".h", ".css", ".json", ".xml"):
+    elif ext in (
+        ".py",
+        ".js",
+        ".ts",
+        ".java",
+        ".go",
+        ".rs",
+        ".c",
+        ".cpp",
+        ".h",
+        ".css",
+        ".json",
+        ".xml",
+    ):
         try:
             text = file_path.read_text(encoding="utf-8", errors="replace")
             return text[:MAX_CONTENT_CHARS]

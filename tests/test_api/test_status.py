@@ -14,7 +14,9 @@ class TestStatusEndpoint:
         """状态接口返回工作区信息"""
         # 写入两个 manifest
         _write_manifest(tmp_workspace, _make_manifest("SRC-0001", status="compiled"))
-        _write_manifest(tmp_workspace, _make_manifest("SRC-0002", status="ingested", file_type="audio"))
+        _write_manifest(
+            tmp_workspace, _make_manifest("SRC-0002", status="ingested", file_type="audio")
+        )
 
         mock_settings = type(
             "Settings",

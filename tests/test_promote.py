@@ -121,6 +121,7 @@ class TestCopyFile:
         """测试超过最大重试次数"""
         # 降低 MAX_COPY_RETRIES 以加快测试
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "MAX_COPY_RETRIES", 3)
 
         src = tmp_path / "file.txt"
@@ -184,6 +185,7 @@ class TestPromoteToWiki:
         self, temp_workspace, sample_manifest, sample_output_files, monkeypatch
     ):
         """测试成功晋升到 wiki"""
+
         # Mock get_manifest 和 update_manifest_status
         def mock_get_manifest(path, src_id):
             return sample_manifest
@@ -195,6 +197,7 @@ class TestPromoteToWiki:
             pass
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
         monkeypatch.setattr(dochris.promote, "update_manifest_status", mock_update_status)
         monkeypatch.setattr(dochris.promote, "append_log", mock_append_log)
@@ -207,19 +210,19 @@ class TestPromoteToWiki:
 
     def test_promote_to_wiki_manifest_not_found(self, temp_workspace, monkeypatch):
         """测试 manifest 不存在"""
+
         def mock_get_manifest(path, src_id):
             return None
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
 
         result = promote_to_wiki(temp_workspace, "SRC-9999")
 
         assert result is False
 
-    def test_promote_to_wiki_wrong_status(
-        self, temp_workspace, sample_manifest, monkeypatch
-    ):
+    def test_promote_to_wiki_wrong_status(self, temp_workspace, sample_manifest, monkeypatch):
         """测试状态不正确"""
         wrong_manifest = sample_manifest.copy()
         wrong_manifest["status"] = "pending"
@@ -228,6 +231,7 @@ class TestPromoteToWiki:
             return wrong_manifest
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
 
         result = promote_to_wiki(temp_workspace, "SRC-0001")
@@ -263,6 +267,7 @@ class TestPromoteToCurated:
             pass
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
         monkeypatch.setattr(dochris.promote, "update_manifest_status", mock_update_status)
         monkeypatch.setattr(dochris.promote, "append_log", mock_append_log)
@@ -273,14 +278,14 @@ class TestPromoteToCurated:
         # 检查文件被复制到 curated
         assert (temp_workspace / "curated" / "promoted" / "测试文档.md").exists()
 
-    def test_promote_to_curated_wrong_status(
-        self, temp_workspace, sample_manifest, monkeypatch
-    ):
+    def test_promote_to_curated_wrong_status(self, temp_workspace, sample_manifest, monkeypatch):
         """测试状态不正确"""
+
         def mock_get_manifest(path, src_id):
             return sample_manifest
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
 
         result = promote_to_curated(temp_workspace, "SRC-0001")
@@ -291,14 +296,14 @@ class TestPromoteToCurated:
 class TestShowStatus:
     """测试 show_status 函数"""
 
-    def test_show_status_existing(
-        self, temp_workspace, sample_manifest, monkeypatch, capsys
-    ):
+    def test_show_status_existing(self, temp_workspace, sample_manifest, monkeypatch, capsys):
         """测试显示现有 manifest 状态"""
+
         def mock_get_manifest(path, src_id):
             return sample_manifest
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
 
         show_status(temp_workspace, "SRC-0001")
@@ -310,10 +315,12 @@ class TestShowStatus:
 
     def test_show_status_not_found(self, temp_workspace, monkeypatch, capsys):
         """测试 manifest 不存在"""
+
         def mock_get_manifest(path, src_id):
             return None
 
         import dochris.promote
+
         monkeypatch.setattr(dochris.promote, "get_manifest", mock_get_manifest)
 
         show_status(temp_workspace, "SRC-9999")

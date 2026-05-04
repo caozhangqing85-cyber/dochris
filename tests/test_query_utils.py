@@ -37,12 +37,10 @@ def mock_workspace(tmp_path, monkeypatch):
 
     # 创建示例摘要和概念文件
     (workspace / "wiki" / "summaries" / "测试文档.md").write_text(
-        "## 一句话摘要\n测试摘要内容\n\n## 要点\n- 要点一\n- 要点二\n- 要点三",
-        encoding="utf-8"
+        "## 一句话摘要\n测试摘要内容\n\n## 要点\n- 要点一\n- 要点二\n- 要点三", encoding="utf-8"
     )
     (workspace / "wiki" / "concepts" / "测试概念.md").write_text(
-        "## 定义\n概念定义内容",
-        encoding="utf-8"
+        "## 定义\n概念定义内容", encoding="utf-8"
     )
 
     monkeypatch.setenv("WORKSPACE", str(workspace))
@@ -103,6 +101,7 @@ class TestBuildManifestIndex:
         # 重新加载 MANIFESTS_PATH
         import dochris.phases.query_utils
         from dochris.phases.query_utils import _build_manifest_index
+
         dochris.phases.query_utils.MANIFESTS_PATH = empty_workspace / "manifests" / "sources"
 
         index = _build_manifest_index()

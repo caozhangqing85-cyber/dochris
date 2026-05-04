@@ -59,16 +59,16 @@ class Settings:
     """LLM API 密钥"""
 
     api_base: str = field(
-        default_factory=lambda: os.environ.get(
-            "OPENAI_API_BASE", DEFAULT_LLM_API_BASE
-        )
+        default_factory=lambda: os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
     )
     """LLM API 基础 URL"""
 
     model: str = field(default_factory=lambda: os.environ.get("MODEL", "glm-5.1"))
     """默认 LLM 模型"""
 
-    llm_provider: str = field(default_factory=lambda: os.environ.get("LLM_PROVIDER", "openai_compat"))
+    llm_provider: str = field(
+        default_factory=lambda: os.environ.get("LLM_PROVIDER", "openai_compat")
+    )
     """LLM 提供商类型 (openai_compat, ollama)"""
 
     query_model: str = "glm-4-flash"
@@ -81,9 +81,7 @@ class Settings:
     # 向量配置
     # ============================================================
 
-    vector_store: str = field(
-        default_factory=lambda: os.environ.get("VECTOR_STORE", "chromadb")
-    )
+    vector_store: str = field(default_factory=lambda: os.environ.get("VECTOR_STORE", "chromadb"))
     """向量数据库类型 (chromadb, faiss)"""
 
     # OpenRouter 备用配置
@@ -265,7 +263,9 @@ class Settings:
 
         # 解析插件配置
         plugin_dirs_str = os.environ.get("PLUGIN_DIRS", "")
-        plugin_dirs = [Path(p).expanduser() for p in plugin_dirs_str.split(":")] if plugin_dirs_str else []
+        plugin_dirs = (
+            [Path(p).expanduser() for p in plugin_dirs_str.split(":")] if plugin_dirs_str else []
+        )
 
         plugins_enabled_str = os.environ.get("PLUGINS_ENABLED", "")
         plugins_enabled = plugins_enabled_str.split(",") if plugins_enabled_str else []
@@ -418,9 +418,7 @@ class Settings:
         try:
             self.workspace.mkdir(parents=True, exist_ok=True)
         except OSError as e:
-            raise ValueError(
-                f"workspace 路径无效或无法创建: {self.workspace}\n错误: {e}"
-            ) from e
+            raise ValueError(f"workspace 路径无效或无法创建: {self.workspace}\n错误: {e}") from e
 
         # 验证 api_key（警告级别）
         api_key = self.api_key or os.environ.get("OPENAI_API_KEY")
@@ -431,9 +429,7 @@ class Settings:
                     f"OPENAI_API_KEY 未设置，可能从 OpenClaw 配置获取: {self.openclaw_config_path}"
                 )
             else:
-                warnings.append(
-                    "OPENAI_API_KEY 未设置，请在运行前设置环境变量或 .env 文件"
-                )
+                warnings.append("OPENAI_API_KEY 未设置，请在运行前设置环境变量或 .env 文件")
 
         return warnings
 

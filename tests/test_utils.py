@@ -137,7 +137,7 @@ class TestSanitizeFilename:
         """测试特殊字符清理"""
         from dochris.core.utils import sanitize_filename
 
-        result = sanitize_filename("file<>:\"|?*name")
+        result = sanitize_filename('file<>:"|?*name')
         assert "<" not in result
         assert ">" not in result
 

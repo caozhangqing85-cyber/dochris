@@ -7,6 +7,7 @@
 - OpenAI (https://api.openai.com)
 - 其他兼容服务
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -48,9 +49,7 @@ class OpenAICompatProvider(BaseLLMProvider):
             try:
                 from openai import AsyncOpenAI
             except ImportError as e:
-                raise ImportError(
-                    "openai package not installed. Run: pip install openai"
-                ) from e
+                raise ImportError("openai package not installed. Run: pip install openai") from e
 
             import httpx
 

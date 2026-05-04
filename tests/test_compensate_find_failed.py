@@ -152,7 +152,9 @@ class TestCompileWithModelFallbackNoKey:
         mock_settings = MagicMock()
         mock_settings.api_key = ""
 
-        with patch("dochris.compensate.compensate_failures.get_settings", return_value=mock_settings):
+        with patch(
+            "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+        ):
             result = await compile_with_model_fallback(
                 "text", "title", MagicMock(), ["model1"], 0.1
             )

@@ -48,8 +48,25 @@ class TestDetectCodeFile:
         assert detect_code_file(Path("TEST.PY")) is True
 
     def test_all_extensions(self):
-        exts = [".py", ".js", ".ts", ".java", ".c", ".cpp", ".go", ".rs",
-                ".rb", ".cs", ".kt", ".swift", ".lua", ".zig", ".php", ".m", ".mm"]
+        exts = [
+            ".py",
+            ".js",
+            ".ts",
+            ".java",
+            ".c",
+            ".cpp",
+            ".go",
+            ".rs",
+            ".rb",
+            ".cs",
+            ".kt",
+            ".swift",
+            ".lua",
+            ".zig",
+            ".php",
+            ".m",
+            ".mm",
+        ]
         for ext in exts:
             assert detect_code_file(Path(f"f{ext}")) is True
 
@@ -92,7 +109,9 @@ class TestExtractDocstringsAndComments:
 
 class TestExtractFromCode:
     def test_valid_python_file(self):
-        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".py", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write('def hello():\n    """Greet"""\n    pass\n\nclass Foo:\n    pass\n')
             f.flush()
             result = extract_from_code(Path(f.name))
@@ -107,7 +126,9 @@ class TestExtractFromCode:
         assert result is None
 
     def test_no_functions_or_classes(self):
-        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".py", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("x = 1\ny = 2\n")
             f.flush()
             result = extract_from_code(Path(f.name))
@@ -145,7 +166,9 @@ class TestDetectDocumentFile:
 
 class TestParseDocument:
     def test_read_text_file(self):
-        with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".txt", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("hello world")
             f.flush()
             result = parse_document(Path(f.name))
@@ -153,7 +176,9 @@ class TestParseDocument:
         assert result == "hello world"
 
     def test_read_md_file(self):
-        with tempfile.NamedTemporaryFile(suffix=".md", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".md", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("# Title\ncontent")
             f.flush()
             result = parse_document(Path(f.name))
@@ -165,7 +190,9 @@ class TestParseDocument:
         assert result is None
 
     def test_html_file(self):
-        with tempfile.NamedTemporaryFile(suffix=".html", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".html", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("<html><body>hi</body></html>")
             f.flush()
             result = parse_document(Path(f.name))
@@ -174,7 +201,9 @@ class TestParseDocument:
         assert "hi" in result
 
     def test_htm_extension(self):
-        with tempfile.NamedTemporaryFile(suffix=".htm", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".htm", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("content")
             f.flush()
             result = parse_document(Path(f.name))
@@ -185,14 +214,18 @@ class TestParseDocument:
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
             f.write(b"PK\x03\x04fake")
             f.flush()
-            with patch("dochris.parsers.doc_parser.parse_office_document", return_value="office text") as mock:
+            with patch(
+                "dochris.parsers.doc_parser.parse_office_document", return_value="office text"
+            ) as mock:
                 result = parse_document(Path(f.name))
         os.unlink(f.name)
         assert result == "office text"
         mock.assert_called_once()
 
     def test_unknown_ext_tries_text_read(self):
-        with tempfile.NamedTemporaryFile(suffix=".log", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".log", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("log line 1\nlog line 2")
             f.flush()
             result = parse_document(Path(f.name))
@@ -212,6 +245,7 @@ class TestParseOfficeDocument:
                 import importlib
 
                 import dochris.parsers.doc_parser as dp_mod
+
                 importlib.reload(dp_mod)
                 result = dp_mod.parse_office_document(Path(f.name))
         os.unlink(f.name)
@@ -233,6 +267,7 @@ class TestParseOfficeDocument:
                 import importlib
 
                 import dochris.parsers.doc_parser as dp_mod
+
                 importlib.reload(dp_mod)
                 result = dp_mod.parse_office_document(Path(f.name))
         os.unlink(f.name)
@@ -254,6 +289,7 @@ class TestParseOfficeDocument:
                 import importlib
 
                 import dochris.parsers.doc_parser as dp_mod
+
                 importlib.reload(dp_mod)
                 result = dp_mod.parse_office_document(Path(f.name))
         os.unlink(f.name)
@@ -273,6 +309,7 @@ class TestParseOfficeDocument:
                 import importlib
 
                 import dochris.parsers.doc_parser as dp_mod
+
                 importlib.reload(dp_mod)
                 result = dp_mod.parse_office_document(Path(f.name))
         os.unlink(f.name)

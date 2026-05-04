@@ -17,6 +17,7 @@ from dochris.log_utils import (
 class TestGetLogger:
     def test_returns_logger(self):
         import logging
+
         logger = get_logger("test_module")
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_module"
@@ -25,6 +26,7 @@ class TestGetLogger:
 class TestSetupLogging:
     def test_basic_setup(self):
         import logging
+
         setup_logging(level=logging.DEBUG)
         root = logging.getLogger()
         # log_utils.setup_logging 使用 basicConfig，可能因为已有 handler 不生效
@@ -36,6 +38,7 @@ class TestSetupLogging:
             log_path = Path(f.name)
         setup_logging(level=20, log_file=log_path, also_console=False)
         import os
+
         os.unlink(str(log_path))
 
 

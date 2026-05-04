@@ -75,7 +75,7 @@ def sample_manifests(mock_workspace):
 class TestMonitorWorkerInit:
     """测试 MonitorWorker 初始化"""
 
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_init_sets_workspace(self, mock_get_workspace, mock_workspace):
         """测试初始化设置工作区"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -90,9 +90,11 @@ class TestMonitorWorkerInit:
 class TestMonitorWorkerGenerateProgressReport:
     """测试进度报告生成"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_generate_report_with_manifests(self, mock_get_workspace, mock_get_all, sample_manifests):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_generate_report_with_manifests(
+        self, mock_get_workspace, mock_get_all, sample_manifests
+    ):
         """测试生成有 manifest 的报告"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -109,8 +111,8 @@ class TestMonitorWorkerGenerateProgressReport:
         assert report["status"]["promoted_to_wiki"] == 1
         assert report["compiled_percentage"] == 40.0  # 2/5 * 100
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_generate_report_empty(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试生成空报告"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -124,9 +126,11 @@ class TestMonitorWorkerGenerateProgressReport:
         assert report["total"] == 0
         assert report["compiled_percentage"] == 0
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_generate_report_quality_stats(self, mock_get_workspace, mock_get_all, sample_manifests):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_generate_report_quality_stats(
+        self, mock_get_workspace, mock_get_all, sample_manifests
+    ):
         """测试质量统计"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -141,8 +145,8 @@ class TestMonitorWorkerGenerateProgressReport:
         assert report["quality_stats"]["min"] == 70
         assert report["quality_stats"]["samples"] == 3
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_generate_report_timestamp(self, mock_get_workspace, mock_get_all, sample_manifests):
         """测试报告时间戳"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -160,8 +164,8 @@ class TestMonitorWorkerGenerateProgressReport:
 class TestMonitorWorkerPrintReport:
     """测试打印报告"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_print_report(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试打印报告"""
         import logging
@@ -179,9 +183,11 @@ class TestMonitorWorkerPrintReport:
         # 验证 logger 有输出
         assert len(caplog.records) > 0
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_print_report_with_quality_stats(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_print_report_with_quality_stats(
+        self, mock_get_workspace, mock_get_all, sample_manifests, caplog
+    ):
         """测试打印带质量统计的报告"""
         import logging
 
@@ -198,9 +204,11 @@ class TestMonitorWorkerPrintReport:
         # 验证包含质量信息
         assert any("质量" in r.message or "quality" in r.message.lower() for r in caplog.records)
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_print_report_empty_workspace(self, mock_get_workspace, mock_get_all, mock_workspace, caplog):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_print_report_empty_workspace(
+        self, mock_get_workspace, mock_get_all, mock_workspace, caplog
+    ):
         """测试打印空工作区报告"""
         import logging
 
@@ -219,8 +227,8 @@ class TestMonitorWorkerPrintReport:
 class TestMonitorWorkerSaveReport:
     """测试保存报告"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_save_report_default_path(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试保存报告到默认路径"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -235,9 +243,11 @@ class TestMonitorWorkerSaveReport:
 
         assert report_path.exists()
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_save_report_custom_path(self, mock_get_workspace, mock_get_all, mock_workspace, tmp_path):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_save_report_custom_path(
+        self, mock_get_workspace, mock_get_all, mock_workspace, tmp_path
+    ):
         """测试保存报告到自定义路径"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -251,9 +261,11 @@ class TestMonitorWorkerSaveReport:
 
         assert custom_path.exists()
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_save_report_content(self, mock_get_workspace, mock_get_all, mock_workspace, sample_manifests):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_save_report_content(
+        self, mock_get_workspace, mock_get_all, mock_workspace, sample_manifests
+    ):
         """测试保存报告内容"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -276,8 +288,8 @@ class TestMonitorWorkerSaveReport:
 class TestMonitorWorkerGetSummaryText:
     """测试获取文本摘要"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_get_summary_text(self, mock_get_workspace, mock_get_all, sample_manifests):
         """测试获取文本摘要"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -294,8 +306,8 @@ class TestMonitorWorkerGetSummaryText:
         assert "待编译: 1 个" in summary
         assert "平均质量: 85.0/100" in summary
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_get_summary_text_empty(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试获取空摘要"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -313,9 +325,11 @@ class TestMonitorWorkerGetSummaryText:
 class TestMonitorWorkerEdgeCases:
     """测试边界情况"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_handles_manifests_without_quality_score(self, mock_get_workspace, mock_get_all, mock_workspace):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_handles_manifests_without_quality_score(
+        self, mock_get_workspace, mock_get_all, mock_workspace
+    ):
         """测试处理没有质量分数的 manifest"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -334,8 +348,8 @@ class TestMonitorWorkerEdgeCases:
         assert report["quality_stats"]["samples"] == 1
         assert report["quality_stats"]["average"] == 80
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_handles_zero_quality_scores(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试处理质量分数为 0 的情况"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -355,8 +369,8 @@ class TestMonitorWorkerEdgeCases:
         assert report["quality_stats"]["samples"] == 1  # 只有非 0 的被计入
         assert report["quality_stats"]["average"] == 100
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_calculates_compiled_percentage(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试编译百分比计算"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -375,8 +389,8 @@ class TestMonitorWorkerEdgeCases:
 
         assert report["compiled_percentage"] == pytest.approx(66.67, abs=0.01)  # 2/3 * 100
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_handles_unknown_status(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试处理未知状态"""
         from dochris.workers.monitor_worker import MonitorWorker
@@ -398,8 +412,8 @@ class TestMonitorWorkerEdgeCases:
 class TestMonitorWorkerReportFormatting:
     """测试报告格式化"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_report_has_header(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试报告有标题"""
         import logging
@@ -416,8 +430,8 @@ class TestMonitorWorkerReportFormatting:
         # 检查有分隔线输出
         assert any("=" * 10 in r.message for r in caplog.records)
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_report_shows_total(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
         """测试报告显示总数"""
         import logging
@@ -434,9 +448,11 @@ class TestMonitorWorkerReportFormatting:
         # 检查是否显示总数
         assert any("5" in r.message for r in caplog.records)
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_report_shows_completion_rate(self, mock_get_workspace, mock_get_all, sample_manifests, caplog):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_report_shows_completion_rate(
+        self, mock_get_workspace, mock_get_all, sample_manifests, caplog
+    ):
         """测试报告显示完成率"""
         import logging
 
@@ -456,9 +472,11 @@ class TestMonitorWorkerReportFormatting:
 class TestMonitorWorkerErrorHandling:
     """测试错误处理"""
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
-    def test_handles_corrupted_manifest_files(self, mock_get_workspace, mock_get_all, mock_workspace):
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
+    def test_handles_corrupted_manifest_files(
+        self, mock_get_workspace, mock_get_all, mock_workspace
+    ):
         """测试处理损坏的 manifest 文件"""
         from dochris.workers.monitor_worker import MonitorWorker
 
@@ -475,8 +493,8 @@ class TestMonitorWorkerErrorHandling:
         report = worker.generate_progress_report()
         assert report["total"] == 0
 
-    @patch('dochris.workers.monitor_worker.get_all_manifests')
-    @patch('dochris.workers.monitor_worker.get_default_workspace')
+    @patch("dochris.workers.monitor_worker.get_all_manifests")
+    @patch("dochris.workers.monitor_worker.get_default_workspace")
     def test_save_report_creates_directory(self, mock_get_workspace, mock_get_all, mock_workspace):
         """测试保存报告时创建目录"""
         from dochris.workers.monitor_worker import MonitorWorker

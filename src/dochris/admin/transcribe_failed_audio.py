@@ -68,7 +68,9 @@ except ImportError:
 class FasterWhisperTranscriber:
     """faster-whisper 转录器"""
 
-    def __init__(self, model_size: str = "small", device: str = "cpu", compute_type: str = "int8") -> None:
+    def __init__(
+        self, model_size: str = "small", device: str = "cpu", compute_type: str = "int8"
+    ) -> None:
         """初始化转录器"""
         self.model_size = model_size
         self.device = device
@@ -84,15 +86,27 @@ class FasterWhisperTranscriber:
             logger.error(f"faster-whisper模型加载失败: {e}")
             raise
 
-    def check_duration(self, file_path: Path, max_duration: int = 1800) -> tuple[bool, float | None]:
+    def check_duration(
+        self, file_path: Path, max_duration: int = 1800
+    ) -> tuple[bool, float | None]:
         """检查音频时长"""
         import subprocess
 
         try:
             result = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)],
-                capture_output=True, text=True, timeout=30,
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
 
             if result.returncode == 0:

@@ -10,11 +10,11 @@ import pytest
 # hierarchical_summarizer.py — 同步方法全覆盖
 # ============================================================
 class TestHierarchicalSummarizerSync:
-
     def _make_summarizer(self, no_think=False):
         mock_client = MagicMock()
         mock_client.no_think = no_think
         from dochris.core.hierarchical_summarizer import HierarchicalSummarizer
+
         return HierarchicalSummarizer(mock_client)
 
     def test_build_chunk_messages_standard(self):
@@ -41,7 +41,12 @@ class TestHierarchicalSummarizerSync:
     def test_build_merge_prompt_standard(self):
         s = self._make_summarizer(no_think=False)
         summaries = [
-            {"one_line": "sum1", "key_points": ["p1", "p2"], "detailed_summary": "detail1", "concepts": [{"name": "c1"}]}
+            {
+                "one_line": "sum1",
+                "key_points": ["p1", "p2"],
+                "detailed_summary": "detail1",
+                "concepts": [{"name": "c1"}],
+            }
         ]
         prompt = s._build_merge_prompt(summaries, "Title")
         assert "Title" in prompt
@@ -51,7 +56,12 @@ class TestHierarchicalSummarizerSync:
     def test_build_merge_prompt_no_think(self):
         s = self._make_summarizer(no_think=True)
         summaries = [
-            {"one_line": "sum1", "key_points": ["p1"], "detailed_summary": "d1", "concepts": [{"name": "c1", "explanation": "e1"}]}
+            {
+                "one_line": "sum1",
+                "key_points": ["p1"],
+                "detailed_summary": "d1",
+                "concepts": [{"name": "c1", "explanation": "e1"}],
+            }
         ]
         prompt = s._build_merge_prompt(summaries, "Title")
         assert "知识工程师" in prompt
@@ -60,7 +70,12 @@ class TestHierarchicalSummarizerSync:
     def test_build_merge_prompt_string_concepts(self):
         s = self._make_summarizer(no_think=False)
         summaries = [
-            {"one_line": "s", "key_points": [], "detailed_summary": "d", "concepts": ["string_concept"]}
+            {
+                "one_line": "s",
+                "key_points": [],
+                "detailed_summary": "d",
+                "concepts": ["string_concept"],
+            }
         ]
         prompt = s._build_merge_prompt(summaries, "T")
         assert "string_concept" in prompt
@@ -68,7 +83,12 @@ class TestHierarchicalSummarizerSync:
     def test_build_merge_prompt_qwen3_dict_concepts(self):
         s = self._make_summarizer(no_think=True)
         summaries = [
-            {"one_line": "s", "key_points": ["k"], "detailed_summary": "d", "concepts": [{"name": "c", "explanation": "long explanation text here"}]}
+            {
+                "one_line": "s",
+                "key_points": ["k"],
+                "detailed_summary": "d",
+                "concepts": [{"name": "c", "explanation": "long explanation text here"}],
+            }
         ]
         prompt = s._build_merge_prompt_qwen3(summaries, "Title")
         assert "c" in prompt
@@ -76,14 +96,23 @@ class TestHierarchicalSummarizerSync:
     def test_build_merge_prompt_qwen3_string_concepts(self):
         s = self._make_summarizer()
         summaries = [
-            {"one_line": "s", "key_points": [], "detailed_summary": "d", "concepts": ["plain_string"]}
+            {
+                "one_line": "s",
+                "key_points": [],
+                "detailed_summary": "d",
+                "concepts": ["plain_string"],
+            }
         ]
         prompt = s._build_merge_prompt_qwen3(summaries, "T")
         assert "plain_string" in prompt
 
     def test_group_chunks_by_section_with_title(self):
         s = self._make_summarizer()
-        mock_chunks = [MagicMock(title="Section A"), MagicMock(title="Section B"), MagicMock(title="Section A")]
+        mock_chunks = [
+            MagicMock(title="Section A"),
+            MagicMock(title="Section B"),
+            MagicMock(title="Section A"),
+        ]
         summaries = [{"id": 1}, {"id": 2}, {"id": 3}]
         result = s._group_chunks_by_section(mock_chunks, summaries)
         assert "Section A" in result
@@ -104,31 +133,51 @@ class TestHierarchicalSummarizerSync:
 # phase2_compilation.py — CLI 分支
 # ============================================================
 class TestPhase2CompilationCLI:
-
     def test_main_no_api_key(self):
         import dochris.phases.phase2_compilation as p2
-        with patch("sys.argv", ["phase2_compilation.py"]), \
-             patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", ""):
+
+        with (
+            patch("sys.argv", ["phase2_compilation.py"]),
+            patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", ""),
+        ):
             with pytest.raises(SystemExit):
                 p2.main()
 
     def test_main_clear_cache(self):
         import dochris.phases.phase2_compilation as p2
-        with patch("sys.argv", ["phase2_compilation.py", "--clear-cache"]), \
-             patch("dochris.phases.phase2_compilation.clear_cache", return_value=5), \
-             patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=Path("/tmp/ws")):
+
+        with (
+            patch("sys.argv", ["phase2_compilation.py", "--clear-cache"]),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=5),
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=Path("/tmp/ws"),
+            ),
+        ):
             p2.main()
 
     def test_main_clear_all_cache(self):
         import dochris.phases.phase2_compilation as p2
-        with patch("sys.argv", ["phase2_compilation.py", "--clear-all-cache"]), \
-             patch("dochris.phases.phase2_compilation.clear_cache", return_value=10), \
-             patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=Path("/tmp/ws")):
+
+        with (
+            patch("sys.argv", ["phase2_compilation.py", "--clear-all-cache"]),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=10),
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=Path("/tmp/ws"),
+            ),
+        ):
             p2.main()
 
     def test_main_with_concurrency(self):
         import dochris.phases.phase2_compilation as p2
-        with patch("sys.argv", ["phase2_compilation.py", "--concurrency", "2", "--clear-cache"]), \
-             patch("dochris.phases.phase2_compilation.clear_cache", return_value=0), \
-             patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=Path("/tmp/ws")):
+
+        with (
+            patch("sys.argv", ["phase2_compilation.py", "--concurrency", "2", "--clear-cache"]),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=Path("/tmp/ws"),
+            ),
+        ):
             p2.main()

@@ -26,7 +26,9 @@ class TestScanSourceDirBranches:
 
         source = tmp_path / "source"
         source.mkdir()
-        (source / "test.xyz").write_text("unknown content here that is long enough", encoding="utf-8")
+        (source / "test.xyz").write_text(
+            "unknown content here that is long enough", encoding="utf-8"
+        )
 
         result = scan_source_dir(source, MagicMock())
         # .xyz 被归类为 "other" 而非 None

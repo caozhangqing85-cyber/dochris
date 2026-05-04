@@ -95,9 +95,7 @@ class TestQualityGateAutoDowngrade:
         (workspace / "wiki/summaries" / f"{safe_title}.md").write_text(
             "# summary", encoding="utf-8"
         )
-        (workspace / "wiki/concepts" / f"{safe_title}.md").write_text(
-            "# concept", encoding="utf-8"
-        )
+        (workspace / "wiki/concepts" / f"{safe_title}.md").write_text("# concept", encoding="utf-8")
 
         with patch("builtins.print"):
             with patch("dochris.quality.quality_gate.update_manifest_status"):

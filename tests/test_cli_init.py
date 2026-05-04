@@ -10,8 +10,8 @@ from unittest.mock import patch
 class TestCmdInit:
     """测试 cmd_init 函数"""
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_creates_workspace(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试创建工作区目录"""
         from dochris.cli.cli_init import cmd_init
@@ -30,8 +30,8 @@ class TestCmdInit:
         # 工作区应该已创建
         assert workspace.exists()
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_creates_directories(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试创建必要目录"""
         from dochris.cli.cli_init import cmd_init
@@ -71,8 +71,8 @@ class TestCmdInit:
         for dir_path in expected_dirs:
             assert (workspace / dir_path).exists(), f"目录 {dir_path} 未创建"
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_creates_env_file(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试创建 .env 文件"""
         from dochris.cli.cli_init import cmd_init
@@ -97,8 +97,8 @@ class TestCmdInit:
         assert "OPENAI_API_BASE=" in content
         assert "MODEL=" in content
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_with_openrouter_key(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试使用 OpenRouter API Key"""
         from dochris.cli.cli_init import cmd_init
@@ -121,8 +121,8 @@ class TestCmdInit:
         assert "openrouter.ai" in content
         assert "sk-or-v1-test-key-12345" in content
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_existing_workspace(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试已存在的工作区"""
         from dochris.cli.cli_init import cmd_init
@@ -143,8 +143,8 @@ class TestCmdInit:
         # 应该返回 0（成功取消）
         assert ret == 0
 
-    @patch('builtins.input')
-    @patch('dochris.settings.get_default_workspace')
+    @patch("builtins.input")
+    @patch("dochris.settings.get_default_workspace")
     def test_init_checks_python_version(self, mock_workspace, mock_input, tmp_path, monkeypatch):
         """测试 Python 版本检查"""
         from dochris.cli.cli_init import cmd_init
@@ -164,7 +164,7 @@ class TestCmdInit:
 class TestPromptApiKey:
     """测试 _prompt_api_key 函数"""
 
-    @patch('builtins.input')
+    @patch("builtins.input")
     def test_prompt_api_key_with_input(self, mock_input):
         """测试提示用户输入 API Key"""
         from dochris.cli.cli_init import _prompt_api_key
@@ -175,7 +175,7 @@ class TestPromptApiKey:
 
         assert result == "test-user-key"
 
-    @patch('builtins.input')
+    @patch("builtins.input")
     def test_prompt_api_key_empty_returns_placeholder(self, mock_input):
         """测试空输入返回占位符"""
         from dochris.cli.cli_init import _prompt_api_key

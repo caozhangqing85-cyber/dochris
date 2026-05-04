@@ -256,9 +256,7 @@ def search_knowledge(query: str, n_results: int = 5) -> None:
     else:
         metadatas_list = metadatas
 
-    for i, (doc, meta) in enumerate(
-        zip(documents[0], metadatas_list[0], strict=False)
-    ):
+    for i, (doc, meta) in enumerate(zip(documents[0], metadatas_list[0], strict=False)):
         meta_dict = dict(meta) if not isinstance(meta, dict) else meta
         logger.info(f"{i + 1}. {meta_dict.get('title', '无标题')}")
         logger.info(f"路径: {meta_dict.get('path', '')}")
@@ -299,7 +297,9 @@ def main() -> None:
         print("  python index_knowledge.py search <查询>    # 搜索")
         print("  python index_knowledge.py stats           # 统计")
         print("\n配置:")
-        print(f"  Obsidian Vault: {get_settings().obsidian_vaults[0] if get_settings().obsidian_vaults else None}")
+        print(
+            f"  Obsidian Vault: {get_settings().obsidian_vaults[0] if get_settings().obsidian_vaults else None}"
+        )
         print(f"  Source Path: {get_settings().source_path}")
         print(f"  Workspace: {get_workspace()}")
         print(f"  Data Dir: {CHROMA_PATH}")

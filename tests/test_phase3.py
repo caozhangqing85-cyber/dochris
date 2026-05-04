@@ -32,6 +32,7 @@ class TestPhase3Query(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_keyword_search(self):
@@ -39,17 +40,12 @@ class TestPhase3Query(unittest.TestCase):
         # 创建测试文件
         summary_file = self.temp_path / "wiki" / "summaries" / "test_summary.md"
         summary_file.write_text(
-            "# 测试摘要\n\n"
-            "## 一句话摘要\n这是一个测试摘要\n\n"
-            "## 要点\n- 要点1\n- 要点2\n"
+            "# 测试摘要\n\n## 一句话摘要\n这是一个测试摘要\n\n## 要点\n- 要点1\n- 要点2\n"
         )
 
         # 创建测试概念文件
         concept_file = self.temp_path / "wiki" / "concepts" / "测试概念.md"
-        concept_file.write_text(
-            "# 测试概念\n\n"
-            "## 定义\n这是测试概念的定义\n"
-        )
+        concept_file.write_text("# 测试概念\n\n## 定义\n这是测试概念的定义\n")
 
         self.assertTrue(summary_file.exists())
         self.assertTrue(concept_file.exists())
@@ -64,7 +60,7 @@ class TestPhase3Query(unittest.TestCase):
             "vector_results": [],
             "search_sources": ["wiki"],
             "answer": "测试回答",
-            "time_seconds": 1.5
+            "time_seconds": 1.5,
         }
 
         self.assertIn("concepts", mock_result)
@@ -90,6 +86,7 @@ class TestPhase3ConceptSearch(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_create_concept_files(self):
@@ -103,7 +100,7 @@ class TestPhase3ConceptSearch(unittest.TestCase):
         ]
 
         for filename, content in concepts:
-            (concept_dir / filename).write_text(content, encoding='utf-8')
+            (concept_dir / filename).write_text(content, encoding="utf-8")
 
         files = list(concept_dir.glob("*.md"))
         self.assertEqual(len(files), 3)
@@ -122,9 +119,9 @@ class TestPhase3ConceptSearch(unittest.TestCase):
         """测试概念文件解析"""
         concept_file = self.temp_path / "wiki" / "concepts" / "测试.md"
         content = "# 测试概念\n\n## 定义\n这是定义\n\n## 示例\n这是示例"
-        concept_file.write_text(content, encoding='utf-8')
+        concept_file.write_text(content, encoding="utf-8")
 
-        read_content = concept_file.read_text(encoding='utf-8')
+        read_content = concept_file.read_text(encoding="utf-8")
         self.assertIn("测试概念", read_content)
         self.assertIn("这是定义", read_content)
 
@@ -132,7 +129,7 @@ class TestPhase3ConceptSearch(unittest.TestCase):
 class TestPhase3VectorSearch(unittest.TestCase):
     """测试向量检索"""
 
-    @patch('builtins.__import__')
+    @patch("builtins.__import__")
     def test_vector_search_mock(self, mock_import):
         """测试向量检索（mock）"""
         # Mock chromadb 模块
@@ -140,9 +137,9 @@ class TestPhase3VectorSearch(unittest.TestCase):
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_collection.query.return_value = {
-            'documents': [['doc1', 'doc2']],
-            'metadatas': [[{'source': 'test1'}, {'source': 'test2'}]],
-            'distances': [[0.1, 0.2]]
+            "documents": [["doc1", "doc2"]],
+            "metadatas": [[{"source": "test1"}, {"source": "test2"}]],
+            "distances": [[0.1, 0.2]],
         }
         mock_client.list_collections.return_value = [mock_collection]
         mock_chromadb.PersistentClient.return_value = mock_client
@@ -154,7 +151,7 @@ class TestPhase3VectorSearch(unittest.TestCase):
         self.assertIsNotNone(mock_client)
         self.assertIsNotNone(mock_collection)
 
-    @patch('builtins.__import__')
+    @patch("builtins.__import__")
     def test_vector_search_empty_results(self, mock_import):
         """测试空结果处理"""
         # Mock chromadb 模块
@@ -162,9 +159,9 @@ class TestPhase3VectorSearch(unittest.TestCase):
         mock_client = MagicMock()
         mock_collection = MagicMock()
         mock_collection.query.return_value = {
-            'documents': [[]],
-            'metadatas': [[]],
-            'distances': [[]]
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
         }
         mock_client.list_collections.return_value = [mock_collection]
         mock_chromadb.PersistentClient.return_value = mock_client
@@ -172,7 +169,7 @@ class TestPhase3VectorSearch(unittest.TestCase):
 
         # 验证空结果结构
         result = mock_collection.query()
-        self.assertEqual(len(result['documents'][0]), 0)
+        self.assertEqual(len(result["documents"][0]), 0)
 
 
 class TestPhase3SummarySearch(unittest.TestCase):
@@ -187,6 +184,7 @@ class TestPhase3SummarySearch(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_search_summaries_by_keyword(self):
@@ -200,7 +198,7 @@ class TestPhase3SummarySearch(unittest.TestCase):
         ]
 
         for filename, content in summaries:
-            (summary_dir / filename).write_text(content, encoding='utf-8')
+            (summary_dir / filename).write_text(content, encoding="utf-8")
 
         # 搜索包含"编程"的文件
         results = list(summary_dir.glob("*编程*.md"))
@@ -221,9 +219,9 @@ class TestPhase3SummarySearch(unittest.TestCase):
 ## 详细摘要
 这是详细摘要内容
 """
-        summary_file.write_text(content, encoding='utf-8')
+        summary_file.write_text(content, encoding="utf-8")
 
-        read_content = summary_file.read_text(encoding='utf-8')
+        read_content = summary_file.read_text(encoding="utf-8")
         self.assertIn("一句话摘要", read_content)
         self.assertIn("要点1", read_content)
 
@@ -239,7 +237,7 @@ class TestPhase3CombinedQuery(unittest.TestCase):
             "vector_results": [{"id": "1", "score": 0.9}],
             "concept_results": [{"name": "概念1"}],
             "summary_results": [{"title": "摘要1"}],
-            "merged_results": []
+            "merged_results": [],
         }
 
         self.assertIn("vector_results", combined_result)
@@ -303,6 +301,7 @@ class TestPhase3ManifestIndex(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_manifest_index_building(self):
@@ -312,11 +311,11 @@ class TestPhase3ManifestIndex(unittest.TestCase):
             "id": "SRC-0001",
             "title": "Test Document",
             "file_path": "raw/articles/test.pdf",
-            "status": "compiled"
+            "status": "compiled",
         }
-        manifest_file.write_text(json.dumps(manifest_data), encoding='utf-8')
+        manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
 
-        loaded = json.loads(manifest_file.read_text(encoding='utf-8'))
+        loaded = json.loads(manifest_file.read_text(encoding="utf-8"))
         self.assertEqual(loaded["id"], "SRC-0001")
 
     def test_search_manifest_by_title(self):
@@ -336,31 +335,21 @@ class TestPhase3ResponseFormatting(unittest.TestCase):
 
     def test_format_concept_result(self):
         """测试概念结果格式化"""
-        concept = {
-            "name": "机器学习",
-            "definition": "让计算机从数据中学习的算法"
-        }
+        concept = {"name": "机器学习", "definition": "让计算机从数据中学习的算法"}
 
         formatted = f"**{concept['name']}**: {concept['definition']}"
         self.assertIn("机器学习", formatted)
 
     def test_format_summary_result(self):
         """测试摘要结果格式化"""
-        summary = {
-            "title": "测试文档",
-            "one_line": "这是一个测试",
-            "source": "SRC-0001"
-        }
+        summary = {"title": "测试文档", "one_line": "这是一个测试", "source": "SRC-0001"}
 
         formatted = f"{summary['title']}: {summary['one_line']}"
         self.assertIn("测试文档", formatted)
 
     def test_format_error_response(self):
         """测试错误响应格式化"""
-        error_response = {
-            "error": "查询失败",
-            "message": "未找到相关结果"
-        }
+        error_response = {"error": "查询失败", "message": "未找到相关结果"}
 
         self.assertIn("error", error_response)
         self.assertIn("message", error_response)

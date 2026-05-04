@@ -102,9 +102,10 @@ class TestSearchObsidianNotes(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.settings.OBSIDIAN_VAULT')
+    @patch("dochris.settings.OBSIDIAN_VAULT")
     def test_search_by_filename(self, mock_vault):
         """测试按文件名搜索"""
         mock_vault.__truediv__ = MagicMock()
@@ -144,10 +145,11 @@ class TestSeedFromObsidian(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.vault.bridge._search_obsidian_notes')
-    @patch('dochris.vault.bridge.get_all_manifests')
+    @patch("dochris.vault.bridge._search_obsidian_notes")
+    @patch("dochris.vault.bridge.get_all_manifests")
     def test_seed_with_no_results(self, mock_get_manifests, mock_search):
         """测试没有搜索结果的导入"""
         from dochris.vault.bridge import seed_from_obsidian
@@ -164,7 +166,7 @@ class TestSeedFromObsidian(unittest.TestCase):
 
         # 创建模拟笔记
         note_file = self.temp_path / "raw" / "inbox" / "TestNote.md"
-        note_file.write_text("# Test Note\n\nContent", encoding='utf-8')
+        note_file.write_text("# Test Note\n\nContent", encoding="utf-8")
 
         # 创建 manifest
         manifest = create_manifest(
@@ -197,6 +199,7 @@ class TestPromoteToObsidian(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_promote_nonexistent_manifest(self):
@@ -226,7 +229,7 @@ class TestPromoteToObsidian(unittest.TestCase):
         result = promote_to_obsidian(self.temp_path, "SRC-0001")
         self.assertFalse(result)
 
-    @patch('dochris.settings.OBSIDIAN_VAULT')
+    @patch("dochris.settings.OBSIDIAN_VAULT")
     def test_promote_creates_target_directory(self, mock_vault):
         """测试推送创建目标目录"""
         # 模拟 Obsidian 主库存在
@@ -250,6 +253,7 @@ class TestListAssociatedNotes(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_list_nonexistent_manifest(self):
@@ -327,7 +331,7 @@ class TestGetObsidianVault(unittest.TestCase):
         """测试当 obsidian_vaults 为空时返回 None"""
         from unittest.mock import MagicMock, patch
 
-        with patch('dochris.vault.bridge._get_settings') as mock_settings:
+        with patch("dochris.vault.bridge._get_settings") as mock_settings:
             mock_instance = MagicMock()
             mock_instance.obsidian_vaults = []
             mock_settings.return_value = mock_instance
@@ -343,7 +347,7 @@ class TestGetObsidianVault(unittest.TestCase):
         from unittest.mock import MagicMock, patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch('dochris.vault.bridge._get_settings') as mock_settings:
+            with patch("dochris.vault.bridge._get_settings") as mock_settings:
                 mock_instance = MagicMock()
                 mock_instance.obsidian_vaults = [Path(tmpdir)]
                 mock_settings.return_value = mock_instance
@@ -370,6 +374,7 @@ class TestSearchObsidianNotesContentMatch(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_search_by_content(self):
@@ -378,9 +383,11 @@ class TestSearchObsidianNotesContentMatch(unittest.TestCase):
 
         # 创建测试文件
         test_file = self.obsidian_dir / "programming.md"
-        test_file.write_text("# Python Programming\n\nThis is about Python basics.", encoding="utf-8")
+        test_file.write_text(
+            "# Python Programming\n\nThis is about Python basics.", encoding="utf-8"
+        )
 
-        with patch('dochris.vault.bridge._get_obsidian_vault', return_value=self.obsidian_dir):
+        with patch("dochris.vault.bridge._get_obsidian_vault", return_value=self.obsidian_dir):
             results = _search_obsidian_notes("python")
 
         self.assertGreater(len(results), 0)
@@ -405,10 +412,11 @@ class TestSeedFromObsidianSuccess(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.vault.bridge._search_obsidian_notes')
-    @patch('dochris.vault.bridge._get_obsidian_vault')
+    @patch("dochris.vault.bridge._search_obsidian_notes")
+    @patch("dochris.vault.bridge._get_obsidian_vault")
     def test_seed_successful_import(self, mock_get_vault, mock_search):
         """测试成功导入笔记"""
         from dochris.vault.bridge import seed_from_obsidian
@@ -454,10 +462,11 @@ class TestPromoteToObsidianSuccess(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.manifest.update_manifest_status')
-    @patch('dochris.vault.bridge._get_obsidian_vault')
+    @patch("dochris.manifest.update_manifest_status")
+    @patch("dochris.vault.bridge._get_obsidian_vault")
     def test_promote_successful(self, mock_get_vault, mock_update_status):
         """测试成功推送"""
         from dochris.manifest import create_manifest, get_manifest
@@ -480,6 +489,7 @@ class TestPromoteToObsidianSuccess(unittest.TestCase):
         manifest = get_manifest(self.temp_path, "SRC-0001")
         manifest["status"] = "promoted"
         import json
+
         manifest_file = self.temp_path / "manifests" / "sources" / "SRC-0001.json"
         manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
 
@@ -504,9 +514,10 @@ class TestListAssociatedNotesSuccess(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.vault.bridge._search_obsidian_notes')
+    @patch("dochris.vault.bridge._search_obsidian_notes")
     def test_list_with_results(self, mock_search):
         """测试有结果时的列表"""
         from dochris.manifest import create_manifest

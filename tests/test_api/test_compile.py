@@ -53,7 +53,9 @@ class TestCompileEndpoint:
         with (
             patch("dochris.api.routes.compile.get_default_workspace"),
             patch("dochris.api.routes.compile.get_all_manifests", return_value=manifests),
-            patch("dochris.api.routes.compile.do_compile_all", new_callable=AsyncMock) as mock_compile,
+            patch(
+                "dochris.api.routes.compile.do_compile_all", new_callable=AsyncMock
+            ) as mock_compile,
         ):
             resp = client.post("/api/v1/compile", json={"limit": 5, "concurrency": 2})
 
@@ -86,7 +88,9 @@ class TestCompileEndpoint:
         with (
             patch("dochris.api.routes.compile.get_default_workspace"),
             patch("dochris.api.routes.compile.get_all_manifests", return_value=manifests),
-            patch("dochris.api.routes.compile.do_compile_all", new_callable=AsyncMock) as mock_compile,
+            patch(
+                "dochris.api.routes.compile.do_compile_all", new_callable=AsyncMock
+            ) as mock_compile,
         ):
             resp = client.post("/api/v1/compile", json={})
 

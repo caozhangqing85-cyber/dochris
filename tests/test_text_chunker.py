@@ -1,6 +1,5 @@
 """测试 dochris.core.text_chunker 模块"""
 
-
 from dochris.core.text_chunker import TextChunk, semantic_chunk
 
 

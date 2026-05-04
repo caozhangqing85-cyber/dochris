@@ -42,12 +42,10 @@ def mock_workspace(tmp_path, monkeypatch):
 
     # 创建示例文件
     (workspace / "wiki" / "summaries" / "测试摘要.md").write_text(
-        "## 一句话摘要\n测试摘要内容\n\n## 要点\n- 要点1\n- 要点2",
-        encoding="utf-8"
+        "## 一句话摘要\n测试摘要内容\n\n## 要点\n- 要点1\n- 要点2", encoding="utf-8"
     )
     (workspace / "wiki" / "concepts" / "测试概念.md").write_text(
-        "## 定义\n概念定义内容",
-        encoding="utf-8"
+        "## 定义\n概念定义内容", encoding="utf-8"
     )
 
     # 创建示例 manifest
@@ -68,6 +66,7 @@ def mock_workspace(tmp_path, monkeypatch):
 
     # 重置 settings
     import dochris.settings
+
     dochris.settings._global_settings = None
 
     return workspace
@@ -136,10 +135,7 @@ class TestReadOpenclawConfig:
         config_content = {
             "models": {
                 "providers": {
-                    "zai": {
-                        "apiKey": "test-key-123456",
-                        "baseUrl": "https://api.test.com"
-                    }
+                    "zai": {"apiKey": "test-key-123456", "baseUrl": "https://api.test.com"}
                 }
             }
         }
@@ -164,6 +160,7 @@ class TestCreateClient:
     def test_create_client_with_env_key(self, monkeypatch):
         """测试使用环境变量 API Key 创建客户端"""
         import dochris.phases.query_engine
+
         dochris.phases.query_engine._llm_client_cache = None
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-env-key")
@@ -181,6 +178,7 @@ class TestCreateClient:
     def test_create_client_caching(self, monkeypatch):
         """测试客户端缓存"""
         import dochris.phases.query_engine
+
         dochris.phases.query_engine._llm_client_cache = None
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-cache-key")
@@ -254,7 +252,7 @@ class TestVectorSearch:
         from dochris.phases.query_engine import vector_search
 
         # Save and remove chromadb to simulate it not being installed
-        original_chroma = getattr(qe, '_chromadb_module', None)
+        original_chroma = getattr(qe, "_chromadb_module", None)
         # Force chromadb import to fail by patching import
         qe._chromadb_module = None
 

@@ -54,15 +54,11 @@ def parse_with_pypdf2(file_path: Path) -> str | None:
         logger.debug("PyPDF2 not installed")
         return None
     except (OSError, ValueError, RuntimeError, KeyError) as e:
-        logger.warning(
-            f"PyPDF2 解析失败: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.warning(f"PyPDF2 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"PyPDF2 错误堆栈:\n{traceback.format_exc()}")
         return None
     except Exception as e:
-        logger.error(
-            f"PyPDF2 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.error(f"PyPDF2 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"PyPDF2 错误堆栈:\n{traceback.format_exc()}")
         return None
 
@@ -82,15 +78,11 @@ def parse_with_pdfplumber(file_path: Path) -> str | None:
         logger.debug("pdfplumber not installed")
         return None
     except (OSError, ValueError, RuntimeError, KeyError) as e:
-        logger.warning(
-            f"pdfplumber 解析失败: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.warning(f"pdfplumber 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"pdfplumber 错误堆栈:\n{traceback.format_exc()}")
         return None
     except Exception as e:
-        logger.error(
-            f"pdfplumber 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.error(f"pdfplumber 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"pdfplumber 错误堆栈:\n{traceback.format_exc()}")
         return None
 
@@ -111,9 +103,7 @@ def parse_with_pymupdf(file_path: Path) -> str | None:
         logger.debug("PyMuPDF (fitz) not installed")
         return None
     except Exception as e:
-        logger.error(
-            f"PyMuPDF 解析失败: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.error(f"PyMuPDF 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"PyMuPDF 错误堆栈:\n{traceback.format_exc()}")
         return None
 
@@ -133,9 +123,7 @@ def parse_with_tesseract_ocr(file_path: Path) -> str | None:
         logger.debug("Tesseract OCR 依赖未安装")
         return None
     except Exception as e:
-        logger.warning(
-            f"Tesseract OCR 解析失败: {type(e).__name__}: {e} | 文件: {file_path}"
-        )
+        logger.warning(f"Tesseract OCR 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
         logger.debug(f"Tesseract OCR 错误堆栈:\n{traceback.format_exc()}")
         return None
 

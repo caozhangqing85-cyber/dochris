@@ -192,9 +192,7 @@ def build_graph(workspace_path: Path | str) -> KnowledgeGraph:
         e for e in graph.edges if e.source in valid_node_ids and e.target in valid_node_ids
     ]
 
-    logger.info(
-        f"知识图谱构建完成: {len(graph.nodes)} 节点, {len(graph.edges)} 边"
-    )
+    logger.info(f"知识图谱构建完成: {len(graph.nodes)} 节点, {len(graph.edges)} 边")
     return graph
 
 

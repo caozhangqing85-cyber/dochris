@@ -86,7 +86,9 @@ class TestExtractTextFromFileDoc:
         html.write_text("<html>test</html>", encoding="utf-8")
         mock_logger = MagicMock()
 
-        with patch("dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")):
+        with patch(
+            "dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")
+        ):
             result = extract_text_from_file(html, mock_logger)
 
         assert result is None

@@ -52,12 +52,14 @@ class TestGenerateSummary:
         # 模拟 LLM 响应
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "测试摘要",
-            "key_points": ["要点1", "要点2"],
-            "detailed_summary": "详细摘要内容",
-            "concepts": [{"name": "概念1", "explanation": "解释"}]
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {
+                "one_line": "测试摘要",
+                "key_points": ["要点1", "要点2"],
+                "detailed_summary": "详细摘要内容",
+                "concepts": [{"name": "概念1", "explanation": "解释"}],
+            }
+        )
 
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=mock_response)
 
@@ -84,12 +86,14 @@ class TestGenerateSummary:
 
         mock_response_success = MagicMock()
         mock_response_success.choices = [MagicMock()]
-        mock_response_success.choices[0].message.content = json.dumps({
-            "one_line": "测试摘要",
-            "key_points": ["要点1"],
-            "detailed_summary": "详细",
-            "concepts": []
-        })
+        mock_response_success.choices[0].message.content = json.dumps(
+            {
+                "one_line": "测试摘要",
+                "key_points": ["要点1"],
+                "detailed_summary": "详细",
+                "concepts": [],
+            }
+        )
 
         call_count = 0
 
@@ -111,6 +115,7 @@ class TestGenerateSummary:
     @pytest.mark.asyncio
     async def test_generate_summary_content_filter(self, summary_generator, mock_llm_client):
         """测试内容过滤直接返回 None"""
+
         async def raise_content_filter(*args, **kwargs):
             raise Exception("contentFilter triggered")
 
@@ -128,9 +133,7 @@ class TestGenerateSummary:
         )
 
         with patch("asyncio.sleep"):  # 跳过 sleep
-            result = await summary_generator.generate_summary(
-                "测试内容", "测试标题", max_retries=2
-            )
+            result = await summary_generator.generate_summary("测试内容", "测试标题", max_retries=2)
 
         assert result is None
 
@@ -183,7 +186,9 @@ class TestGenerateSummarySmart:
         with patch("dochris.core.text_chunker.should_use_hierarchical") as mock_strategy:
             mock_strategy.return_value = "map_reduce"
 
-            with patch("dochris.core.hierarchical_summarizer.HierarchicalSummarizer") as mock_summarizer:
+            with patch(
+                "dochris.core.hierarchical_summarizer.HierarchicalSummarizer"
+            ) as mock_summarizer:
                 mock_instance = MagicMock()
                 mock_instance.generate_map_reduce_summary = AsyncMock(
                     return_value={"result": "map_reduce"}
@@ -203,7 +208,9 @@ class TestGenerateSummarySmart:
         with patch("dochris.core.text_chunker.should_use_hierarchical") as mock_strategy:
             mock_strategy.return_value = "hierarchical"
 
-            with patch("dochris.core.hierarchical_summarizer.HierarchicalSummarizer") as mock_summarizer:
+            with patch(
+                "dochris.core.hierarchical_summarizer.HierarchicalSummarizer"
+            ) as mock_summarizer:
                 mock_instance = MagicMock()
                 mock_instance.generate_hierarchical_summary = AsyncMock(
                     return_value={"result": "hierarchical"}

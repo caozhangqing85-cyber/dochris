@@ -3,6 +3,7 @@
 
 使用 Ollama REST API 进行本地推理，无需 API Key。
 """
+
 from __future__ import annotations
 
 import logging

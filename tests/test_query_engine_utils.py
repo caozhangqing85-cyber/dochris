@@ -145,9 +145,7 @@ class TestBuildManifestIndex:
             "file_path": "raw/test.pdf",
             "title": "测试文档",
         }
-        (manifests_dir / "SRC-0001.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (manifests_dir / "SRC-0001.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         with patch.object(query_utils, "MANIFESTS_PATH", manifests_dir):
             result = query_utils._build_manifest_index()

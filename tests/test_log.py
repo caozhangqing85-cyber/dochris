@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """测试日志模块"""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """测试 log_utils.py 日志工具模块"""
+
 from __future__ import annotations
 
 import json

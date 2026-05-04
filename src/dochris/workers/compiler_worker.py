@@ -194,9 +194,7 @@ class CompilerWorker:
 
             # 3.5 编译前处理（插件 hook）
             metadata = manifest.copy()
-            pre_result = self.plugin_manager.call_hook_firstresult(
-                "pre_compile", text, metadata
-            )
+            pre_result = self.plugin_manager.call_hook_firstresult("pre_compile", text, metadata)
             if pre_result:
                 text, metadata = pre_result
                 logger.debug(f"应用 pre_compile hook: {src_id}")
@@ -264,9 +262,7 @@ class CompilerWorker:
             提取的文本，失败返回 None
         """
         # 首先尝试插件解析器
-        plugin_text = self.plugin_manager.call_hook_firstresult(
-            "ingest_parser", str(file_path)
-        )
+        plugin_text = self.plugin_manager.call_hook_firstresult("ingest_parser", str(file_path))
         if plugin_text:
             logger.info(f"使用插件解析器提取文本: {file_path.name}")
             return cast(str | None, plugin_text)

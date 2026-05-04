@@ -163,9 +163,7 @@ def get_manifest(workspace_path: Path, src_id: str) -> dict | None:
                 data = json.load(f)
         except json.JSONDecodeError as json_e:
             # JSON 解析也失败时抛出异常，不返回损坏数据
-            logger.error(
-                f"JSON 解析失败（编码错误后）in {manifest_path}: {json_e}"
-            )
+            logger.error(f"JSON 解析失败（编码错误后）in {manifest_path}: {json_e}")
             raise
 
     # 验证返回的 JSON 数据完整性

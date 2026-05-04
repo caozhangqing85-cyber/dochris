@@ -21,15 +21,17 @@ class TestGetVectorStore(unittest.TestCase):
     def setUp(self):
         """清理缓存"""
         import dochris.phases.query_engine as qe
+
         qe._vector_store_cache = None
 
     def tearDown(self):
         """清理缓存"""
         import dochris.phases.query_engine as qe
+
         qe._vector_store_cache = None
 
-    @patch('dochris.vector.get_store')
-    @patch('dochris.phases.query_engine.get_settings')
+    @patch("dochris.vector.get_store")
+    @patch("dochris.phases.query_engine.get_settings")
     def test_get_vector_store_chromadb(self, mock_settings, mock_get_store):
         """测试获取 ChromaDB 向量存储"""
         from dochris.phases.query_engine import get_vector_store
@@ -43,14 +45,14 @@ class TestGetVectorStore(unittest.TestCase):
         mock_store_cls.return_value = mock_store_instance
         mock_get_store.return_value = mock_store_cls
 
-        with patch('dochris.phases.query_engine.DATA_PATH', Path("/tmp/test")):
+        with patch("dochris.phases.query_engine.DATA_PATH", Path("/tmp/test")):
             result = get_vector_store()
 
         mock_store_cls.assert_called_once_with(persist_directory=str(Path("/tmp/test")))
         self.assertEqual(result, mock_store_instance)
 
-    @patch('dochris.vector.get_store')
-    @patch('dochris.phases.query_engine.get_settings')
+    @patch("dochris.vector.get_store")
+    @patch("dochris.phases.query_engine.get_settings")
     def test_get_vector_store_cache(self, mock_settings, mock_get_store):
         """测试向量存储缓存"""
         from dochris.phases.query_engine import get_vector_store
@@ -76,7 +78,7 @@ class TestGetVectorStore(unittest.TestCase):
 class TestSearchConcepts(unittest.TestCase):
     """测试概念搜索"""
 
-    @patch('dochris.phases.query_engine._keyword_search')
+    @patch("dochris.phases.query_engine._keyword_search")
     def test_search_concepts_wiki_has_results(self, mock_search):
         """测试 wiki 有结果时的概念搜索"""
         from dochris.phases.query_engine import search_concepts
@@ -89,7 +91,7 @@ class TestSearchConcepts(unittest.TestCase):
         mock_search.assert_called_once()
         self.assertEqual(result, mock_results)
 
-    @patch('dochris.phases.query_engine._keyword_search')
+    @patch("dochris.phases.query_engine._keyword_search")
     def test_search_concepts_fallback_to_outputs(self, mock_search):
         """测试 wiki 无结果时 fallback 到 outputs"""
         from dochris.phases.query_engine import search_concepts
@@ -106,7 +108,7 @@ class TestSearchConcepts(unittest.TestCase):
 class TestSearchSummaries(unittest.TestCase):
     """测试摘要搜索"""
 
-    @patch('dochris.phases.query_engine._keyword_search')
+    @patch("dochris.phases.query_engine._keyword_search")
     def test_search_summaries_wiki_has_results(self, mock_search):
         """测试 wiki 有结果时的摘要搜索"""
         from dochris.phases.query_engine import search_summaries
@@ -123,9 +125,9 @@ class TestSearchSummaries(unittest.TestCase):
 class TestSearchAll(unittest.TestCase):
     """测试搜索全部"""
 
-    @patch('dochris.phases.query_engine.vector_search')
-    @patch('dochris.phases.query_engine.search_summaries')
-    @patch('dochris.phases.query_engine.search_concepts')
+    @patch("dochris.phases.query_engine.vector_search")
+    @patch("dochris.phases.query_engine.search_summaries")
+    @patch("dochris.phases.query_engine.search_concepts")
     def test_search_all_combined_results(self, mock_concepts, mock_summaries, mock_vector):
         """测试搜索全部合并结果"""
         from dochris.phases.query_engine import search_all
@@ -143,9 +145,9 @@ class TestSearchAll(unittest.TestCase):
         self.assertIn("wiki", result["search_sources"])
         self.assertIn("vector", result["search_sources"])
 
-    @patch('dochris.phases.query_engine.vector_search')
-    @patch('dochris.phases.query_engine.search_summaries')
-    @patch('dochris.phases.query_engine.search_concepts')
+    @patch("dochris.phases.query_engine.vector_search")
+    @patch("dochris.phases.query_engine.search_summaries")
+    @patch("dochris.phases.query_engine.search_concepts")
     def test_search_all_empty_results(self, mock_concepts, mock_summaries, mock_vector):
         """测试搜索全部无结果"""
         from dochris.phases.query_engine import search_all
@@ -167,11 +169,13 @@ class TestVectorSearch(unittest.TestCase):
     def setUp(self):
         """清理缓存"""
         import dochris.phases.query_engine as qe
+
         qe._chromadb_client_cache = None
 
     def tearDown(self):
         """清理缓存"""
         import dochris.phases.query_engine as qe
+
         qe._chromadb_client_cache = None
 
     def test_vector_search_non_chromadb(self):
@@ -179,8 +183,10 @@ class TestVectorSearch(unittest.TestCase):
         from dochris.phases import query_engine
 
         # patch settings 模块的 get_settings（因为函数内部导入了它）
-        with patch('dochris.settings.get_settings') as mock_settings, \
-             patch.object(query_engine, '_vector_search_with_store') as mock_store_search:
+        with (
+            patch("dochris.settings.get_settings") as mock_settings,
+            patch.object(query_engine, "_vector_search_with_store") as mock_store_search,
+        ):
             mock_config = Mock()
             mock_config.vector_store = "faiss"
             mock_settings.return_value = mock_config
@@ -192,7 +198,7 @@ class TestVectorSearch(unittest.TestCase):
             mock_store_search.assert_called_once()
             self.assertEqual(len(result), 1)
 
-    @patch('dochris.phases.query_engine.get_settings')
+    @patch("dochris.phases.query_engine.get_settings")
     def test_vector_search_chromadb_no_collections(self, mock_settings):
         """测试 ChromaDB 无集合时返回空"""
         from dochris.phases.query_engine import vector_search
@@ -201,16 +207,16 @@ class TestVectorSearch(unittest.TestCase):
         mock_config.vector_store = "chromadb"
         mock_settings.return_value = mock_config
 
-        with patch('dochris.phases.query_engine.DATA_PATH', Path("/tmp/test")):
+        with patch("dochris.phases.query_engine.DATA_PATH", Path("/tmp/test")):
             mock_client = Mock()
             mock_client.list_collections.return_value = []
 
-            with patch('chromadb.PersistentClient', return_value=mock_client):
+            with patch("chromadb.PersistentClient", return_value=mock_client):
                 result = vector_search("test", 5)
 
         self.assertEqual(result, [])
 
-    @patch('dochris.phases.query_engine.get_settings')
+    @patch("dochris.phases.query_engine.get_settings")
     def test_vector_search_chromadb_import_error(self, mock_settings):
         """测试 ChromaDB 未安装时返回空"""
         from dochris.phases.query_engine import vector_search
@@ -219,8 +225,8 @@ class TestVectorSearch(unittest.TestCase):
         mock_config.vector_store = "chromadb"
         mock_settings.return_value = mock_config
 
-        with patch('dochris.phases.query_engine.DATA_PATH', Path("/tmp/test")):
-            with patch('chromadb.PersistentClient', side_effect=ImportError):
+        with patch("dochris.phases.query_engine.DATA_PATH", Path("/tmp/test")):
+            with patch("chromadb.PersistentClient", side_effect=ImportError):
                 result = vector_search("test", 5, logger=None)
 
         self.assertEqual(result, [])
@@ -229,7 +235,7 @@ class TestVectorSearch(unittest.TestCase):
 class TestVectorSearchWithStore(unittest.TestCase):
     """测试抽象层向量检索"""
 
-    @patch('dochris.phases.query_engine.get_vector_store')
+    @patch("dochris.phases.query_engine.get_vector_store")
     def test_vector_search_with_store_no_collections(self, mock_get_store):
         """测试无集合时返回空"""
         from dochris.phases.query_engine import _vector_search_with_store
@@ -242,7 +248,7 @@ class TestVectorSearchWithStore(unittest.TestCase):
 
         self.assertEqual(result, [])
 
-    @patch('dochris.phases.query_engine.get_vector_store')
+    @patch("dochris.phases.query_engine.get_vector_store")
     def test_vector_search_with_store_with_results(self, mock_get_store):
         """测试有结果时的向量检索"""
         from dochris.phases.query_engine import _vector_search_with_store
@@ -269,7 +275,7 @@ class TestVectorSearchWithStore(unittest.TestCase):
 class TestGenerateAnswer(unittest.TestCase):
     """测试 LLM 回答生成"""
 
-    @patch('dochris.phases.query_engine.openai')
+    @patch("dochris.phases.query_engine.openai")
     def test_generate_answer_with_context(self, mock_openai):
         """测试有上下文时生成回答"""
         from dochris.phases.query_engine import generate_answer
@@ -287,12 +293,14 @@ class TestGenerateAnswer(unittest.TestCase):
         summaries = [{"title": "标题1", "one_line": "摘要", "key_points": ["要点1"]}]
         vector_results = [{"text": "向量内容", "source": "test.md"}]
 
-        result = generate_answer("test query", concepts, summaries, vector_results, mock_client, Mock())
+        result = generate_answer(
+            "test query", concepts, summaries, vector_results, mock_client, Mock()
+        )
 
         self.assertIsNotNone(result)
         self.assertEqual(result, "Generated answer")
 
-    @patch('dochris.phases.query_engine.openai')
+    @patch("dochris.phases.query_engine.openai")
     def test_generate_answer_no_context(self, mock_openai):
         """测试无上下文时返回提示"""
         from dochris.phases.query_engine import generate_answer
@@ -334,21 +342,16 @@ class TestReadOpenclawConfig(unittest.TestCase):
 
         config_data = {
             "models": {
-                "providers": {
-                    "zai": {
-                        "apiKey": "test-key",
-                        "baseUrl": "https://api.test.com"
-                    }
-                }
+                "providers": {"zai": {"apiKey": "test-key", "baseUrl": "https://api.test.com"}}
             }
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(config_data, f)
             temp_path = f.name
 
         try:
-            with patch('dochris.phases.query_engine.OPENCLAW_CONFIG_PATH', Path(temp_path)):
+            with patch("dochris.phases.query_engine.OPENCLAW_CONFIG_PATH", Path(temp_path)):
                 result = read_openclaw_config()
 
             self.assertIsNotNone(result)
@@ -360,7 +363,9 @@ class TestReadOpenclawConfig(unittest.TestCase):
         """测试配置文件不存在"""
         from dochris.phases.query_engine import read_openclaw_config
 
-        with patch('dochris.phases.query_engine.OPENCLAW_CONFIG_PATH', Path("/nonexistent/config.json")):
+        with patch(
+            "dochris.phases.query_engine.OPENCLAW_CONFIG_PATH", Path("/nonexistent/config.json")
+        ):
             result = read_openclaw_config()
 
         self.assertIsNone(result)
@@ -369,12 +374,12 @@ class TestReadOpenclawConfig(unittest.TestCase):
         """测试配置文件 JSON 格式错误"""
         from dochris.phases.query_engine import read_openclaw_config
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("invalid json")
             temp_path = f.name
 
         try:
-            with patch('dochris.phases.query_engine.OPENCLAW_CONFIG_PATH', Path(temp_path)):
+            with patch("dochris.phases.query_engine.OPENCLAW_CONFIG_PATH", Path(temp_path)):
                 result = read_openclaw_config()
 
             self.assertIsNone(result)
@@ -388,25 +393,27 @@ class TestCreateClient(unittest.TestCase):
     def setUp(self):
         """清理缓存"""
         import dochris.phases.query_engine as qe
+
         qe._llm_client_cache = None
         # 确保 OPENAI_API_KEY 环境变量不存在
-        if 'OPENAI_API_KEY' in os.environ:
-            del os.environ['OPENAI_API_KEY']
+        if "OPENAI_API_KEY" in os.environ:
+            del os.environ["OPENAI_API_KEY"]
 
     def tearDown(self):
         """清理环境"""
         import dochris.phases.query_engine as qe
-        qe._llm_client_cache = None
-        if 'OPENAI_API_KEY' in os.environ:
-            del os.environ['OPENAI_API_KEY']
 
-    @patch('dochris.phases.query_engine.openai')
-    @patch('dochris.phases.query_engine.get_settings')
+        qe._llm_client_cache = None
+        if "OPENAI_API_KEY" in os.environ:
+            del os.environ["OPENAI_API_KEY"]
+
+    @patch("dochris.phases.query_engine.openai")
+    @patch("dochris.phases.query_engine.get_settings")
     def test_create_client_from_env(self, mock_settings, mock_openai):
         """测试从环境变量创建客户端"""
         from dochris.phases.query_engine import create_client
 
-        os.environ['OPENAI_API_KEY'] = 'env-key'
+        os.environ["OPENAI_API_KEY"] = "env-key"
 
         mock_config = Mock()
         mock_config.api_key = None
@@ -420,14 +427,14 @@ class TestCreateClient(unittest.TestCase):
 
         self.assertEqual(result, mock_client)
 
-    @patch('dochris.phases.query_engine.openai')
-    @patch('dochris.phases.query_engine.get_settings')
+    @patch("dochris.phases.query_engine.openai")
+    @patch("dochris.phases.query_engine.get_settings")
     def test_create_client_from_settings(self, mock_settings, mock_openai):
         """测试从 settings 创建客户端"""
         from dochris.phases.query_engine import create_client
 
         mock_config = Mock()
-        mock_config.api_key = 'settings-key'
+        mock_config.api_key = "settings-key"
         mock_config.api_base = "https://api.test.com"
         mock_settings.return_value = mock_config
 
@@ -442,13 +449,13 @@ class TestCreateClient(unittest.TestCase):
         """测试无 API Key 时返回 None"""
         from dochris.phases.query_engine import create_client
 
-        with patch('dochris.phases.query_engine.get_settings') as mock_settings:
+        with patch("dochris.phases.query_engine.get_settings") as mock_settings:
             mock_config = Mock()
             mock_config.api_key = None
             mock_config.api_base = None
             mock_settings.return_value = mock_config
 
-            with patch('dochris.phases.query_engine.read_openclaw_config', return_value=None):
+            with patch("dochris.phases.query_engine.read_openclaw_config", return_value=None):
                 result = create_client()
 
         self.assertIsNone(result)
@@ -473,7 +480,7 @@ class TestPrintResult(unittest.TestCase):
         }
 
         output = StringIO()
-        with patch('sys.stdout', output):
+        with patch("sys.stdout", output):
             print_result(result)
 
         output_str = output.getvalue()
@@ -496,7 +503,7 @@ class TestPrintResult(unittest.TestCase):
         }
 
         output = StringIO()
-        with patch('sys.stdout', output):
+        with patch("sys.stdout", output):
             print_result(result)
 
         output_str = output.getvalue()

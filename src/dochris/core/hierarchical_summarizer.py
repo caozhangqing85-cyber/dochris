@@ -132,9 +132,7 @@ class HierarchicalSummarizer:
             if chunks[-1] not in sampled:
                 sampled[-1] = chunks[-1]
             chunks = sampled
-            logger.warning(
-                f"分层摘要: 块数 {len(chunks)} 超过上限 {MAX_CHUNKS}，已均匀采样"
-            )
+            logger.warning(f"分层摘要: 块数 {len(chunks)} 超过上限 {MAX_CHUNKS}，已均匀采样")
 
         logger.info(f"分层摘要: 分为 {len(chunks)} 块")
 
@@ -202,6 +200,7 @@ class HierarchicalSummarizer:
                 except json.JSONDecodeError:
                     try:
                         import json_repair
+
                         return cast(dict[str, Any], json_repair.loads(content))
                     except ImportError:
                         result = self.llm_client._extract_json_from_text(content)
@@ -302,6 +301,7 @@ class HierarchicalSummarizer:
             except json.JSONDecodeError:
                 try:
                     import json_repair
+
                     result = cast(dict[str, Any], json_repair.loads(content))
                     logger.info("✓ 合并摘要成功（使用 json_repair）")
                     return result
@@ -524,7 +524,9 @@ class HierarchicalSummarizer:
             章节摘要列表
         """
 
-        async def summarize_section(section_title: str, summaries: list[dict[str, Any]]) -> dict[str, Any] | None:
+        async def summarize_section(
+            section_title: str, summaries: list[dict[str, Any]]
+        ) -> dict[str, Any] | None:
             """为单个章节生成摘要"""
             if len(summaries) == 1:
                 return summaries[0]

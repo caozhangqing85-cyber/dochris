@@ -41,10 +41,11 @@ def sample_pdf_manifests(mock_workspace):
 
 
 class TestGetFailedPDFManifests:
-    @patch('dochris.admin.ocr_failed_pdf.get_all_manifests')
-    @patch('dochris.admin.ocr_failed_pdf.get_default_workspace')
+    @patch("dochris.admin.ocr_failed_pdf.get_all_manifests")
+    @patch("dochris.admin.ocr_failed_pdf.get_default_workspace")
     def test_get_failed_pdf_manifests(self, mock_ws, mock_get, sample_pdf_manifests):
         from dochris.admin.ocr_failed_pdf import get_failed_pdf_manifests
+
         mock_ws.return_value = mock_workspace
         mock_get.return_value = sample_pdf_manifests
         result = get_failed_pdf_manifests()
@@ -52,9 +53,10 @@ class TestGetFailedPDFManifests:
 
 
 class TestPDFToImages:
-    @patch('dochris.admin.ocr_failed_pdf.subprocess.run')
+    @patch("dochris.admin.ocr_failed_pdf.subprocess.run")
     def test_pdf_to_images(self, mock_run, tmp_path):
         from dochris.admin.ocr_failed_pdf import pdf_to_images
+
         mock_run.return_value = MagicMock(returncode=0)
         pdf_file = tmp_path / "test.pdf"
         output_dir = tmp_path / "output"
@@ -63,9 +65,10 @@ class TestPDFToImages:
 
 
 class TestOCRImage:
-    @patch('dochris.admin.ocr_failed_pdf.subprocess.run')
+    @patch("dochris.admin.ocr_failed_pdf.subprocess.run")
     def test_ocr_image(self, mock_run, tmp_path):
         from dochris.admin.ocr_failed_pdf import ocr_image
+
         mock_run.return_value = MagicMock(stdout="OCR 文本", returncode=0)
         img_file = tmp_path / "page.png"
         result = ocr_image(img_file)
@@ -73,10 +76,11 @@ class TestOCRImage:
 
 
 class TestFindExistingTranscript:
-    @patch('dochris.admin.ocr_failed_pdf.TRANSCRIPTS_DIR')
-    @patch('dochris.admin.ocr_failed_pdf.RAW_DIR')
+    @patch("dochris.admin.ocr_failed_pdf.TRANSCRIPTS_DIR")
+    @patch("dochris.admin.ocr_failed_pdf.RAW_DIR")
     def test_find_existing_transcript(self, mock_raw, mock_transcripts, tmp_path):
         from dochris.admin.ocr_failed_pdf import find_existing_transcript
+
         # 设置 mock，确保 exists() 和 stat().st_size 返回合适的值
         mock_transcripts.__truediv__ = Mock(return_value=Mock(exists=Mock(return_value=False)))
         mock_raw.__truediv__ = Mock(return_value=Mock(exists=Mock(return_value=False)))

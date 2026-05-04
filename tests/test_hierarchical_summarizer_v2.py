@@ -215,9 +215,7 @@ class TestHierarchicalEdgeCases:
     @pytest.mark.asyncio
     async def test_all_chunks_identical(self, summarizer):
         """所有块内容相同"""
-        identical_chunks = [
-            MagicMock(title=f"块{i}", content="相同内容") for i in range(3)
-        ]
+        identical_chunks = [MagicMock(title=f"块{i}", content="相同内容") for i in range(3)]
 
         with patch("dochris.core.text_chunker.structure_aware_split") as mock_split:
             mock_split.return_value = identical_chunks
@@ -254,7 +252,9 @@ class TestHierarchicalEdgeCases:
                 new=AsyncMock(return_value=[SAMPLE_SUMMARY]),
             ):
                 with patch.object(
-                    summarizer, "_group_chunks_by_section", return_value={"唯一章节": [SAMPLE_SUMMARY]}
+                    summarizer,
+                    "_group_chunks_by_section",
+                    return_value={"唯一章节": [SAMPLE_SUMMARY]},
                 ):
                     with patch.object(
                         summarizer, "_merge_summaries", new=AsyncMock(return_value=SAMPLE_SUMMARY)
@@ -278,15 +278,18 @@ class TestHierarchicalEdgeCases:
                 new=AsyncMock(return_value=[SAMPLE_SUMMARY, SAMPLE_SUMMARY]),
             ):
                 with patch.object(
-                    summarizer, "_group_chunks_by_section",
+                    summarizer,
+                    "_group_chunks_by_section",
                     return_value={"章A": [SAMPLE_SUMMARY], "章B": [SAMPLE_SUMMARY]},
                 ):
                     with patch.object(
-                        summarizer, "_summarize_sections_parallel",
+                        summarizer,
+                        "_summarize_sections_parallel",
                         new=AsyncMock(return_value=[]),
                     ):
                         with patch.object(
-                            summarizer, "_merge_summaries",
+                            summarizer,
+                            "_merge_summaries",
                             new=AsyncMock(return_value=SAMPLE_SUMMARY),
                         ):
                             result = await summarizer.generate_hierarchical_summary(
@@ -319,7 +322,12 @@ class TestBuildMessagesEdgeCases:
     def test_build_merge_prompt_with_many_summaries(self, summarizer):
         """大量摘要的合并 prompt"""
         summaries = [
-            {"one_line": f"摘要{i}", "key_points": [], "detailed_summary": f"内容{i}", "concepts": []}
+            {
+                "one_line": f"摘要{i}",
+                "key_points": [],
+                "detailed_summary": f"内容{i}",
+                "concepts": [],
+            }
             for i in range(10)
         ]
         prompt = summarizer._build_merge_prompt(summaries, "大型文档")

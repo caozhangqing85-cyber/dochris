@@ -104,6 +104,7 @@ class TestGenerateSummary:
             # json_repair needs to be importable
             with patch.dict("sys.modules", {"json_repair": jr}):
                 import sys
+
                 sys.modules["json_repair"] = jr
                 result = await generator.generate_summary("text", "title", max_retries=1)
 
@@ -137,13 +138,16 @@ class TestGenerateSummarySmart:
     @pytest.mark.asyncio
     async def test_short_text_uses_direct(self, generator, mock_llm_client):
         """短文本应使用直接策略"""
-        result_data = {"one_line": "short", "key_points": [], "detailed_summary": "", "concepts": []}
+        result_data = {
+            "one_line": "short",
+            "key_points": [],
+            "detailed_summary": "",
+            "concepts": [],
+        }
         resp = _make_response(json.dumps(result_data))
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=resp)
 
-        with patch(
-            "dochris.core.text_chunker.should_use_hierarchical", return_value="direct"
-        ):
+        with patch("dochris.core.text_chunker.should_use_hierarchical", return_value="direct"):
             result = await generator.generate_summary_smart("short text", "title")
 
         assert result is not None
@@ -152,12 +156,15 @@ class TestGenerateSummarySmart:
     @pytest.mark.asyncio
     async def test_map_reduce_strategy(self, generator, mock_llm_client):
         """中等长度文本使用 map_reduce"""
-        with patch(
-            "dochris.core.text_chunker.should_use_hierarchical", return_value="map_reduce"
-        ):
+        with patch("dochris.core.text_chunker.should_use_hierarchical", return_value="map_reduce"):
             mock_summarizer = MagicMock()
             mock_summarizer.generate_map_reduce_summary = AsyncMock(
-                return_value={"one_line": "mr", "key_points": [], "detailed_summary": "", "concepts": []}
+                return_value={
+                    "one_line": "mr",
+                    "key_points": [],
+                    "detailed_summary": "",
+                    "concepts": [],
+                }
             )
             with patch(
                 "dochris.core.hierarchical_summarizer.HierarchicalSummarizer",
@@ -177,7 +184,12 @@ class TestGenerateSummarySmart:
         ):
             mock_summarizer = MagicMock()
             mock_summarizer.generate_hierarchical_summary = AsyncMock(
-                return_value={"one_line": "hi", "key_points": [], "detailed_summary": "", "concepts": []}
+                return_value={
+                    "one_line": "hi",
+                    "key_points": [],
+                    "detailed_summary": "",
+                    "concepts": [],
+                }
             )
             with patch(
                 "dochris.core.hierarchical_summarizer.HierarchicalSummarizer",

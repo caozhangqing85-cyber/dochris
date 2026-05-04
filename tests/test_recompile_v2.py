@@ -31,9 +31,7 @@ class TestRecompilePdfNoText:
             },
         ]
 
-        with patch(
-            "dochris.admin.recompile.get_all_manifests", return_value=manifests
-        ):
+        with patch("dochris.admin.recompile.get_all_manifests", return_value=manifests):
             result = get_recoverable_failed_docs(tmp_path, mode="text")
 
         ids = [m["id"] for m in result]

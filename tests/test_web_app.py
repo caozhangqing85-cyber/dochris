@@ -332,8 +332,7 @@ class TestFileTable:
         mock_get_settings.return_value = mock_settings
         # 生成 250 条 manifest
         many_manifests = [
-            {"id": f"SRC-{i:04d}", "type": "pdf", "status": "compiled"}
-            for i in range(250)
+            {"id": f"SRC-{i:04d}", "type": "pdf", "status": "compiled"} for i in range(250)
         ]
         mock_manifests.return_value = many_manifests
 
@@ -389,7 +388,12 @@ class TestEventHandlers:
         """刷新文件列表"""
         mock_get_settings.return_value = mock_settings
         mock_manifests.return_value = [
-            {"id": "SRC-0001", "original_filename": "test.pdf", "type": "pdf", "status": "compiled"},
+            {
+                "id": "SRC-0001",
+                "original_filename": "test.pdf",
+                "type": "pdf",
+                "status": "compiled",
+            },
         ]
         rows, status = handle_refresh_files()
         assert len(rows) == 1

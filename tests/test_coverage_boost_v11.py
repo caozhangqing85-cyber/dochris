@@ -176,7 +176,12 @@ class TestSeedFromObsidian:
         note.write_text("# Test Note Content", encoding="utf-8")
 
         mock_search.return_value = [
-            {"path": note, "rel_path": "test_note.md", "title": "test_note", "match_type": "filename"}
+            {
+                "path": note,
+                "rel_path": "test_note.md",
+                "title": "test_note",
+                "match_type": "filename",
+            }
         ]
         mock_all.return_value = []
         mock_next_id.return_value = "SRC-0001"
@@ -220,7 +225,12 @@ class TestSeedFromObsidian:
         from dochris.vault.bridge import seed_from_obsidian
 
         mock_search.return_value = [
-            {"path": tmp_path / "nonexistent.md", "rel_path": "nonexistent.md", "title": "x", "match_type": "filename"}
+            {
+                "path": tmp_path / "nonexistent.md",
+                "rel_path": "nonexistent.md",
+                "title": "x",
+                "match_type": "filename",
+            }
         ]
         with patch("dochris.vault.bridge.get_all_manifests", return_value=[]):
             result = seed_from_obsidian(tmp_path, "x")
@@ -307,8 +317,10 @@ class TestPromoteToObsidian:
         wiki.mkdir(parents=True)
         (wiki / "wiki_test.md").write_text("wiki content", encoding="utf-8")
 
-        with patch("dochris.manifest.update_manifest_status"), \
-             patch("dochris.vault.bridge.append_log"):
+        with (
+            patch("dochris.manifest.update_manifest_status"),
+            patch("dochris.vault.bridge.append_log"),
+        ):
             result = promote_to_obsidian(tmp_path, "SRC-0001")
         assert result is True
 
@@ -337,7 +349,12 @@ class TestListAssociatedNotes:
 
         mock_get.return_value = {"title": "机器学习入门"}
         mock_search.return_value = [
-            {"path": "/some/path.md", "rel_path": "path.md", "title": "path", "match_type": "filename"}
+            {
+                "path": "/some/path.md",
+                "rel_path": "path.md",
+                "title": "path",
+                "match_type": "filename",
+            }
         ]
         result = list_associated_notes(tmp_path, "SRC-0001")
         assert len(result) == 1
@@ -357,8 +374,7 @@ class TestBridgeMain:
     def test_main_too_few_args(self):
         from dochris.vault.bridge import main
 
-        with patch("sys.argv", ["bridge.py"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with patch("sys.argv", ["bridge.py"]), pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
 
@@ -367,8 +383,10 @@ class TestBridgeMain:
         from dochris.vault.bridge import main
 
         mock_seed.return_value = [{"src_id": "SRC-0001"}]
-        with patch("sys.argv", ["bridge.py", "/tmp/ws", "seed", "topic"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.argv", ["bridge.py", "/tmp/ws", "seed", "topic"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 0
 
@@ -377,8 +395,10 @@ class TestBridgeMain:
         from dochris.vault.bridge import main
 
         mock_promote.return_value = True
-        with patch("sys.argv", ["bridge.py", "/tmp/ws", "promote", "SRC-0001"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.argv", ["bridge.py", "/tmp/ws", "promote", "SRC-0001"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 0
 
@@ -387,16 +407,20 @@ class TestBridgeMain:
         from dochris.vault.bridge import main
 
         mock_list.return_value = [{"title": "note"}]
-        with patch("sys.argv", ["bridge.py", "/tmp/ws", "list", "SRC-0001"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.argv", ["bridge.py", "/tmp/ws", "list", "SRC-0001"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 0
 
     def test_main_unknown_action(self):
         from dochris.vault.bridge import main
 
-        with patch("sys.argv", ["bridge.py", "/tmp/ws", "unknown", "arg"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.argv", ["bridge.py", "/tmp/ws", "unknown", "arg"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 1
 

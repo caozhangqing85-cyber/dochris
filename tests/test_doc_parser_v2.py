@@ -19,7 +19,9 @@ class TestDocParserErrorBranches:
             text_content="![](data:image/png;base64,AAAA) short"
         )
 
-        with patch.dict("sys.modules", {"markitdown": MagicMock(MarkItDown=MagicMock(return_value=mock_md))}):
+        with patch.dict(
+            "sys.modules", {"markitdown": MagicMock(MarkItDown=MagicMock(return_value=mock_md))}
+        ):
             result = parse_office_document(doc_file)
 
         assert result is None
@@ -46,7 +48,9 @@ class TestDocParserErrorBranches:
         bad_file = tmp_path / "test.xyz"
         bad_file.write_bytes(b"\xff\xfe")
 
-        with patch("pathlib.Path.read_text", side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")):
+        with patch(
+            "pathlib.Path.read_text", side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")
+        ):
             result = parse_document(bad_file)
 
         assert result is None

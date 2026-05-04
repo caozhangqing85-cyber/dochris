@@ -13,9 +13,14 @@ def mock_workspace(tmp_path, monkeypatch):
     workspace.mkdir()
 
     for d in [
-        "raw", "wiki/summaries", "wiki/concepts",
-        "outputs/summaries", "outputs/concepts",
-        "manifests/sources", "data", "logs",
+        "raw",
+        "wiki/summaries",
+        "wiki/concepts",
+        "outputs/summaries",
+        "outputs/concepts",
+        "manifests/sources",
+        "data",
+        "logs",
     ]:
         (workspace / d).mkdir(parents=True)
 
@@ -89,7 +94,9 @@ class TestCmdDoctorConfigError:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("WORKSPACE", raising=False)
 
-        with patch("dochris.cli.cli_doctor.get_settings", side_effect=ConfigurationError("bad config")):
+        with patch(
+            "dochris.cli.cli_doctor.get_settings", side_effect=ConfigurationError("bad config")
+        ):
             result = cmd_doctor(argparse.Namespace())
 
         assert result == 1

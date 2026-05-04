@@ -112,10 +112,7 @@ def sanitize_filename(filename: str, replacement: str = "_", max_length: int = 2
         return replacement
 
     # 移除控制字符
-    cleaned = "".join(
-        c for c in filename
-        if unicodedata.category(c)[0] != "C"
-    )
+    cleaned = "".join(c for c in filename if unicodedata.category(c)[0] != "C")
 
     # 移除路径遍历字符
     cleaned = cleaned.replace("..", replacement)
@@ -229,9 +226,7 @@ def get_iso_timestamp() -> str:
 
 
 def validate_path_within_base(
-    file_path: Path,
-    base_dir: Path,
-    allow_symlinks: bool = False
+    file_path: Path, base_dir: Path, allow_symlinks: bool = False
 ) -> bool:
     """
     验证文件路径是否在基础目录内（防止路径遍历攻击）

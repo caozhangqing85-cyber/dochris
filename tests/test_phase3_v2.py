@@ -99,6 +99,7 @@ class TestPhase3SetupLogging:
         original_path = LOGS_PATH
         try:
             import phase3_query
+
             logs_dir = mock_workspace / "logs"
             logs_dir.mkdir(parents=True, exist_ok=True)
             phase3_query.LOGS_PATH = logs_dir
@@ -117,6 +118,7 @@ class TestPhase3SetupLogging:
         original_path = LOGS_PATH
         try:
             import phase3_query
+
             logs_dir = mock_workspace / "logs"
             logs_dir.mkdir(parents=True, exist_ok=True)
             phase3_query.LOGS_PATH = logs_dir
@@ -141,6 +143,7 @@ class TestPhase3ManifestIndex:
         try:
             # 临时修改模块常量
             import phase3_query
+
             phase3_query.MANIFESTS_PATH = mock_workspace / "manifests" / "sources"
             # 清除缓存
             phase3_query._manifest_index_cache = None
@@ -160,6 +163,7 @@ class TestPhase3ManifestIndex:
         original_path = MANIFESTS_PATH
         try:
             import phase3_query
+
             phase3_query.MANIFESTS_PATH = mock_workspace / "manifests" / "sources"
             phase3_query._manifest_index_cache = None
 
@@ -178,6 +182,7 @@ class TestPhase3ManifestIndex:
         original_path = MANIFESTS_PATH
         try:
             import phase3_query
+
             phase3_query.MANIFESTS_PATH = mock_workspace / "manifests" / "sources"
             phase3_query._manifest_index_cache = None
 
@@ -195,6 +200,7 @@ class TestPhase3ManifestIndex:
         original_path = MANIFESTS_PATH
         try:
             import phase3_query
+
             phase3_query.MANIFESTS_PATH = mock_workspace / "manifests" / "sources"
 
             status = _get_manifest_status("SRC-0001")
@@ -219,6 +225,7 @@ class TestPhase3ConceptSearch:
         original_outputs = OUTPUTS_CONCEPTS_PATH
         try:
             import phase3_query
+
             phase3_query.WIKI_CONCEPTS_PATH = mock_workspace / "wiki" / "concepts"
             phase3_query.OUTPUTS_CONCEPTS_PATH = mock_workspace / "outputs" / "concepts"
 
@@ -241,6 +248,7 @@ class TestPhase3ConceptSearch:
         original_outputs = OUTPUTS_CONCEPTS_PATH
         try:
             import phase3_query
+
             phase3_query.WIKI_CONCEPTS_PATH = mock_workspace / "wiki" / "concepts"
             phase3_query.OUTPUTS_CONCEPTS_PATH = mock_workspace / "outputs" / "concepts"
 
@@ -271,6 +279,7 @@ class TestPhase3ConceptSearch:
         original_outputs = OUTPUTS_CONCEPTS_PATH
         try:
             import phase3_query
+
             phase3_query.WIKI_CONCEPTS_PATH = mock_workspace / "wiki" / "concepts"
             phase3_query.OUTPUTS_CONCEPTS_PATH = outputs_dir
 
@@ -297,6 +306,7 @@ class TestPhase3SummarySearch:
         original_outputs = OUTPUTS_SUMMARIES_PATH
         try:
             import phase3_query
+
             phase3_query.WIKI_SUMMARIES_PATH = mock_workspace / "wiki" / "summaries"
             phase3_query.OUTPUTS_SUMMARIES_PATH = mock_workspace / "outputs" / "summaries"
 
@@ -319,6 +329,7 @@ class TestPhase3SummarySearch:
         original_outputs = OUTPUTS_SUMMARIES_PATH
         try:
             import phase3_query
+
             phase3_query.WIKI_SUMMARIES_PATH = mock_workspace / "wiki" / "summaries"
             phase3_query.OUTPUTS_SUMMARIES_PATH = mock_workspace / "outputs" / "summaries"
 
@@ -342,19 +353,21 @@ class TestPhase3VectorSearch:
         original_path = DATA_PATH
         try:
             import phase3_query
+
             phase3_query.DATA_PATH = mock_workspace / "data"
             phase3_query._chromadb_client_cache = None
 
             # Mock import chromadb 语句来模拟 ImportError
             import builtins
+
             real_import = builtins.__import__
 
             def mock_import(name, *args, **kwargs):
-                if name == 'chromadb':
+                if name == "chromadb":
                     raise ImportError("chromadb not installed")
                 return real_import(name, *args, **kwargs)
 
-            with patch('builtins.__import__', side_effect=mock_import):
+            with patch("builtins.__import__", side_effect=mock_import):
                 results = vector_search("测试", 5)
 
             assert results == []
@@ -369,6 +382,7 @@ class TestPhase3VectorSearch:
         original_path = DATA_PATH
         try:
             import phase3_query
+
             phase3_query.DATA_PATH = mock_workspace / "data"
             phase3_query._chromadb_client_cache = None
 
@@ -377,14 +391,14 @@ class TestPhase3VectorSearch:
             mock_collection = MagicMock()
             mock_collection.count.return_value = 10
             mock_collection.query.return_value = {
-                'documents': [['文档1内容', '文档2内容']],
-                'metadatas': [[{'source': 'file1.pdf'}, {'source': 'file2.pdf'}]],
-                'distances': [[0.1, 0.2]]
+                "documents": [["文档1内容", "文档2内容"]],
+                "metadatas": [[{"source": "file1.pdf"}, {"source": "file2.pdf"}]],
+                "distances": [[0.1, 0.2]],
             }
             mock_client.list_collections.return_value = [mock_collection]
 
             # 使用 patch 来替换 chromadb.PersistentClient
-            with patch('chromadb.PersistentClient', return_value=mock_client):
+            with patch("chromadb.PersistentClient", return_value=mock_client):
                 results = vector_search("测试", 5)
 
             assert len(results) > 0
@@ -397,7 +411,7 @@ class TestPhase3VectorSearch:
 class TestPhase3GenerateAnswer:
     """测试 LLM 回答生成"""
 
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.create_client")
     def test_generate_answer_no_context(self, mock_create_client):
         """测试无上下文时的回答"""
         from dochris.phases.phase3_query import generate_answer
@@ -411,7 +425,7 @@ class TestPhase3GenerateAnswer:
 
         assert result == "未找到相关内容。请尝试其他关键词。"
 
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.create_client")
     def test_generate_answer_with_context(self, mock_create_client):
         """测试有上下文时的回答"""
         from dochris.phases.phase3_query import generate_answer
@@ -431,7 +445,7 @@ class TestPhase3GenerateAnswer:
 
         assert result == "测试回答"
 
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.create_client")
     def test_generate_answer_api_error(self, mock_create_client):
         """测试 API 错误处理"""
         import openai
@@ -456,31 +470,28 @@ class TestPhase3GenerateAnswer:
 class TestPhase3ClientManagement:
     """测试客户端管理功能"""
 
-    @patch('dochris.phases.phase3_query.read_openclaw_config')
+    @patch("dochris.phases.phase3_query.read_openclaw_config")
     def test_create_client_from_openclaw_config(self, mock_read_config):
         """测试从 OpenClaw 配置创建客户端"""
         from dochris.phases.phase3_query import create_client
 
-        mock_read_config.return_value = {
-            "apiKey": "test-key",
-            "baseUrl": "https://api.test.com"
-        }
+        mock_read_config.return_value = {"apiKey": "test-key", "baseUrl": "https://api.test.com"}
 
-        with patch('dochris.phases.phase3_query.openai.OpenAI') as mock_openai:
+        with patch("dochris.phases.phase3_query.openai.OpenAI") as mock_openai:
             mock_openai.return_value = MagicMock()
             client = create_client()
 
         assert client is not None
 
-    @patch('dochris.phases.phase3_query.read_openclaw_config')
-    @patch.dict(os.environ, {'OPENAI_API_KEY': 'env-key'})
+    @patch("dochris.phases.phase3_query.read_openclaw_config")
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "env-key"})
     def test_create_client_from_env_var(self, mock_read_config):
         """测试从环境变量创建客户端"""
         from dochris.phases.phase3_query import create_client
 
         mock_read_config.return_value = None
 
-        with patch('dochris.phases.phase3_query.openai.OpenAI') as mock_openai:
+        with patch("dochris.phases.phase3_query.openai.OpenAI") as mock_openai:
             mock_openai.return_value = MagicMock()
             client = create_client()
 
@@ -494,17 +505,12 @@ class TestPhase3ClientManagement:
         config_file = tmp_path / "openclaw.json"
         config_content = {
             "models": {
-                "providers": {
-                    "zai": {
-                        "apiKey": "test-api-key",
-                        "baseUrl": "https://api.zai.com"
-                    }
-                }
+                "providers": {"zai": {"apiKey": "test-api-key", "baseUrl": "https://api.zai.com"}}
             }
         }
         config_file.write_text(json.dumps(config_content), encoding="utf-8")
 
-        with patch('dochris.phases.phase3_query.OPENCLAW_CONFIG_PATH', str(config_file)):
+        with patch("dochris.phases.phase3_query.OPENCLAW_CONFIG_PATH", str(config_file)):
             config = read_openclaw_config()
 
         assert config is not None
@@ -515,10 +521,10 @@ class TestPhase3ClientManagement:
 class TestPhase3Query:
     """测试统一查询功能"""
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
+    @patch("dochris.phases.phase3_query.create_client")
     def test_query_concept_mode(self, mock_create, mock_vector, mock_summaries, mock_concepts):
         """测试概念查询模式"""
         from dochris.phases.phase3_query import query
@@ -534,10 +540,10 @@ class TestPhase3Query:
         assert len(result["concepts"]) > 0
         assert result["search_sources"] == ["wiki"]
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
+    @patch("dochris.phases.phase3_query.create_client")
     def test_query_summary_mode(self, mock_create, mock_vector, mock_summaries, mock_concepts):
         """测试摘要查询模式"""
         from dochris.phases.phase3_query import query
@@ -552,10 +558,10 @@ class TestPhase3Query:
         assert result["mode"] == "summary"
         assert len(result["summaries"]) > 0
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
+    @patch("dochris.phases.phase3_query.create_client")
     def test_query_vector_mode(self, mock_create, mock_vector, mock_summaries, mock_concepts):
         """测试向量查询模式"""
         from dochris.phases.phase3_query import query
@@ -570,10 +576,10 @@ class TestPhase3Query:
         assert result["mode"] == "vector"
         assert len(result["vector_results"]) > 0
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
-    @patch('dochris.phases.phase3_query.create_client')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
+    @patch("dochris.phases.phase3_query.create_client")
     def test_query_all_mode(self, mock_create, mock_vector, mock_summaries, mock_concepts):
         """测试全部查询模式"""
         from dochris.phases.phase3_query import query
@@ -637,9 +643,9 @@ class TestPhase3ExtractFunctions:
 class TestPhase3SearchAll:
     """测试搜索全部功能"""
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
     def test_search_all_wiki_priority(self, mock_vector, mock_summaries, mock_concepts):
         """测试 wiki 优先搜索"""
         from dochris.phases.phase3_query import search_all
@@ -660,7 +666,7 @@ class TestPhase3SearchAll:
 class TestPhase3PrintResult:
     """测试结果打印"""
 
-    @patch('builtins.print')
+    @patch("builtins.print")
     def test_print_result_basic(self, mock_print):
         """测试基本结果打印"""
         from dochris.phases.phase3_query import print_result
@@ -673,7 +679,7 @@ class TestPhase3PrintResult:
             "summaries": [],
             "vector_results": [],
             "search_sources": [],
-            "answer": None  # 添加缺少的字段
+            "answer": None,  # 添加缺少的字段
         }
 
         print_result(result)
@@ -684,9 +690,9 @@ class TestPhase3PrintResult:
 class TestPhase3EdgeCases:
     """测试边界情况"""
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
     def test_empty_query(self, mock_vector, mock_summaries, mock_concepts):
         """测试空查询"""
         from dochris.phases.phase3_query import query
@@ -699,9 +705,9 @@ class TestPhase3EdgeCases:
 
         assert result is not None
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
     def test_special_characters_query(self, mock_vector, mock_summaries, mock_concepts):
         """测试特殊字符查询"""
         from dochris.phases.phase3_query import query
@@ -714,9 +720,9 @@ class TestPhase3EdgeCases:
 
         assert result is not None
 
-    @patch('dochris.phases.phase3_query.search_concepts')
-    @patch('dochris.phases.phase3_query.search_summaries')
-    @patch('dochris.phases.phase3_query.vector_search')
+    @patch("dochris.phases.phase3_query.search_concepts")
+    @patch("dochris.phases.phase3_query.search_summaries")
+    @patch("dochris.phases.phase3_query.vector_search")
     def test_very_long_query(self, mock_vector, mock_summaries, mock_concepts):
         """测试超长查询"""
         from dochris.phases.phase3_query import query

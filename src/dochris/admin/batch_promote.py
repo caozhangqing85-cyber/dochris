@@ -60,13 +60,21 @@ def batch_promote_to_wiki(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {
+        "total": len(candidates),
+        "success": 0,
+        "failed": 0,
+        "skipped": 0,
+        "details": [],
+    }
 
     logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
         logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(
+                f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}"
+            )
         if len(candidates) > 20:
             logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats
@@ -126,13 +134,21 @@ def batch_promote_to_curated(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {
+        "total": len(candidates),
+        "success": 0,
+        "failed": 0,
+        "skipped": 0,
+        "details": [],
+    }
 
     logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
         logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(
+                f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}"
+            )
         if len(candidates) > 20:
             logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats
@@ -200,13 +216,21 @@ def batch_promote_to_obsidian(
     if limit > 0:
         candidates = candidates[:limit]
 
-    stats: dict[str, Any] = {"total": len(candidates), "success": 0, "failed": 0, "skipped": 0, "details": []}
+    stats: dict[str, Any] = {
+        "total": len(candidates),
+        "success": 0,
+        "failed": 0,
+        "skipped": 0,
+        "details": [],
+    }
 
     logger.info(f"候选数量: {len(candidates)} 个（min_score={min_score}）")
     if dry_run:
         logger.info("[DRY RUN] 仅预览，不执行")
         for m in candidates[:20]:
-            logger.info(f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}")
+            logger.info(
+                f"  {m['id']} | {m.get('title', '')[:40]} | score={m.get('quality_score', 0)}"
+            )
         if len(candidates) > 20:
             logger.info(f"  ... 还有 {len(candidates) - 20} 个")
         return stats

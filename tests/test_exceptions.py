@@ -2,7 +2,6 @@
 异常模块单元测试
 """
 
-
 from dochris.exceptions import (
     APIError,
     CacheError,

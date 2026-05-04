@@ -25,6 +25,7 @@ class TestPhase1FileHash(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_file_hash_calculation(self):
@@ -101,6 +102,7 @@ class TestPhase1ProgressFile(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_progress_file_operations(self):
@@ -116,8 +118,8 @@ class TestPhase1ProgressFile(unittest.TestCase):
             }
         }
 
-        progress_file.write_text(json.dumps(progress_data), encoding='utf-8')
-        loaded = json.loads(progress_file.read_text(encoding='utf-8'))
+        progress_file.write_text(json.dumps(progress_data), encoding="utf-8")
+        loaded = json.loads(progress_file.read_text(encoding="utf-8"))
         self.assertEqual(loaded["phase1"]["stats"]["total"], 0)
 
     def test_progress_file_create_new(self):
@@ -128,11 +130,12 @@ class TestPhase1ProgressFile(unittest.TestCase):
         # 备份原有的 PROGRESS_FILE
         original_backup = None
         if PROGRESS_FILE.exists():
-            original_backup = PROGRESS_FILE.read_text(encoding='utf-8')
+            original_backup = PROGRESS_FILE.read_text(encoding="utf-8")
 
         try:
             # 临时覆盖 PROGRESS_FILE 为测试目录
             import phase1_ingestion
+
             original_progress_file = phase1_ingestion.PROGRESS_FILE
             phase1_ingestion.PROGRESS_FILE = self.temp_path / "progress.json"
 
@@ -142,7 +145,7 @@ class TestPhase1ProgressFile(unittest.TestCase):
                     "hash_index": {},
                     "stats": {"total": 0, "linked": 0, "skipped": 0, "failed": 0},
                 },
-                "test": "data"
+                "test": "data",
             }
             save_progress(test_data)
             loaded = load_progress()
@@ -153,7 +156,7 @@ class TestPhase1ProgressFile(unittest.TestCase):
         finally:
             # 恢复原有 PROGRESS_FILE 内容
             if original_backup is not None:
-                PROGRESS_FILE.write_text(original_backup, encoding='utf-8')
+                PROGRESS_FILE.write_text(original_backup, encoding="utf-8")
 
     def test_progress_file_update_stats(self):
         """测试更新统计信息"""
@@ -166,8 +169,8 @@ class TestPhase1ProgressFile(unittest.TestCase):
             }
         }
 
-        progress_file.write_text(json.dumps(progress_data), encoding='utf-8')
-        loaded = json.loads(progress_file.read_text(encoding='utf-8'))
+        progress_file.write_text(json.dumps(progress_data), encoding="utf-8")
+        loaded = json.loads(progress_file.read_text(encoding="utf-8"))
         self.assertEqual(loaded["phase1"]["stats"]["total"], 10)
 
 
@@ -178,39 +181,39 @@ class TestPhase1FileDetection(unittest.TestCase):
         """测试文件扩展名检测"""
         from dochris.settings import get_file_category
 
-        self.assertEqual(get_file_category('.pdf'), 'pdfs')
-        self.assertEqual(get_file_category('.md'), 'articles')
-        self.assertEqual(get_file_category('.mp3'), 'audio')
-        self.assertEqual(get_file_category('.mp4'), 'videos')
-        self.assertEqual(get_file_category('.mobi'), 'ebooks')
-        self.assertEqual(get_file_category('.epub'), 'ebooks')
-        self.assertEqual(get_file_category('.xyz'), 'other')
+        self.assertEqual(get_file_category(".pdf"), "pdfs")
+        self.assertEqual(get_file_category(".md"), "articles")
+        self.assertEqual(get_file_category(".mp3"), "audio")
+        self.assertEqual(get_file_category(".mp4"), "videos")
+        self.assertEqual(get_file_category(".mobi"), "ebooks")
+        self.assertEqual(get_file_category(".epub"), "ebooks")
+        self.assertEqual(get_file_category(".xyz"), "other")
 
     def test_file_extension_case_insensitive(self):
         """测试扩展名大小写不敏感"""
         from dochris.settings import get_file_category
 
-        self.assertEqual(get_file_category('.PDF'), 'pdfs')
-        self.assertEqual(get_file_category('.Mp3'), 'audio')
-        self.assertEqual(get_file_category('.MD'), 'articles')
+        self.assertEqual(get_file_category(".PDF"), "pdfs")
+        self.assertEqual(get_file_category(".Mp3"), "audio")
+        self.assertEqual(get_file_category(".MD"), "articles")
 
     def test_supported_video_formats(self):
         """测试支持的视频格式"""
         from dochris.settings import get_file_category
 
         # 只测试 FILE_TYPE_MAP 中实际支持的格式
-        video_formats = ['.mp4', '.mkv', '.avi', '.mov', '.wmv']
+        video_formats = [".mp4", ".mkv", ".avi", ".mov", ".wmv"]
         for ext in video_formats:
-            self.assertEqual(get_file_category(ext), 'videos')
+            self.assertEqual(get_file_category(ext), "videos")
 
     def test_supported_audio_formats(self):
         """测试支持的音频格式"""
         from dochris.settings import get_file_category
 
         # 只测试 FILE_TYPE_MAP 中实际支持的格式
-        audio_formats = ['.mp3', '.m4a', '.flac', '.aac', '.ogg']
+        audio_formats = [".mp3", ".m4a", ".flac", ".aac", ".ogg"]
         for ext in audio_formats:
-            self.assertEqual(get_file_category(ext), 'audio')
+            self.assertEqual(get_file_category(ext), "audio")
 
 
 class TestPhase1Deduplication(unittest.TestCase):
@@ -238,14 +241,12 @@ class TestPhase1Deduplication(unittest.TestCase):
 
         finally:
             import shutil
+
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def test_duplicate_detection_in_hash_index(self):
         """测试哈希索引中检测重复"""
-        hash_index = {
-            "abc123def456": "SRC-0001",
-            "789xyz012": "SRC-0002"
-        }
+        hash_index = {"abc123def456": "SRC-0001", "789xyz012": "SRC-0002"}
 
         # 测试存在的哈希
         self.assertIn("abc123def456", hash_index)
@@ -269,6 +270,7 @@ class TestPhase1SymlinkCreation(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_create_symlink(self):
@@ -309,7 +311,7 @@ class TestPhase1AudioDuration(unittest.TestCase):
         result = get_audio_duration(Path("/nonexistent/file.mp3"))
         self.assertIsNone(result)
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_audio_duration_ffprobe_success(self, mock_run):
         """测试 ffprobe 成功获取时长"""
         from dochris import settings
@@ -326,7 +328,7 @@ class TestPhase1AudioDuration(unittest.TestCase):
         mock_result.returncode = 0
         mock_run.return_value = mock_result
 
-        temp_file = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False, dir='/tmp')
+        temp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, dir="/tmp")
         temp_file.close()
 
         try:
@@ -338,7 +340,7 @@ class TestPhase1AudioDuration(unittest.TestCase):
             settings.SOURCE_PATH = original_source_path
             phase1_ingestion.SOURCE_PATH = original_source_path
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_audio_duration_ffprobe_failure(self, mock_run):
         """测试 ffprobe 失败返回 None"""
         from dochris import settings
@@ -354,7 +356,7 @@ class TestPhase1AudioDuration(unittest.TestCase):
         mock_result.returncode = 1
         mock_run.return_value = mock_result
 
-        temp_file = tempfile.NamedTemporaryFile(suffix='.mp3', delete=False, dir='/tmp')
+        temp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, dir="/tmp")
         temp_file.close()
 
         try:
@@ -378,6 +380,7 @@ class TestPhase1SourceDirectoryScanning(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_scan_pdf_files(self):
@@ -421,24 +424,14 @@ class TestPhase1Statistics(unittest.TestCase):
 
     def test_calculate_stats(self):
         """测试计算统计数据"""
-        stats = {
-            "total": 100,
-            "linked": 80,
-            "skipped": 15,
-            "failed": 5
-        }
+        stats = {"total": 100, "linked": 80, "skipped": 15, "failed": 5}
 
         success_rate = (stats["linked"] / stats["total"] * 100) if stats["total"] > 0 else 0
         self.assertEqual(success_rate, 80.0)
 
     def test_empty_stats(self):
         """测试空统计"""
-        stats = {
-            "total": 0,
-            "linked": 0,
-            "skipped": 0,
-            "failed": 0
-        }
+        stats = {"total": 0, "linked": 0, "skipped": 0, "failed": 0}
 
         self.assertEqual(stats["total"], 0)
 
@@ -458,10 +451,11 @@ class TestPhase1Integration(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.phases.phase1_ingestion.load_progress')
-    @patch('dochris.phases.phase1_ingestion.save_progress')
+    @patch("dochris.phases.phase1_ingestion.load_progress")
+    @patch("dochris.phases.phase1_ingestion.save_progress")
     def test_full_ingestion_flow(self, mock_save, mock_load):
         """测试完整摄入流程"""
         from dochris.phases.phase1_ingestion import file_hash

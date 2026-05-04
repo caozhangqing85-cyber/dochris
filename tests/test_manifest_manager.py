@@ -291,12 +291,12 @@ class TestUpdateManifestStatus:
         index_path = temp_workspace / "manifests" / "source_index.csv"
         assert index_path.exists()
 
-        with open(index_path, encoding='utf-8', newline='') as f:
+        with open(index_path, encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('id') == "SRC-0001":
-                    assert row.get('status') == "compiled"
-                    assert row.get('quality_score') == "90"
+                if row.get("id") == "SRC-0001":
+                    assert row.get("status") == "compiled"
+                    assert row.get("quality_score") == "90"
 
 
 class TestAppendToIndex:
@@ -334,7 +334,7 @@ class TestAppendToIndex:
         append_to_index(temp_workspace, manifest)
 
         index_path = temp_workspace / "manifests" / "source_index.csv"
-        with open(index_path, encoding='utf-8') as f:
+        with open(index_path, encoding="utf-8") as f:
             header = f.readline().strip()
             assert "id" in header
             assert "title" in header
@@ -345,7 +345,7 @@ class TestAppendToIndex:
         for i in range(3):
             create_manifest(
                 temp_workspace,
-                f"SRC-{i+1:04d}",
+                f"SRC-{i + 1:04d}",
                 f"Test {i}",
                 "pdf",
                 Path(f"/source/test{i}.pdf"),
@@ -355,7 +355,7 @@ class TestAppendToIndex:
             # create_manifest 现在会自动调用 append_to_index
 
         index_path = temp_workspace / "manifests" / "source_index.csv"
-        with open(index_path, encoding='utf-8') as f:
+        with open(index_path, encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) == 4  # 1 header + 3 data rows
 
@@ -373,7 +373,7 @@ class TestGetAllManifests:
         for i in range(3):
             create_manifest(
                 temp_workspace,
-                f"SRC-{i+1:04d}",
+                f"SRC-{i + 1:04d}",
                 f"Test {i}",
                 "pdf",
                 Path(f"/source/test{i}.pdf"),
@@ -462,12 +462,12 @@ class TestUpdateIndexEntry:
         )
 
         index_path = temp_workspace / "manifests" / "source_index.csv"
-        with open(index_path, encoding='utf-8') as f:
+        with open(index_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('id') == "SRC-0001":
-                    assert row.get('status') == "compiled"
-                    assert row.get('quality_score') == "95"
+                if row.get("id") == "SRC-0001":
+                    assert row.get("status") == "compiled"
+                    assert row.get("quality_score") == "95"
 
     def test_nonexistent_index_file(self, temp_workspace):
         """测试不存在的索引文件不报错"""
@@ -484,7 +484,7 @@ class TestRebuildIndex:
         for i in range(3):
             create_manifest(
                 temp_workspace,
-                f"SRC-{i+1:04d}",
+                f"SRC-{i + 1:04d}",
                 f"Test {i}",
                 "pdf",
                 Path(f"/source/test{i}.pdf"),
@@ -493,18 +493,20 @@ class TestRebuildIndex:
             )
             # 更新一些状态
             if i == 0:
-                update_manifest_status(temp_workspace, f"SRC-{i+1:04d}", "compiled", quality_score=90)
+                update_manifest_status(
+                    temp_workspace, f"SRC-{i + 1:04d}", "compiled", quality_score=90
+                )
 
         rebuild_index(temp_workspace)
 
         index_path = temp_workspace / "manifests" / "source_index.csv"
         assert index_path.exists()
 
-        with open(index_path, encoding='utf-8') as f:
+        with open(index_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 3
             # 检查更新的状态被反映
-            compiled_row = next(r for r in rows if r.get('id') == "SRC-0001")
-            assert compiled_row.get('status') == "compiled"
-            assert compiled_row.get('quality_score') == "90"
+            compiled_row = next(r for r in rows if r.get("id") == "SRC-0001")
+            assert compiled_row.get("status") == "compiled"
+            assert compiled_row.get("quality_score") == "90"

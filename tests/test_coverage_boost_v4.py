@@ -1,10 +1,9 @@
 """覆盖率提升 v4 — quality_scorer + cache + cli_utils 边界分支"""
 
 
-
-
 def _score(summary):
     from dochris.core.quality_scorer import score_summary_quality_v4
+
     return score_summary_quality_v4(summary)
 
 
@@ -12,7 +11,6 @@ def _score(summary):
 # quality_scorer.py — 覆盖所有评分分支
 # ============================================================
 class TestQualityScorerBranches:
-
     def test_empty_summary(self):
         assert _score({}) == 0
 
@@ -95,7 +93,9 @@ class TestQualityScorerBranches:
         assert _score({"concepts": [{"name": f"c{i}"} for i in range(5)]}) > 0
 
     def test_template_detected(self):
-        summary = {"detailed_summary": "This is a placeholder text that needs to be replaced with actual content"}
+        summary = {
+            "detailed_summary": "This is a placeholder text that needs to be replaced with actual content"
+        }
         result_template = _score(summary)
         assert result_template < 20
 
@@ -115,6 +115,7 @@ class TestQualityScorerBranches:
 
     def test_get_quality_threshold(self):
         from dochris.core.quality_scorer import get_quality_threshold
+
         assert get_quality_threshold() == 85
 
     def test_max_score_100(self):

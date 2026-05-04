@@ -164,7 +164,13 @@ class TestQualityScoringParametrized:
             (
                 "Python 装饰器详解",
                 "Python 装饰器是一种强大的语法特性。" * 20,
-                ["装饰器是语法糖", "理解闭包很重要", "可以添加额外功能", "提高代码复用性", "实际应用广泛"],
+                [
+                    "装饰器是语法糖",
+                    "理解闭包很重要",
+                    "可以添加额外功能",
+                    "提高代码复用性",
+                    "实际应用广泛",
+                ],
                 ["装饰器", "闭包", "高阶函数", "一等公民"],
                 60,
             ),
@@ -287,9 +293,13 @@ class TestSettingsAttributeTypesParametrized:
 
         # 处理联合类型
         if isinstance(expected_type, tuple):
-            assert isinstance(value, expected_type), f"{attr} 类型错误: {type(value)} not in {expected_type}"
+            assert isinstance(value, expected_type), (
+                f"{attr} 类型错误: {type(value)} not in {expected_type}"
+            )
         else:
-            assert isinstance(value, expected_type), f"{attr} 类型错误: {type(value)} != {expected_type}"
+            assert isinstance(value, expected_type), (
+                f"{attr} 类型错误: {type(value)} != {expected_type}"
+            )
 
 
 class TestProtocolMethodsParametrized:

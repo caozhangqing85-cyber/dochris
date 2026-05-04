@@ -121,7 +121,9 @@ class TestGenerateSummaryWithLLM:
         mock_settings.api_key = None
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_failures.get_settings", return_value=mock_settings):
+        with patch(
+            "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+        ):
             result = await generate_summary_with_llm("text", "title", logger)
         assert result is None
 
@@ -138,8 +140,10 @@ class TestGenerateSummaryWithLLM:
         mock_client = MagicMock()
         mock_client.generate_summary = AsyncMock(return_value={"summary": "test"})
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", return_value=mock_client):
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
+        ):
             result = await generate_summary_with_llm("text", "title", logger)
         assert result == {"summary": "test"}
 
@@ -156,8 +160,10 @@ class TestGenerateSummaryWithLLM:
         mock_client = MagicMock()
         mock_client.generate_summary = AsyncMock(side_effect=Exception("LLM error"))
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", return_value=mock_client):
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
+        ):
             result = await generate_summary_with_llm("text", "title", logger)
         assert result is None
 
@@ -171,7 +177,9 @@ class TestCompileWithModelFallback:
         mock_settings.api_key = None
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_failures.get_settings", return_value=mock_settings):
+        with patch(
+            "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+        ):
             result = await compile_with_model_fallback("text", "title", logger, ["m1", "m2"], 0.1)
         assert result is None
 
@@ -187,9 +195,11 @@ class TestCompileWithModelFallback:
         mock_client = MagicMock()
         mock_client.generate_summary = AsyncMock(return_value={"summary": "ok"})
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", return_value=mock_client), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             result = await compile_with_model_fallback("text", "title", logger, ["model-a"], 0.1)
         assert result == {"summary": "ok"}
 
@@ -214,9 +224,11 @@ class TestCompileWithModelFallback:
                 c.generate_summary = AsyncMock(return_value={"summary": "fallback"})
             return c
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", side_effect=make_client), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", side_effect=make_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             result = await compile_with_model_fallback(
                 "text", "title", logger, ["model-a", "model-b"], 0.1
             )
@@ -234,12 +246,12 @@ class TestCompileWithModelFallback:
         mock_client = MagicMock()
         mock_client.generate_summary = AsyncMock(side_effect=RuntimeError("all fail"))
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", return_value=mock_client), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await compile_with_model_fallback(
-                "text", "title", logger, ["m1", "m2"], 0.1
-            )
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await compile_with_model_fallback("text", "title", logger, ["m1", "m2"], 0.1)
         assert result is None
 
     @pytest.mark.asyncio
@@ -254,18 +266,19 @@ class TestCompileWithModelFallback:
         mock_client = MagicMock()
         mock_client.generate_summary = AsyncMock(return_value=None)
 
-        with patch("dochris.settings.get_settings", return_value=mock_settings), \
-             patch("dochris.core.llm_client.LLMClient", return_value=mock_client), \
-             patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await compile_with_model_fallback(
-                "text", "title", logger, ["m1"], 0.1
-            )
+        with (
+            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
+            result = await compile_with_model_fallback("text", "title", logger, ["m1"], 0.1)
         assert result is None
 
 
 class TestFindFailedManifests:
     def _make_cf(self):
         from dochris.compensate import compensate_failures as cf
+
         return cf
 
     def test_filter_ebook(self, tmp_path):
@@ -276,14 +289,28 @@ class TestFindFailedManifests:
         (ebook_dir / "test.mobi").write_bytes(b"fake mobi")
 
         manifests = [
-            {"id": "SRC-0001", "type": "ebook", "file_path": "raw/ebooks/test.mobi",
-             "error_message": "no_text", "title": "Test"},
-            {"id": "SRC-0002", "type": "pdf", "file_path": "raw/pdfs/test.pdf",
-             "error_message": "no_text", "title": "PDF"},
+            {
+                "id": "SRC-0001",
+                "type": "ebook",
+                "file_path": "raw/ebooks/test.mobi",
+                "error_message": "no_text",
+                "title": "Test",
+            },
+            {
+                "id": "SRC-0002",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test.pdf",
+                "error_message": "no_text",
+                "title": "PDF",
+            },
         ]
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
+            ),
+        ):
             result = cf.find_failed_manifests("ebook", logger)
         assert len(result) == 1
         assert result[0]["id"] == "SRC-0001"
@@ -297,64 +324,112 @@ class TestFindFailedManifests:
         (pdf_dir / "test2.pdf").write_bytes(b"fake pdf 2")
 
         manifests = [
-            {"id": "SRC-0001", "type": "pdf", "file_path": "raw/pdfs/test.pdf",
-             "error_message": "no_text", "title": "Test"},
-            {"id": "SRC-0002", "type": "pdf", "file_path": "raw/pdfs/test2.pdf",
-             "error_message": "llm_failed", "title": "Test2"},
+            {
+                "id": "SRC-0001",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test.pdf",
+                "error_message": "no_text",
+                "title": "Test",
+            },
+            {
+                "id": "SRC-0002",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test2.pdf",
+                "error_message": "llm_failed",
+                "title": "Test2",
+            },
         ]
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
+            ),
+        ):
             result = cf.find_failed_manifests("pdf", logger)
         assert len(result) == 1
 
     def test_filter_llm(self, tmp_path):
         cf = self._make_cf()
         manifests = [
-            {"id": "SRC-0001", "type": "pdf", "file_path": "raw/pdfs/test.pdf",
-             "error_message": "llm_failed: timeout", "title": "Test"},
+            {
+                "id": "SRC-0001",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test.pdf",
+                "error_message": "llm_failed: timeout",
+                "title": "Test",
+            },
         ]
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
+            ),
+        ):
             result = cf.find_failed_manifests("llm", logger)
         assert len(result) == 1
 
     def test_filter_other(self, tmp_path):
         cf = self._make_cf()
         manifests = [
-            {"id": "SRC-0001", "type": "other", "file_path": "raw/other/test.mhtml",
-             "error_message": "no_text", "title": "Test"},
+            {
+                "id": "SRC-0001",
+                "type": "other",
+                "file_path": "raw/other/test.mhtml",
+                "error_message": "no_text",
+                "title": "Test",
+            },
         ]
         other_dir = tmp_path / "raw" / "other"
         other_dir.mkdir(parents=True)
         (other_dir / "test.mhtml").write_text("content", encoding="utf-8")
 
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
+            ),
+        ):
             result = cf.find_failed_manifests("other", logger)
         assert len(result) == 1
 
     def test_filter_all(self, tmp_path):
         cf = self._make_cf()
         manifests = [
-            {"id": "SRC-0001", "type": "pdf", "file_path": "raw/pdfs/test.pdf",
-             "error_message": "no_text", "title": "Test"},
-            {"id": "SRC-0002", "type": "pdf", "file_path": "raw/pdfs/test2.pdf",
-             "error_message": "llm_failed", "title": "Test2"},
+            {
+                "id": "SRC-0001",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test.pdf",
+                "error_message": "no_text",
+                "title": "Test",
+            },
+            {
+                "id": "SRC-0002",
+                "type": "pdf",
+                "file_path": "raw/pdfs/test2.pdf",
+                "error_message": "llm_failed",
+                "title": "Test2",
+            },
         ]
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
+            ),
+        ):
             result = cf.find_failed_manifests("all", logger)
         assert len(result) == 2
 
     def test_filter_empty(self, tmp_path):
         cf = self._make_cf()
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=[]):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=[]),
+        ):
             result = cf.find_failed_manifests("all", logger)
         assert result == []
 
@@ -365,8 +440,10 @@ class TestRunCompensate:
         from dochris.compensate import compensate_failures as cf
 
         logger = MagicMock()
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.find_failed_manifests", return_value=[]):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch("dochris.compensate.compensate_failures.find_failed_manifests", return_value=[]),
+        ):
             await cf.run_compensate(logger, "all")
 
     @pytest.mark.asyncio
@@ -378,10 +455,16 @@ class TestRunCompensate:
         mock_settings = MagicMock()
         mock_settings.api_key = None
 
-        with patch.object(cf, "KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.find_failed_manifests",
-                   return_value=[{"id": "S1", "type": "pdf"}]), \
-             patch("dochris.compensate.compensate_failures.get_settings", return_value=mock_settings):
+        with (
+            patch.object(cf, "KB_PATH", tmp_path),
+            patch(
+                "dochris.compensate.compensate_failures.find_failed_manifests",
+                return_value=[{"id": "S1", "type": "pdf"}],
+            ),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
+        ):
             await cf.run_compensate(logger, "all")
 
 
@@ -411,11 +494,11 @@ class TestRetryLLMFailed:
         manifest = {"id": "SRC-0001", "file_path": "raw/test.txt", "title": "Test"}
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path), \
-             patch("dochris.compensate.compensate_failures.MIN_AUDIO_TEXT_LENGTH", 100):
-            src_id, ok, status, comp = await retry_llm_failed(
-                manifest, None, logger, 0.1, ["m1"]
-            )
+        with (
+            patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path),
+            patch("dochris.compensate.compensate_failures.MIN_AUDIO_TEXT_LENGTH", 100),
+        ):
+            src_id, ok, status, comp = await retry_llm_failed(manifest, None, logger, 0.1, ["m1"])
         assert ok is False
         assert status == "no_text"
 
@@ -425,7 +508,12 @@ class TestCompensateSingle:
     async def test_file_not_found(self, tmp_path):
         from dochris.compensate.compensate_failures import compensate_single
 
-        manifest = {"id": "SRC-0001", "file_path": "raw/nonexistent.pdf", "title": "Missing", "type": "pdf"}
+        manifest = {
+            "id": "SRC-0001",
+            "file_path": "raw/nonexistent.pdf",
+            "title": "Missing",
+            "type": "pdf",
+        }
         logger = MagicMock()
         sem = MagicMock()
         sem.__aenter__ = AsyncMock(return_value=None)
@@ -447,7 +535,9 @@ class TestCompensateExtractors:
         from dochris.compensate.compensate_extractors import extract_text_compensated
 
         logger = MagicMock()
-        result, method = extract_text_compensated(tmp_path / "nonexistent.xyz", {"type": "other"}, logger)
+        result, method = extract_text_compensated(
+            tmp_path / "nonexistent.xyz", {"type": "other"}, logger
+        )
         assert result is None or result == ""
 
 
@@ -784,18 +874,22 @@ class TestPhase2DryRun:
             {"id": "SRC-0003", "title": "Tiny Doc", "size_bytes": 1000},
         ]
 
-        with patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path), \
-             patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=manifests), \
-             patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"):
+        with (
+            patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path),
+            patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=manifests),
+            patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"),
+        ):
             await compile_all(dry_run=True)
 
     @pytest.mark.asyncio
     async def test_compile_all_no_manifests(self, tmp_path):
         from dochris.phases.phase2_compilation import compile_all
 
-        with patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path), \
-             patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=[]), \
-             patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"):
+        with (
+            patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path),
+            patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=[]),
+            patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"),
+        ):
             await compile_all()
 
     @pytest.mark.asyncio
@@ -807,9 +901,11 @@ class TestPhase2DryRun:
             {"id": "SRC-0002", "title": "Doc2", "size_bytes": 1000},
         ]
 
-        with patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path), \
-             patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=manifests), \
-             patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"):
+        with (
+            patch("dochris.phases.phase2_compilation.get_default_workspace", return_value=tmp_path),
+            patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=manifests),
+            patch("dochris.phases.phase2_compilation.get_logs_dir", return_value=tmp_path / "logs"),
+        ):
             await compile_all(dry_run=True, limit=1)
 
 
@@ -822,36 +918,44 @@ class TestQualityGateCLI:
     def test_main_no_args(self):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with patch("sys.argv", ["quality_gate.py"]), pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
 
     def test_main_scan_wiki(self, tmp_path):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "scan-wiki"]), \
-             patch("dochris.quality.quality_gate.scan_wiki", return_value={
-                 "wiki_summaries": 5,
-                 "wiki_concepts": 3,
-                 "wiki_total": 8,
-                 "pollution": {"polluted": False, "details": "干净"},
-                 "manifest_status_counts": {"compiled": 5, "pending": 2},
-             }):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "scan-wiki"]),
+            patch(
+                "dochris.quality.quality_gate.scan_wiki",
+                return_value={
+                    "wiki_summaries": 5,
+                    "wiki_concepts": 3,
+                    "wiki_total": 8,
+                    "pollution": {"polluted": False, "details": "干净"},
+                    "manifest_status_counts": {"compiled": 5, "pending": 2},
+                },
+            ),
+        ):
             main()
 
     def test_main_report(self, tmp_path):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "report"]), \
-             patch("dochris.quality.quality_gate.generate_report", return_value={"total": 10}):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "report"]),
+            patch("dochris.quality.quality_gate.generate_report", return_value={"total": 10}),
+        ):
             main()
 
     def test_main_unknown_command(self, tmp_path):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "unknown"]), \
-             pytest.raises(SystemExit) as exc_info:
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "unknown"]),
+            pytest.raises(SystemExit) as exc_info,
+        ):
             main()
         assert exc_info.value.code == 1
 
@@ -893,7 +997,9 @@ class TestExtractTextFromFileExtra:
         doc_file.write_text("x" * 200, encoding="utf-8")
         logger = MagicMock()
 
-        with patch("dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")):
+        with patch(
+            "dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")
+        ):
             result = extract_text_from_file(doc_file, logger)
             assert result is None
 
@@ -904,7 +1010,9 @@ class TestExtractTextFromFileExtra:
         doc_file.write_text("x" * 200, encoding="utf-8")
         logger = MagicMock()
 
-        with patch("dochris.parsers.doc_parser.parse_document", side_effect=RuntimeError("unexpected")):
+        with patch(
+            "dochris.parsers.doc_parser.parse_document", side_effect=RuntimeError("unexpected")
+        ):
             result = extract_text_from_file(doc_file, logger)
             assert result is None
 
@@ -915,7 +1023,9 @@ class TestExtractTextFromFileExtra:
         code_file.write_text("valid", encoding="utf-8")
         logger = MagicMock()
 
-        with patch.object(Path, "read_text", side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "bad")):
+        with patch.object(
+            Path, "read_text", side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "bad")
+        ):
             result = extract_text_from_file(code_file, logger)
             assert result is None
 
@@ -1004,8 +1114,15 @@ class TestExtractTextCompensatedExtra:
         file.write_bytes(b"fake")
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None), \
-             patch("dochris.compensate.compensate_extractors.extract_ebook_text", return_value="A" * 500):
+        with (
+            patch(
+                "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+            ),
+            patch(
+                "dochris.compensate.compensate_extractors.extract_ebook_text",
+                return_value="A" * 500,
+            ),
+        ):
             text, method = extract_text_compensated(file, {"type": "ebook"}, logger)
             assert method == "ebook_convert"
 
@@ -1016,8 +1133,15 @@ class TestExtractTextCompensatedExtra:
         file.write_bytes(b"fake")
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None), \
-             patch("dochris.compensate.compensate_extractors.extract_pdf_with_ocr", return_value="A" * 500):
+        with (
+            patch(
+                "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+            ),
+            patch(
+                "dochris.compensate.compensate_extractors.extract_pdf_with_ocr",
+                return_value="A" * 500,
+            ),
+        ):
             text, method = extract_text_compensated(file, {"type": "pdf"}, logger)
             assert method == "ocr"
 
@@ -1028,8 +1152,12 @@ class TestExtractTextCompensatedExtra:
         file.write_bytes(b"fake")
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None), \
-             patch("subprocess.run") as mock_run:
+        with (
+            patch(
+                "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+            ),
+            patch("subprocess.run") as mock_run,
+        ):
             mock_run.return_value = MagicMock(returncode=0, stdout="A" * 500)
             text, method = extract_text_compensated(file, {"type": "other"}, logger)
             assert method == "markitdown"
@@ -1041,7 +1169,9 @@ class TestExtractTextCompensatedExtra:
         file.write_bytes(b"fake")
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None):
+        with patch(
+            "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+        ):
             text, method = extract_text_compensated(file, {"type": "unknown"}, logger)
             assert text is None
             assert method == "failed"
@@ -1053,8 +1183,12 @@ class TestExtractTextCompensatedExtra:
         file.write_bytes(b"fake")
         logger = MagicMock()
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None), \
-             patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 120)):
+        with (
+            patch(
+                "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+            ),
+            patch("subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 120)),
+        ):
             text, method = extract_text_compensated(file, {"type": "other"}, logger)
             assert text is None
             assert method == "failed"

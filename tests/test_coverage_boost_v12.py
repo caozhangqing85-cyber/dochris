@@ -28,11 +28,21 @@ class TestCmdDoctor:
         s.model = "glm-5.1"
         s.workspace = tmp_path
         # Create required subdirectories
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -49,7 +59,9 @@ class TestCmdDoctor:
         s.model = "glm-5.1"
         s.workspace = tmp_path
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -66,7 +78,9 @@ class TestCmdDoctor:
         s.model = "glm-5.1"
         s.workspace = tmp_path / "nonexistent"
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -82,11 +96,21 @@ class TestCmdDoctor:
         s.api_base = "https://api.example.com/v1"
         s.model = "glm-5.1"
         s.workspace = tmp_path
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=500 * 1024**2, total=100 * 1024**3, used=100 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=500 * 1024**2, total=100 * 1024**3, used=100 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -104,7 +128,9 @@ class TestCmdDoctor:
         s.workspace = tmp_path
         tmp_path.mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -120,8 +146,16 @@ class TestCmdDoctor:
         s.api_base = "https://api.example.com/v1"
         s.model = "glm-5.1"
         s.workspace = tmp_path
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
         mock_disk.side_effect = OSError("cannot check")
@@ -140,11 +174,21 @@ class TestCmdDoctor:
         s.api_base = ""
         s.model = "glm-5.1"
         s.workspace = tmp_path
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -160,11 +204,21 @@ class TestCmdDoctor:
         s.api_base = "https://api.example.com/v1"
         s.model = ""
         s.workspace = tmp_path
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         args = argparse.Namespace()
         result = cmd_doctor(args)
@@ -180,11 +234,21 @@ class TestCmdDoctor:
         s.api_base = "https://api.example.com/v1"
         s.model = "glm-5.1"
         s.workspace = tmp_path
-        for d in ["raw", "wiki/summaries", "wiki/concepts", "outputs/summaries",
-                   "outputs/concepts", "manifests/sources", "data", "logs"]:
+        for d in [
+            "raw",
+            "wiki/summaries",
+            "wiki/concepts",
+            "outputs/summaries",
+            "outputs/concepts",
+            "manifests/sources",
+            "data",
+            "logs",
+        ]:
             (tmp_path / d).mkdir(parents=True, exist_ok=True)
         mock_settings.return_value = s
-        mock_disk.return_value = MagicMock(free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3)
+        mock_disk.return_value = MagicMock(
+            free=10 * 1024**3, total=100 * 1024**3, used=90 * 1024**3
+        )
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-key-from-env-123")
         monkeypatch.setenv("OPENAI_API_BASE", "https://test.example.com/v1")

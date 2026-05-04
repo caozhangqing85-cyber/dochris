@@ -45,6 +45,7 @@ def cmd_config(args: argparse.Namespace) -> int:
 def cmd_version(args: argparse.Namespace) -> int:
     """显示版本"""
     from dochris import __version__
+
     print(f"\n知识库编译系统 v{__version__}")
     print("统一 CLI 入口")
     print(f"工作区: {get_settings().workspace}")

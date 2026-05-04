@@ -2,7 +2,6 @@
 质量评分模块单元测试
 """
 
-
 from dochris.core.quality_scorer import (
     get_quality_threshold,
     score_summary_quality_v4,
@@ -30,7 +29,9 @@ class TestScoreSummaryQualityV4:
     def test_perfect_score(self):
         """测试完美摘要得分"""
         summary = {
-            "detailed_summary": "学习" * 400 + "方法" * 200 + "策略" * 120,  # 长内容 (1440字符) + 学习关键词
+            "detailed_summary": "学习" * 400
+            + "方法" * 200
+            + "策略" * 120,  # 长内容 (1440字符) + 学习关键词
             "key_points": ["要点1", "要点2", "要点3", "要点4", "要点5"],
             "one_line": "这是一个关于学习方法的优秀文档",
             "concepts": ["概念1", "概念2", "概念3", "概念4", "概念5"],
@@ -41,14 +42,14 @@ class TestScoreSummaryQualityV4:
     def test_detailed_summary_length_scoring(self):
         """测试详细摘要长度评分"""
         test_cases = [
-            (100, 0),   # < 200: 0分
-            (300, 5),   # >= 200: 5分
+            (100, 0),  # < 200: 0分
+            (300, 5),  # >= 200: 5分
             (500, 10),  # >= 400: 10分
             (700, 15),  # >= 600: 15分
             (900, 20),  # >= 800: 20分
-            (1100, 25), # >= 1000: 25分
-            (1300, 30), # >= 1200: 30分
-            (1600, 35), # >= 1500: 35分
+            (1100, 25),  # >= 1000: 25分
+            (1300, 30),  # >= 1200: 30分
+            (1600, 35),  # >= 1500: 35分
         ]
 
         for length, expected_points in test_cases:
@@ -58,19 +59,21 @@ class TestScoreSummaryQualityV4:
                 "concepts": [],
             }
             # 基础分数
-            base_score = score_summary_quality_v4({
-                "detailed_summary": "",
-                "key_points": [],
-                "concepts": [],
-            })
+            base_score = score_summary_quality_v4(
+                {
+                    "detailed_summary": "",
+                    "key_points": [],
+                    "concepts": [],
+                }
+            )
             result = score_summary_quality_v4(summary)
             assert result >= base_score + expected_points - 5  # 允许误差
 
     def test_key_points_scoring(self):
         """测试要点评分"""
         test_cases = [
-            ([], 0),        # 0个要点: 0分
-            (["1"], 10),    # 1个要点: 10分
+            ([], 0),  # 0个要点: 0分
+            (["1"], 10),  # 1个要点: 10分
             (["1", "2"], 20),  # 2个要点: 20分
             (["1", "2", "3"], 30),  # 3个要点: 30分
             (["1", "2", "3", "4"], 35),  # 4个要点: 35分
@@ -83,11 +86,13 @@ class TestScoreSummaryQualityV4:
                 "key_points": key_points,
                 "concepts": [],
             }
-            base_score = score_summary_quality_v4({
-                "detailed_summary": "",
-                "key_points": [],
-                "concepts": [],
-            })
+            base_score = score_summary_quality_v4(
+                {
+                    "detailed_summary": "",
+                    "key_points": [],
+                    "concepts": [],
+                }
+            )
             result = score_summary_quality_v4(summary)
             assert result >= base_score + expected_points - 5
 
@@ -139,7 +144,6 @@ class TestScoreSummaryQualityV4:
         """测试一句话摘要质量评分"""
         # 最佳长度 20-50 字符
 
-
     def test_concepts_scoring(self):
         """测试概念评分"""
         test_cases = [
@@ -157,11 +161,13 @@ class TestScoreSummaryQualityV4:
                 "key_points": [],
                 "concepts": concepts,
             }
-            base_score = score_summary_quality_v4({
-                "detailed_summary": "",
-                "key_points": [],
-                "concepts": [],
-            })
+            base_score = score_summary_quality_v4(
+                {
+                    "detailed_summary": "",
+                    "key_points": [],
+                    "concepts": [],
+                }
+            )
             result = score_summary_quality_v4(summary)
             assert result >= base_score + expected_points - 5
 

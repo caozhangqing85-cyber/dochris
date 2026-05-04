@@ -113,8 +113,7 @@ class TestQualityScorerIntegration:
                 "掌握 Python 的核心概念包括变量、函数、类和模块等。"
                 "通过实践项目，你可以深入理解面向对象编程和函数式编程的思想。"
                 "Python 的应用领域非常广泛，包括数据分析、机器学习、Web 开发等。"
-                "持续学习和实践是成为优秀 Python 开发者的关键。"
-                * 5  # 增加长度
+                "持续学习和实践是成为优秀 Python 开发者的关键。" * 5  # 增加长度
             ),
             "key_points": [
                 "Python 语法简洁，易于学习",
@@ -183,8 +182,7 @@ class TestQualityScorerIntegration:
         learning_content = {
             "detailed_summary": (
                 "学习是提升技能的关键方法。通过实践，你可以掌握新知识。"
-                "理解核心概念有助于应用技术。"
-                * 20
+                "理解核心概念有助于应用技术。" * 20
             ),
             "key_points": ["学习要点", "理解方法"],
             "concepts": ["学习", "实践"],

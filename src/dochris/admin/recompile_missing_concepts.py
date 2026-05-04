@@ -119,7 +119,13 @@ class CompileStats:
         self.api_success = 0
 
     def add_record(
-        self, src_id: str, file_type: str, status: str, duration: float, error: str | None = None, quality_score: int = 0
+        self,
+        src_id: str,
+        file_type: str,
+        status: str,
+        duration: float,
+        error: str | None = None,
+        quality_score: int = 0,
     ) -> None:
         self.file_records.append(
             {
@@ -139,7 +145,16 @@ class CompileStats:
         else:
             self.total_failed += 1
 
-    def add_batch(self, batch_num: int, total_batches: int, files: list, success: int, failed: int, skipped: int, duration: float) -> None:
+    def add_batch(
+        self,
+        batch_num: int,
+        total_batches: int,
+        files: list,
+        success: int,
+        failed: int,
+        skipped: int,
+        duration: float,
+    ) -> None:
         self.batch_stats.append(
             {
                 "batch_num": batch_num,

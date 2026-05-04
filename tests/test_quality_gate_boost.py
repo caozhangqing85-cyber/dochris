@@ -40,9 +40,7 @@ class TestCheckPollutionBranches:
         manifest = {
             "status": "promoted_to_wiki",
             "title": "test",
-            "compiled_summary": {
-                "concepts": []
-            },
+            "compiled_summary": {"concepts": []},
         }
         with patch("dochris.quality.quality_gate.get_all_manifests", return_value=[manifest]):
             result = check_pollution(tmp_path)
@@ -229,8 +227,10 @@ class TestAutoDowngradeBranches:
         (tmp_path / "wiki" / "summaries" / "Test Doc.md").write_text("x")
 
         manifest = {"status": "promoted", "title": "Test Doc", "promoted_to": "wiki"}
-        with patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.update_manifest_status"):
+        with (
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.update_manifest_status"),
+        ):
             result = auto_downgrade(tmp_path, "src_001")
             assert result["success"] is True
             assert result["from_status"] == "promoted"
@@ -245,8 +245,10 @@ class TestAutoDowngradeBranches:
         (tmp_path / "wiki" / "summaries" / "Test Doc.md").write_text("x")
 
         manifest = {"status": "promoted_to_wiki", "title": "Test Doc"}
-        with patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.update_manifest_status"):
+        with (
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.update_manifest_status"),
+        ):
             result = auto_downgrade(tmp_path, "src_001")
             assert result["success"] is True
             assert result["to_status"] == "compiled"
@@ -256,8 +258,10 @@ class TestAutoDowngradeBranches:
         from dochris.quality.quality_gate import auto_downgrade
 
         manifest = {"status": "compiled", "title": "Test Doc"}
-        with patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.update_manifest_status"):
+        with (
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.update_manifest_status"),
+        ):
             result = auto_downgrade(tmp_path, "src_001")
             assert result["success"] is True
             assert result["to_status"] == "ingested"
@@ -354,9 +358,11 @@ class TestMainCLI:
         (tmp_path / "wiki" / "summaries").mkdir(parents=True)
         (tmp_path / "wiki" / "concepts").mkdir(parents=True)
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "check-pollution"]), \
-             patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "check-pollution"]),
+            patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -367,9 +373,11 @@ class TestMainCLI:
         (tmp_path / "wiki" / "summaries").mkdir(parents=True)
         (tmp_path / "wiki" / "summaries" / "orphan.md").write_text("x")
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "check-pollution"]), \
-             patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "check-pollution"]),
+            patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -384,9 +392,11 @@ class TestMainCLI:
             "summary": "test",
             "title": "Test",
         }
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "quality-gate", "src_001"]), \
-             patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "quality-gate", "src_001"]),
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -400,9 +410,11 @@ class TestMainCLI:
             "error_message": None,
             "summary": "test",
         }
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "quality-gate", "src_001"]), \
-             patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "quality-gate", "src_001"]),
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -419,10 +431,12 @@ class TestMainCLI:
         from dochris.quality.quality_gate import main
 
         manifest = {"status": "compiled", "title": "Test"}
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "auto-downgrade", "src_001"]), \
-             patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.update_manifest_status"), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "auto-downgrade", "src_001"]),
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.update_manifest_status"),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -430,8 +444,10 @@ class TestMainCLI:
     def test_auto_downgrade_fail(self, tmp_path):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "auto-downgrade", "src_001"]), \
-             patch("dochris.quality.quality_gate.get_manifest", return_value=None):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "auto-downgrade", "src_001"]),
+            patch("dochris.quality.quality_gate.get_manifest", return_value=None),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
@@ -440,10 +456,22 @@ class TestMainCLI:
         from dochris.quality.quality_gate import main
 
         manifest = {"status": "compiled", "title": "Test"}
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "auto-downgrade", "src_001", "--reason", "manual review"]), \
-             patch("dochris.quality.quality_gate.get_manifest", return_value=manifest), \
-             patch("dochris.quality.quality_gate.update_manifest_status"), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "quality_gate.py",
+                    str(tmp_path),
+                    "auto-downgrade",
+                    "src_001",
+                    "--reason",
+                    "manual review",
+                ],
+            ),
+            patch("dochris.quality.quality_gate.get_manifest", return_value=manifest),
+            patch("dochris.quality.quality_gate.update_manifest_status"),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
@@ -462,15 +490,19 @@ class TestMainCLI:
         (tmp_path / "wiki" / "summaries").mkdir(parents=True)
         (tmp_path / "wiki" / "concepts").mkdir(parents=True)
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "scan-wiki"]), \
-             patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "scan-wiki"]),
+            patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             main()  # scan-wiki doesn't sys.exit
 
     def test_report(self, tmp_path):
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["quality_gate.py", str(tmp_path), "report"]), \
-             patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]), \
-             patch("dochris.quality.quality_gate.append_log"):
+        with (
+            patch("sys.argv", ["quality_gate.py", str(tmp_path), "report"]),
+            patch("dochris.quality.quality_gate.get_all_manifests", return_value=[]),
+            patch("dochris.quality.quality_gate.append_log"),
+        ):
             main()  # report doesn't sys.exit

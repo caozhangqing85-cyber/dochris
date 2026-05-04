@@ -29,11 +29,13 @@ class TestQualityGate(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_min_quality_score_constant(self):
         """测试最低质量分数常量"""
         from dochris.quality.quality_gate import MIN_QUALITY_SCORE
+
         self.assertEqual(MIN_QUALITY_SCORE, 85)
 
     def test_quality_gate_pass(self):
@@ -55,12 +57,9 @@ class TestQualityGate(unittest.TestCase):
 
         # 更新为 compiled 状态且高分
         from dochris.manifest import update_manifest_status
+
         update_manifest_status(
-            self.temp_path,
-            "SRC-0001",
-            "compiled",
-            quality_score=95,
-            summary={"one_line": "test"}
+            self.temp_path, "SRC-0001", "compiled", quality_score=95, summary={"one_line": "test"}
         )
 
         result = quality_gate(self.temp_path, "SRC-0001")
@@ -87,7 +86,7 @@ class TestQualityGate(unittest.TestCase):
             "SRC-0002",
             "compiled",
             quality_score=60,  # 低于 85
-            summary={"one_line": "test"}
+            summary={"one_line": "test"},
         )
 
         result = quality_gate(self.temp_path, "SRC-0002")
@@ -136,6 +135,7 @@ class TestPollutionDetection(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_pollution_detection_clean(self):
@@ -184,6 +184,7 @@ class TestAutoDowngrade(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_auto_downgrade_from_promoted(self):
@@ -204,11 +205,7 @@ class TestAutoDowngrade(unittest.TestCase):
 
         # 先提升到 promoted
         update_manifest_status(
-            self.temp_path,
-            "SRC-0001",
-            "promoted",
-            quality_score=90,
-            summary={"one_line": "test"}
+            self.temp_path, "SRC-0001", "promoted", quality_score=90, summary={"one_line": "test"}
         )
 
         # 降级
@@ -260,6 +257,7 @@ class TestScanWiki(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_scan_wiki_empty(self):
@@ -311,6 +309,7 @@ class TestGenerateReport(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_generate_report_structure(self):

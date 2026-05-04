@@ -1,8 +1,6 @@
 """补充测试 vector/base.py — 覆盖 collection_exists + __repr__"""
 
 
-
-
 class TestBaseVectorStoreConcrete:
     """测试 BaseVectorStore 基类的具体方法"""
 

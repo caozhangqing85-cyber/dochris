@@ -4,6 +4,7 @@
 class TestQualityScorerLastMile:
     def _score(self, summary):
         from dochris.core.quality_scorer import score_summary_quality_v4
+
         return score_summary_quality_v4(summary)
 
     def test_ds_is_none(self):
@@ -24,6 +25,7 @@ class TestQualityScorerLastMile:
 class TestTextChunkerLine175:
     def test_title_from_non_heading_line(self):
         from dochris.core.text_chunker import semantic_chunk
+
         text = "First paragraph about something important\n" * 20
         result = semantic_chunk(text, chunk_size=200, overlap=0)
         assert isinstance(result, list)
@@ -32,9 +34,11 @@ class TestTextChunkerLine175:
 class TestPromoteNoFiles:
     def test_promote_to_wiki_no_files(self, tmp_path):
         from dochris.promote import promote_to_wiki
+
         (tmp_path / "outputs").mkdir()
         (tmp_path / "manifests" / "sources").mkdir(parents=True)
         import json
+
         manifest = {
             "id": "SRC_TEST",
             "status": "compiled",

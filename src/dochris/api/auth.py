@@ -1,4 +1,5 @@
 """API 认证中间件"""
+
 from __future__ import annotations
 
 import os
@@ -16,8 +17,6 @@ async def verify_api_key(request: Request) -> None:
     if not api_key:
         return  # 开发模式，无需认证
 
-    client_key = request.headers.get("X-API-Key") or request.query_params.get(
-        "api_key", ""
-    )
+    client_key = request.headers.get("X-API-Key") or request.query_params.get("api_key", "")
     if client_key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")

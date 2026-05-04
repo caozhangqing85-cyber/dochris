@@ -32,49 +32,61 @@ class TestCliMainBranches:
     def test_main_init_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "init"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_init", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "init"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_init", return_value=0),
+        ):
             assert main() == 0
 
     def test_main_doctor_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "doctor"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_doctor", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "doctor"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_doctor", return_value=0),
+        ):
             assert main() == 0
 
     def test_main_status_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "status"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_status", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "status"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_status", return_value=0),
+        ):
             assert main() == 0
 
     def test_main_config_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "config"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_config", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "config"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_config", return_value=0),
+        ):
             assert main() == 0
 
     def test_main_version_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "version"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_version", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "version"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_version", return_value=0),
+        ):
             assert main() == 0
 
     def test_main_completion_bash(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "--completion", "bash"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.completion_script", return_value="# bash completion"):
+        with (
+            patch("sys.argv", ["kb", "--completion", "bash"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.completion_script", return_value="# bash completion"),
+        ):
             assert main() == 0
 
     def test_main_validation_value_error(self):
@@ -86,105 +98,129 @@ class TestCliMainBranches:
         settings.log_level = "INFO"
         settings.max_concurrency = 1
 
-        with patch("sys.argv", ["kb", "status"]), \
-             patch("dochris.cli.main.get_settings", return_value=settings):
+        with (
+            patch("sys.argv", ["kb", "status"]),
+            patch("dochris.cli.main.get_settings", return_value=settings),
+        ):
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_api_key_error(self):
         from dochris.cli.main import EXIT_CONFIG_ERROR, main
         from dochris.exceptions import APIKeyError
 
-        with patch("sys.argv", ["kb", "ingest"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_ingest", side_effect=APIKeyError("no key")):
+        with (
+            patch("sys.argv", ["kb", "ingest"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_ingest", side_effect=APIKeyError("no key")),
+        ):
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_configuration_error(self):
         from dochris.cli.main import EXIT_CONFIG_ERROR, main
         from dochris.exceptions import ConfigurationError
 
-        with patch("sys.argv", ["kb", "ingest"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_ingest", side_effect=ConfigurationError("bad")):
+        with (
+            patch("sys.argv", ["kb", "ingest"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_ingest", side_effect=ConfigurationError("bad")),
+        ):
             assert main() == EXIT_CONFIG_ERROR
 
     def test_main_llm_connection_error(self):
         from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMConnectionError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=LLMConnectionError("timeout")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=LLMConnectionError("timeout")),
+        ):
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_timeout_error(self):
         from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMTimeoutError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=LLMTimeoutError("slow")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=LLMTimeoutError("slow")),
+        ):
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_rate_limit_error(self):
         from dochris.cli.main import EXIT_NETWORK_ERROR, main
         from dochris.exceptions import LLMRateLimitError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=LLMRateLimitError("429")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=LLMRateLimitError("429")),
+        ):
             assert main() == EXIT_NETWORK_ERROR
 
     def test_main_llm_content_filter_error(self):
         from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import LLMContentFilterError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=LLMContentFilterError("filtered")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=LLMContentFilterError("filtered")),
+        ):
             assert main() == EXIT_FAILURE
 
     def test_main_llm_generic_error(self):
         from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import LLMError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=LLMError("generic")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=LLMError("generic")),
+        ):
             assert main() == EXIT_FAILURE
 
     def test_main_file_processing_error(self):
         from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import FileProcessingError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=FileProcessingError("file")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=FileProcessingError("file")),
+        ):
             assert main() == EXIT_FAILURE
 
     def test_main_kb_error(self):
         from dochris.cli.main import EXIT_FAILURE, main
         from dochris.exceptions import KnowledgeBaseError
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=KnowledgeBaseError("kb")):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=KnowledgeBaseError("kb")),
+        ):
             assert main() == EXIT_FAILURE
 
     def test_main_keyboard_interrupt(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "compile"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_compile", side_effect=KeyboardInterrupt()):
+        with (
+            patch("sys.argv", ["kb", "compile"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_compile", side_effect=KeyboardInterrupt()),
+        ):
             assert main() == 130
 
     def test_main_plugin_command(self):
         from dochris.cli.main import main
 
-        with patch("sys.argv", ["kb", "plugin", "list"]), \
-             patch("dochris.cli.main.get_settings", return_value=self._make_settings()), \
-             patch("dochris.cli.main.cmd_plugin", return_value=0):
+        with (
+            patch("sys.argv", ["kb", "plugin", "list"]),
+            patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
+            patch("dochris.cli.main.cmd_plugin", return_value=0),
+        ):
             assert main() == 0
 
 
@@ -226,7 +262,12 @@ class TestHierarchicalSummarizerBuildMethods:
         hs = HierarchicalSummarizer(mock_llm)
 
         summaries = [
-            {"one_line": "摘要1", "key_points": ["要点1"], "detailed_summary": "详情1", "concepts": [{"name": "概念1"}]},
+            {
+                "one_line": "摘要1",
+                "key_points": ["要点1"],
+                "detailed_summary": "详情1",
+                "concepts": [{"name": "概念1"}],
+            },
         ]
         prompt = hs._build_merge_prompt(summaries, "Test Doc")
         assert "Test Doc" in prompt
@@ -240,8 +281,12 @@ class TestHierarchicalSummarizerBuildMethods:
         hs = HierarchicalSummarizer(mock_llm)
 
         summaries = [
-            {"one_line": "摘要1", "key_points": ["要点1"], "detailed_summary": "详情1",
-             "concepts": [{"name": "概念1", "explanation": "解释1"}]},
+            {
+                "one_line": "摘要1",
+                "key_points": ["要点1"],
+                "detailed_summary": "详情1",
+                "concepts": [{"name": "概念1", "explanation": "解释1"}],
+            },
         ]
         prompt = hs._build_merge_prompt(summaries, "Qwen Doc")
         assert "Qwen Doc" in prompt
@@ -368,9 +413,11 @@ class TestHierarchicalSummarizerAsyncFallbacks:
         merged = {"one_line": "merged"}
 
         # semantic_chunk 是延迟导入（在函数体内 from...import），patch 源模块
-        with patch("dochris.core.text_chunker.semantic_chunk", return_value=chunks), \
-             patch.object(hs, "_summarize_chunks_parallel", return_value=[{"one_line": "s1"}]), \
-             patch.object(hs, "_merge_summaries", return_value=merged):
+        with (
+            patch("dochris.core.text_chunker.semantic_chunk", return_value=chunks),
+            patch.object(hs, "_summarize_chunks_parallel", return_value=[{"one_line": "s1"}]),
+            patch.object(hs, "_merge_summaries", return_value=merged),
+        ):
             result = await hs.generate_map_reduce_summary("text" * 100, "Test", max_retries=1)
             assert result == merged
 
@@ -384,8 +431,10 @@ class TestHierarchicalSummarizerAsyncFallbacks:
 
         chunks = [MagicMock(content="c1", title="t1")]
 
-        with patch("dochris.core.text_chunker.semantic_chunk", return_value=chunks), \
-             patch.object(hs, "_summarize_chunks_parallel", return_value=[]):
+        with (
+            patch("dochris.core.text_chunker.semantic_chunk", return_value=chunks),
+            patch.object(hs, "_summarize_chunks_parallel", return_value=[]),
+        ):
             result = await hs.generate_map_reduce_summary("text" * 100, "Test", max_retries=1)
             assert result is None
 
@@ -433,8 +482,10 @@ class TestPdfParserFallbacks:
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(return_value=mock_reader)
 
-        with patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}), \
-             patch("builtins.open", MagicMock()):
+        with (
+            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch("builtins.open", MagicMock()),
+        ):
             result = parse_with_pypdf2(Path("/fake/test.pdf"))
             assert result is None  # < 100 chars
 
@@ -448,8 +499,10 @@ class TestPdfParserFallbacks:
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(return_value=mock_reader)
 
-        with patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}), \
-             patch("builtins.open", MagicMock()):
+        with (
+            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch("builtins.open", MagicMock()),
+        ):
             result = parse_with_pypdf2(Path("/fake/test.pdf"))
             assert result is not None
             assert len(result) >= 100
@@ -460,8 +513,10 @@ class TestPdfParserFallbacks:
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(side_effect=RuntimeError("pdf broken"))
 
-        with patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}), \
-             patch("builtins.open", MagicMock()):
+        with (
+            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch("builtins.open", MagicMock()),
+        ):
             result = parse_with_pypdf2(Path("/fake/test.pdf"))
             assert result is None
 
@@ -471,8 +526,10 @@ class TestPdfParserFallbacks:
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(side_effect=TypeError("unexpected"))
 
-        with patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}), \
-             patch("builtins.open", MagicMock()):
+        with (
+            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch("builtins.open", MagicMock()),
+        ):
             result = parse_with_pypdf2(Path("/fake/test.pdf"))
             assert result is None
 
@@ -497,11 +554,13 @@ class TestPdfParserFallbacks:
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
 
-        with patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             with pytest.raises(FileProcessingError):
                 parse_pdf(pdf_file)
 

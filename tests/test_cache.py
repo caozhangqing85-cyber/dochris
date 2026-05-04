@@ -20,7 +20,7 @@ class TestFileHash:
     def test_file_hash_existing_file(self, temp_workspace):
         """测试计算现有文件的哈希"""
         test_file = temp_workspace / "test.txt"
-        test_file.write_text("Hello, World!", encoding='utf-8')
+        test_file.write_text("Hello, World!", encoding="utf-8")
 
         result = file_hash(test_file)
         assert result is not None
@@ -40,8 +40,8 @@ class TestFileHash:
         file2 = temp_workspace / "file2.txt"
         content = "Same content"
 
-        file1.write_text(content, encoding='utf-8')
-        file2.write_text(content, encoding='utf-8')
+        file1.write_text(content, encoding="utf-8")
+        file2.write_text(content, encoding="utf-8")
 
         hash1 = file_hash(file1)
         hash2 = file_hash(file2)
@@ -54,8 +54,8 @@ class TestFileHash:
         file1 = temp_workspace / "file1.txt"
         file2 = temp_workspace / "file2.txt"
 
-        file1.write_text("Content 1", encoding='utf-8')
-        file2.write_text("Content 2", encoding='utf-8')
+        file1.write_text("Content 1", encoding="utf-8")
+        file2.write_text("Content 2", encoding="utf-8")
 
         hash1 = file_hash(file1)
         hash2 = file_hash(file2)
@@ -104,11 +104,7 @@ class TestLoadCached:
         # 创建缓存文件
         cache_file = cache_path / f"{test_hash}.json"
         cache_file.write_text(
-            json.dumps({
-                "hash": test_hash,
-                "result": test_result
-            }),
-            encoding='utf-8'
+            json.dumps({"hash": test_hash, "result": test_result}), encoding="utf-8"
         )
 
         result = load_cached(cache_path, test_hash)
@@ -123,11 +119,7 @@ class TestLoadCached:
         # 创建哈希不匹配的缓存文件
         cache_file = cache_path / f"{stored_hash}.json"
         cache_file.write_text(
-            json.dumps({
-                "hash": stored_hash,
-                "result": {"data": "test"}
-            }),
-            encoding='utf-8'
+            json.dumps({"hash": stored_hash, "result": {"data": "test"}}), encoding="utf-8"
         )
 
         # 查询时使用不同的哈希
@@ -138,7 +130,7 @@ class TestLoadCached:
         """测试无效 JSON 返回 None"""
         cache_path = cache_dir(temp_workspace)
         cache_file = cache_path / "invalid.json"
-        cache_file.write_text("not valid json", encoding='utf-8')
+        cache_file.write_text("not valid json", encoding="utf-8")
 
         result = load_cached(cache_path, "invalid")
         assert result is None
@@ -168,11 +160,7 @@ class TestSaveCached:
         """测试保存后加载可恢复数据"""
         cache_path = cache_dir(temp_workspace)
         test_hash = "roundtrip_hash"
-        test_result = {
-            "one_line": "测试摘要",
-            "key_points": ["要点1", "要点2"],
-            "score": 95
-        }
+        test_result = {"one_line": "测试摘要", "key_points": ["要点1", "要点2"], "score": 95}
 
         save_cached(cache_path, test_hash, test_result)
         loaded = load_cached(cache_path, test_hash)
@@ -188,7 +176,7 @@ class TestSaveCached:
         save_cached(cache_path, test_hash, test_result)
 
         cache_file = cache_path / f"{test_hash}.json"
-        content = json.loads(cache_file.read_text(encoding='utf-8'))
+        content = json.loads(cache_file.read_text(encoding="utf-8"))
 
         assert "timestamp" in content
         assert content["hash"] == test_hash
@@ -221,11 +209,12 @@ class TestClearCache:
 
         # 创建旧文件
         old_file = cache_path / "old_cache.json"
-        old_file.write_text('{"hash": "old", "result": {}}', encoding='utf-8')
+        old_file.write_text('{"hash": "old", "result": {}}', encoding="utf-8")
 
         # 修改文件时间为 31 天前
         old_time = datetime.now() - timedelta(days=31)
         import os
+
         os.utime(old_file, (old_time.timestamp(), old_time.timestamp()))
 
         count = clear_cache(cache_path, older_than_days=30)
@@ -238,7 +227,7 @@ class TestClearCache:
 
         # 创建新文件
         new_file = cache_path / "new_cache.json"
-        new_file.write_text('{"hash": "new", "result": {}}', encoding='utf-8')
+        new_file.write_text('{"hash": "new", "result": {}}', encoding="utf-8")
 
         count = clear_cache(cache_path, older_than_days=30)
         assert count == 0
@@ -251,17 +240,17 @@ class TestClearCache:
 
         # 创建旧文件
         old_file = cache_path / "old.json"
-        old_file.write_text('{"hash": "old"}', encoding='utf-8')
+        old_file.write_text('{"hash": "old"}', encoding="utf-8")
         old_time = datetime.now() - timedelta(days=35)
         os.utime(old_file, (old_time.timestamp(), old_time.timestamp()))
 
         # 创建新文件
         new_file = cache_path / "new.json"
-        new_file.write_text('{"hash": "new"}', encoding='utf-8')
+        new_file.write_text('{"hash": "new"}', encoding="utf-8")
 
         # 创建中等文件
         mid_file = cache_path / "mid.json"
-        mid_file.write_text('{"hash": "mid"}', encoding='utf-8')
+        mid_file.write_text('{"hash": "mid"}', encoding="utf-8")
         mid_time = datetime.now() - timedelta(days=25)
         os.utime(mid_file, (mid_time.timestamp(), mid_time.timestamp()))
 
@@ -279,7 +268,7 @@ class TestClearCache:
         # 创建多个文件
         for i in range(3):
             cache_file = cache_path / f"cache_{i}.json"
-            cache_file.write_text(f'{{"hash": "{i}"}}', encoding='utf-8')
+            cache_file.write_text(f'{{"hash": "{i}"}}', encoding="utf-8")
 
         count = clear_cache(cache_path, older_than_days=0)
 

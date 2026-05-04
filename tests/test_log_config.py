@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """测试日志配置模块"""
+
 from __future__ import annotations
 
 import json
@@ -157,4 +158,7 @@ class TestSetupLogging:
         setup_logging(level="INFO")
 
         # 应该被清除并重新添加
-        assert len(root_logger.handlers) != initial_count or initial_handler not in root_logger.handlers
+        assert (
+            len(root_logger.handlers) != initial_count
+            or initial_handler not in root_logger.handlers
+        )

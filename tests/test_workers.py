@@ -31,10 +31,11 @@ class TestCompilerWorker(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.workers.compiler_worker.get_default_workspace')
-    @patch('dochris.workers.compiler_worker.LLMClient')
+    @patch("dochris.workers.compiler_worker.get_default_workspace")
+    @patch("dochris.workers.compiler_worker.LLMClient")
     def test_worker_initialization(self, mock_llm, mock_workspace):
         """测试 Worker 初始化"""
         mock_workspace.return_value = self.temp_path
@@ -42,18 +43,16 @@ class TestCompilerWorker(unittest.TestCase):
         from dochris.workers.compiler_worker import CompilerWorker
 
         worker = CompilerWorker(
-            api_key="test_key",
-            base_url="https://api.test.com",
-            model="test_model"
+            api_key="test_key", base_url="https://api.test.com", model="test_model"
         )
 
         self.assertIsNotNone(worker)
         self.assertIsNotNone(worker.llm)
         self.assertEqual(worker.workspace, self.temp_path)
 
-    @patch('dochris.workers.compiler_worker.get_manifest')
-    @patch('dochris.workers.compiler_worker.file_hash')
-    @patch('dochris.workers.compiler_worker.load_cached')
+    @patch("dochris.workers.compiler_worker.get_manifest")
+    @patch("dochris.workers.compiler_worker.file_hash")
+    @patch("dochris.workers.compiler_worker.load_cached")
     def test_cache_hit_handling(self, mock_load_cached, mock_hash, mock_get_manifest):
         """测试缓存命中处理"""
         from dochris.workers.compiler_worker import CompilerWorker
@@ -61,13 +60,10 @@ class TestCompilerWorker(unittest.TestCase):
         mock_get_manifest.return_value = {
             "id": "SRC-0001",
             "title": "Test",
-            "file_path": "raw/pdfs/test.pdf"
+            "file_path": "raw/pdfs/test.pdf",
         }
         mock_hash.return_value = "abc123"
-        mock_load_cached.return_value = {
-            "one_line": "cached summary",
-            "key_points": ["point1"]
-        }
+        mock_load_cached.return_value = {"one_line": "cached summary", "key_points": ["point1"]}
 
         worker = CompilerWorker(
             api_key="test_key",
@@ -78,7 +74,7 @@ class TestCompilerWorker(unittest.TestCase):
         # 验证缓存检查逻辑
         self.assertTrue(callable(mock_load_cached))
 
-    @patch('dochris.workers.compiler_worker.get_manifest')
+    @patch("dochris.workers.compiler_worker.get_manifest")
     def test_manifest_not_found(self, mock_get_manifest):
         """测试 manifest 不存在"""
         from dochris.workers.compiler_worker import CompilerWorker
@@ -106,6 +102,7 @@ class TestCompilerWorkerPDF(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_detect_pdf_file(self):
@@ -137,11 +134,12 @@ class TestCompilerWorkerAudio(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_detect_audio_file(self):
         """测试音频文件检测"""
-        audio_extensions = ['.mp3', '.wav', '.m4a', '.flac']
+        audio_extensions = [".mp3", ".wav", ".m4a", ".flac"]
 
         for ext in audio_extensions:
             test_file = self.temp_path / f"test{ext}"
@@ -172,11 +170,12 @@ class TestCompilerWorkerCode(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_detect_code_file(self):
         """测试代码文件检测"""
-        code_extensions = ['.py', '.js', '.ts', '.java', '.cpp', '.go']
+        code_extensions = [".py", ".js", ".ts", ".java", ".cpp", ".go"]
 
         for ext in code_extensions:
             test_file = self.temp_path / f"test{ext}"
@@ -218,6 +217,7 @@ class TestCompilerWorkerResult(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_save_summary_file(self):
@@ -225,7 +225,7 @@ class TestCompilerWorkerResult(unittest.TestCase):
         summary_file = self.temp_path / "outputs" / "summaries" / "SRC-0001.md"
         content = "# Test Summary\n\n## Key Points\n- Point 1"
 
-        summary_file.write_text(content, encoding='utf-8')
+        summary_file.write_text(content, encoding="utf-8")
 
         self.assertTrue(summary_file.exists())
         self.assertIn("Test Summary", summary_file.read_text())
@@ -238,8 +238,8 @@ class TestCompilerWorkerResult(unittest.TestCase):
         concept1 = concepts_dir / "01_概念1.md"
         concept2 = concepts_dir / "02_概念2.md"
 
-        concept1.write_text("# 概念1\n\n描述1", encoding='utf-8')
-        concept2.write_text("# 概念2\n\n描述2", encoding='utf-8')
+        concept1.write_text("# 概念1\n\n描述1", encoding="utf-8")
+        concept2.write_text("# 概念2\n\n描述2", encoding="utf-8")
 
         self.assertTrue(concept1.exists())
         self.assertTrue(concept2.exists())

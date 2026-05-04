@@ -124,7 +124,9 @@ def _get_system_status() -> str:
     chroma_path = data_dir / "chroma.sqlite3"
     if chroma_path.exists():
         size_mb = chroma_path.stat().st_size / (1024 * 1024)
-        lines.extend(["", "## 向量数据库", f"- **路径:** `{data_dir}`", f"- **大小:** {size_mb:.1f} MB"])
+        lines.extend(
+            ["", "## 向量数据库", f"- **路径:** `{data_dir}`", f"- **大小:** {size_mb:.1f} MB"]
+        )
     else:
         lines.extend(["", "## 向量数据库", "- **状态:** 未初始化"])
 
@@ -297,7 +299,9 @@ def _get_graph_html() -> str:
         keep_ids = {n["id"] for n in d3_data["nodes"][:max_nodes]}
         d3_data["nodes"] = d3_data["nodes"][:max_nodes]
         d3_data["links"] = [
-            link for link in d3_data["links"] if link["source"] in keep_ids and link["target"] in keep_ids
+            link
+            for link in d3_data["links"]
+            if link["source"] in keep_ids and link["target"] in keep_ids
         ]
 
     data_json = json.dumps(d3_data, ensure_ascii=False)
@@ -467,10 +471,7 @@ def create_web_app() -> gr.Blocks:
         gr.Blocks 实例
     """
     with gr.Blocks(title="dochris - 个人知识库") as app:
-        gr.Markdown(
-            f"# dochris 个人知识库 v{__version__}\n"
-            "四阶段流水线: 摄入 → 编译 → 审核 → 分发"
-        )
+        gr.Markdown(f"# dochris 个人知识库 v{__version__}\n四阶段流水线: 摄入 → 编译 → 审核 → 分发")
 
         with gr.Tabs():
             # ── Tab 1: 知识库查询 ──

@@ -50,9 +50,7 @@ def _copy_file(src: Path, dst_dir: Path) -> Path:
     counter = 1
     while dst.exists():
         if counter > MAX_COPY_RETRIES:
-            raise ValueError(
-                f"文件复制重名冲突超过上限 ({MAX_COPY_RETRIES}): {src.name}"
-            )
+            raise ValueError(f"文件复制重名冲突超过上限 ({MAX_COPY_RETRIES}): {src.name}")
         stem = src.stem
         suffix = src.suffix
         dst = dst_dir / f"{stem}_{counter}{suffix}"

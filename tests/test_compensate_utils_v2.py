@@ -45,37 +45,46 @@ class TestConstants:
 
     def test_ebook_convert_cmd(self):
         from dochris.compensate.compensate_utils import EBOOK_CONVERT_CMD
+
         assert EBOOK_CONVERT_CMD == "ebook-convert"
 
     def test_tesseract_cmd(self):
         from dochris.compensate.compensate_utils import TESSERACT_CMD
+
         assert TESSERACT_CMD == "tesseract"
 
     def test_pdftoppm_cmd(self):
         from dochris.compensate.compensate_utils import PDFTOPPM_CMD
+
         assert PDFTOPPM_CMD == "pdftoppm"
 
     def test_max_concurrency(self):
         from dochris.compensate.compensate_utils import MAX_CONCURRENCY
+
         assert MAX_CONCURRENCY == 4
 
     def test_batch_size(self):
         from dochris.compensate.compensate_utils import BATCH_SIZE
+
         assert BATCH_SIZE == 30
 
     def test_batch_delay(self):
         from dochris.compensate.compensate_utils import BATCH_DELAY
+
         assert BATCH_DELAY == 3
 
     def test_ocr_max_pages(self):
         from dochris.compensate.compensate_utils import OCR_MAX_PAGES
+
         assert OCR_MAX_PAGES == 5
 
     def test_ocr_timeout(self):
         from dochris.compensate.compensate_utils import OCR_TIMEOUT
+
         assert OCR_TIMEOUT == 60
 
     def test_model_chain(self):
         from dochris.compensate.compensate_utils import MODEL_CHAIN
+
         assert isinstance(MODEL_CHAIN, list)
         assert len(MODEL_CHAIN) >= 2

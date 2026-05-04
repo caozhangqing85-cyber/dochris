@@ -27,8 +27,7 @@ class TestHookspecDecorator:
         from dochris.plugin.hookspec import hookspec
 
         @hookspec
-        def my_test_hook(x: str) -> str | None:
-            ...
+        def my_test_hook(x: str) -> str | None: ...
 
         assert my_test_hook._is_hookspec is True
 
@@ -36,8 +35,7 @@ class TestHookspecDecorator:
         from dochris.plugin.hookspec import _HOOK_SPECS, hookspec
 
         @hookspec
-        def unique_hook_name_for_test():
-            ...
+        def unique_hook_name_for_test(): ...
 
         assert "unique_hook_name_for_test" in _HOOK_SPECS
 
@@ -225,13 +223,13 @@ class TestPluginManager:
         plugin_dir.mkdir()
 
         # Write a valid plugin file
-        plugin_code = '''
+        plugin_code = """
 from dochris.plugin.hookspec import hookimpl
 
 @hookimpl
 def pre_query(query: str) -> str:
     return query.upper()
-'''
+"""
         (plugin_dir / "upper_query.py").write_text(plugin_code, encoding="utf-8")
 
         result = pm.load_from_directory(plugin_dir)
@@ -427,7 +425,11 @@ class TestAutoDowngrade:
         wiki_summ.mkdir(parents=True)
         (wiki_summ / "Test_Doc.md").write_text("content", encoding="utf-8")
 
-        mock_get.return_value = {"status": "promoted_to_wiki", "title": "Test_Doc", "promoted_to": "wiki"}
+        mock_get.return_value = {
+            "status": "promoted_to_wiki",
+            "title": "Test_Doc",
+            "promoted_to": "wiki",
+        }
         result = auto_downgrade(tmp_path, "SRC-0001")
         assert result["success"] is True
         assert not (wiki_summ / "Test_Doc.md").exists()
@@ -592,12 +594,13 @@ class TestBatchPromote:
     @patch("dochris.admin.batch_promote.get_all_manifests")
     @patch("dochris.admin.batch_promote.promote_to_wiki")
     @patch("dochris.admin.batch_promote.append_log")
-    def test_batch_promote_to_wiki_with_limit(self, mock_log, mock_promote, mock_manifests, tmp_path):
+    def test_batch_promote_to_wiki_with_limit(
+        self, mock_log, mock_promote, mock_manifests, tmp_path
+    ):
         from dochris.admin.batch_promote import batch_promote_to_wiki
 
         mock_manifests.return_value = [
-            {"id": f"SRC-{i:04d}", "quality_score": 90, "title": f"Doc {i}"}
-            for i in range(10)
+            {"id": f"SRC-{i:04d}", "quality_score": 90, "title": f"Doc {i}"} for i in range(10)
         ]
         mock_promote.return_value = True
         result = batch_promote_to_wiki(tmp_path, limit=3)

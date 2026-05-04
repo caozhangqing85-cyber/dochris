@@ -60,12 +60,14 @@ class TestGenerateMapReduceSummary:
         """测试 Map-Reduce 摘要成功"""
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "摘要",
-            "key_points": ["要点"],
-            "detailed_summary": "详细摘要",
-            "concepts": []
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {
+                "one_line": "摘要",
+                "key_points": ["要点"],
+                "detailed_summary": "详细摘要",
+                "concepts": [],
+            }
+        )
 
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=mock_response)
 
@@ -75,10 +77,12 @@ class TestGenerateMapReduceSummary:
             with patch.object(
                 hierarchical_summarizer,
                 "_summarize_chunks_parallel",
-                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}])
+                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}]),
             ):
                 with patch.object(
-                    hierarchical_summarizer, "_merge_summaries", new=AsyncMock(return_value={"result": "merged"})
+                    hierarchical_summarizer,
+                    "_merge_summaries",
+                    new=AsyncMock(return_value={"result": "merged"}),
                 ):
                     result = await hierarchical_summarizer.generate_map_reduce_summary(
                         "测试文本" * 100, "测试标题"
@@ -95,7 +99,7 @@ class TestGenerateMapReduceSummary:
             with patch.object(
                 hierarchical_summarizer,
                 "_summarize_chunks_parallel",
-                new=AsyncMock(return_value=[])
+                new=AsyncMock(return_value=[]),
             ):
                 result = await hierarchical_summarizer.generate_map_reduce_summary(
                     "测试文本" * 100, "测试标题"
@@ -119,13 +123,17 @@ class TestGenerateHierarchicalSummary:
             with patch.object(
                 hierarchical_summarizer,
                 "_summarize_chunks_parallel",
-                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}])
+                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}]),
             ):
                 with patch.object(
-                    hierarchical_summarizer, "_group_chunks_by_section", return_value={"section": []}
+                    hierarchical_summarizer,
+                    "_group_chunks_by_section",
+                    return_value={"section": []},
                 ):
                     with patch.object(
-                        hierarchical_summarizer, "_merge_summaries", new=AsyncMock(return_value={"result": "ok"})
+                        hierarchical_summarizer,
+                        "_merge_summaries",
+                        new=AsyncMock(return_value={"result": "ok"}),
                     ):
                         await hierarchical_summarizer.generate_hierarchical_summary(
                             oversized_text, "测试标题"
@@ -149,15 +157,21 @@ class TestGenerateHierarchicalSummary:
             with patch.object(
                 hierarchical_summarizer,
                 "_summarize_chunks_parallel",
-                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}] * 50)
+                new=AsyncMock(return_value=[{"detailed_summary": "摘要1"}] * 50),
             ):
                 with patch.object(
-                    hierarchical_summarizer, "_group_chunks_by_section", return_value={"section": []}
+                    hierarchical_summarizer,
+                    "_group_chunks_by_section",
+                    return_value={"section": []},
                 ):
                     with patch.object(
-                        hierarchical_summarizer, "_merge_summaries", new=AsyncMock(return_value={"result": "ok"})
+                        hierarchical_summarizer,
+                        "_merge_summaries",
+                        new=AsyncMock(return_value={"result": "ok"}),
                     ):
-                        await hierarchical_summarizer.generate_hierarchical_summary("测试文本", "测试标题")
+                        await hierarchical_summarizer.generate_hierarchical_summary(
+                            "测试文本", "测试标题"
+                        )
 
                         # split 本身返回所有块，但后续处理会限制到 MAX_CHUNKS
 
@@ -175,12 +189,9 @@ class TestSummarizeChunksParallel:
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "摘要",
-            "key_points": ["要点"],
-            "detailed_summary": "详细",
-            "concepts": []
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {"one_line": "摘要", "key_points": ["要点"], "detailed_summary": "详细", "concepts": []}
+        )
 
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=mock_response)
 
@@ -206,12 +217,14 @@ class TestSummarizeChunksParallel:
                 raise Exception("API error")
             mock_response = MagicMock()
             mock_response.choices = [MagicMock()]
-            mock_response.choices[0].message.content = json.dumps({
-                "one_line": "摘要",
-                "key_points": ["要点"],
-                "detailed_summary": "详细",
-                "concepts": []
-            })
+            mock_response.choices[0].message.content = json.dumps(
+                {
+                    "one_line": "摘要",
+                    "key_points": ["要点"],
+                    "detailed_summary": "详细",
+                    "concepts": [],
+                }
+            )
             return mock_response
 
         mock_llm_client.client.chat.completions.create = AsyncMock(side_effect=side_effect)
@@ -239,18 +252,30 @@ class TestMergeSummaries:
     async def test_merge_summaries_multiple(self, hierarchical_summarizer, mock_llm_client):
         """测试合并多个摘要"""
         summaries = [
-            {"one_line": "摘要1", "detailed_summary": "内容1", "key_points": ["p1"], "concepts": []},
-            {"one_line": "摘要2", "detailed_summary": "内容2", "key_points": ["p2"], "concepts": []},
+            {
+                "one_line": "摘要1",
+                "detailed_summary": "内容1",
+                "key_points": ["p1"],
+                "concepts": [],
+            },
+            {
+                "one_line": "摘要2",
+                "detailed_summary": "内容2",
+                "key_points": ["p2"],
+                "concepts": [],
+            },
         ]
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "合并摘要",
-            "key_points": ["p1", "p2"],
-            "detailed_summary": "合并内容",
-            "concepts": []
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {
+                "one_line": "合并摘要",
+                "key_points": ["p1", "p2"],
+                "detailed_summary": "合并内容",
+                "concepts": [],
+            }
+        )
 
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=mock_response)
 
@@ -284,7 +309,12 @@ class TestBuildMessages:
     def test_build_merge_prompt(self, hierarchical_summarizer):
         """测试合并 prompt 构建"""
         summaries = [
-            {"one_line": "摘要1", "key_points": ["p1"], "detailed_summary": "内容1", "concepts": []},
+            {
+                "one_line": "摘要1",
+                "key_points": ["p1"],
+                "detailed_summary": "内容1",
+                "concepts": [],
+            },
         ]
 
         prompt = hierarchical_summarizer._build_merge_prompt(summaries, "测试标题")
@@ -298,7 +328,12 @@ class TestBuildMessages:
         summarizer = HierarchicalSummarizer(mock_llm_client)
 
         summaries = [
-            {"one_line": "摘要1", "key_points": ["p1"], "detailed_summary": "内容1", "concepts": []},
+            {
+                "one_line": "摘要1",
+                "key_points": ["p1"],
+                "detailed_summary": "内容1",
+                "concepts": [],
+            },
         ]
 
         prompt = summarizer._build_merge_prompt_qwen3(summaries, "测试标题")

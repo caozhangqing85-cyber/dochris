@@ -48,13 +48,14 @@ class TestBuildManifestIndex(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_build_manifest_index_empty(self):
         """测试空目录构建索引"""
         from dochris.phases.query_utils import _build_manifest_index
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             index = _build_manifest_index()
 
         self.assertEqual(index, {})
@@ -72,7 +73,7 @@ class TestBuildManifestIndex(unittest.TestCase):
         manifest_file = self.manifests_dir / "SRC-0001.json"
         manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             index = _build_manifest_index()
 
         self.assertIn("raw/articles/test.pdf", index)
@@ -92,6 +93,7 @@ class TestGetManifestId(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_get_manifest_id_direct_match(self):
@@ -106,9 +108,10 @@ class TestGetManifestId(unittest.TestCase):
         manifest_file = self.manifests_dir / "SRC-0001.json"
         manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             # 清除缓存
             import dochris.phases.query_utils as qu
+
             qu._manifest_index_cache = None
 
             result = _get_manifest_id("raw/articles/test.pdf")
@@ -119,9 +122,10 @@ class TestGetManifestId(unittest.TestCase):
         """测试未找到 manifest"""
         from dochris.phases.query_utils import _get_manifest_id
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             # 清除缓存
             import dochris.phases.query_utils as qu
+
             qu._manifest_index_cache = None
 
             result = _get_manifest_id("nonexistent/file.pdf")
@@ -142,6 +146,7 @@ class TestGetManifestStatus(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_get_manifest_status_found(self):
@@ -155,7 +160,7 @@ class TestGetManifestStatus(unittest.TestCase):
         manifest_file = self.manifests_dir / "SRC-0001.json"
         manifest_file.write_text(json.dumps(manifest_data), encoding="utf-8")
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             result = _get_manifest_status("SRC-0001")
 
         self.assertEqual(result, "compiled")
@@ -164,7 +169,7 @@ class TestGetManifestStatus(unittest.TestCase):
         """测试未找到 manifest"""
         from dochris.phases.query_utils import _get_manifest_status
 
-        with patch('dochris.phases.query_utils.MANIFESTS_PATH', self.manifests_dir):
+        with patch("dochris.phases.query_utils.MANIFESTS_PATH", self.manifests_dir):
             result = _get_manifest_status("SRC-9999")
 
         self.assertIsNone(result)
@@ -191,6 +196,7 @@ class TestKeywordSearch(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_keyword_search_no_directory(self):
@@ -214,7 +220,9 @@ class TestKeywordSearch(unittest.TestCase):
 
         # 创建测试文件
         test_file = self.search_dir / "python_basics.md"
-        test_file.write_text("# Python Basics\n\nThis is about Python programming.", encoding="utf-8")
+        test_file.write_text(
+            "# Python Basics\n\nThis is about Python programming.", encoding="utf-8"
+        )
 
         result = _keyword_search(
             "python",

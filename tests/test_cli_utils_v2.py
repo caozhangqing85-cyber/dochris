@@ -21,12 +21,16 @@ class TestShowStatusSourcePath:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_src = MagicMock()
                                         mock_src.exists.return_value = True
                                         mock_src.is_dir.return_value = True
-                                        mock_src.rglob.return_value = [MagicMock(is_file=lambda: True) for _ in range(3)]
+                                        mock_src.rglob.return_value = [
+                                            MagicMock(is_file=lambda: True) for _ in range(3)
+                                        ]
                                         mock_s.return_value = MagicMock(
                                             source_path=mock_src,
                                             obsidian_vaults=[],
@@ -38,7 +42,11 @@ class TestShowStatusSourcePath:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: True,
+                                                is_dir=lambda: True,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -51,7 +59,9 @@ class TestShowStatusSourcePath:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_src = MagicMock()
                                         mock_src.exists.return_value = False
@@ -66,7 +76,11 @@ class TestShowStatusSourcePath:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: False, is_dir=lambda: False, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: False,
+                                                is_dir=lambda: False,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -79,7 +93,9 @@ class TestShowStatusSourcePath:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_src = MagicMock()
                                         mock_src.exists.return_value = True
@@ -95,7 +111,11 @@ class TestShowStatusSourcePath:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: False, is_dir=lambda: False, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: False,
+                                                is_dir=lambda: False,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -115,7 +135,9 @@ class TestShowStatusObsidianVaults:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_s.return_value = MagicMock(
                                             source_path=None,
@@ -128,7 +150,11 @@ class TestShowStatusObsidianVaults:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: True,
+                                                is_dir=lambda: True,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -144,7 +170,9 @@ class TestShowStatusObsidianVaults:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_s.return_value = MagicMock(
                                             source_path=None,
@@ -157,7 +185,11 @@ class TestShowStatusObsidianVaults:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: True,
+                                                is_dir=lambda: True,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -181,7 +213,10 @@ class TestShowStatusManifestStats:
                     with patch("dochris.cli.cli_utils.get_wiki_dir") as mock_wiki:
                         with patch("dochris.cli.cli_utils.get_manifests_dir") as mock_mf:
                             with patch("dochris.cli.cli_utils.get_logs_dir") as mock_log:
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=manifests):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests",
+                                    return_value=manifests,
+                                ):
                                     with patch("builtins.print"):
                                         mock_s.return_value = MagicMock(
                                             source_path=None,
@@ -194,7 +229,11 @@ class TestShowStatusManifestStats:
                                             max_content_chars=20000,
                                         )
                                         for p in [mock_raw, mock_out, mock_wiki, mock_mf, mock_log]:
-                                            p.return_value = MagicMock(exists=lambda: True, is_dir=lambda: True, rglob=lambda pat: [])
+                                            p.return_value = MagicMock(
+                                                exists=lambda: True,
+                                                is_dir=lambda: True,
+                                                rglob=lambda pat: [],
+                                            )
 
                                         rc = show_status(Path("/test"))
         assert rc == 0
@@ -210,9 +249,13 @@ class TestShowStatusManifestStats:
             with patch("dochris.cli.cli_utils.get_raw_dir", return_value=mock_dir):
                 with patch("dochris.cli.cli_utils.get_outputs_dir", return_value=mock_dir):
                     with patch("dochris.cli.cli_utils.get_wiki_dir", return_value=mock_dir):
-                        with patch("dochris.cli.cli_utils.get_manifests_dir", return_value=mock_dir):
+                        with patch(
+                            "dochris.cli.cli_utils.get_manifests_dir", return_value=mock_dir
+                        ):
                             with patch("dochris.cli.cli_utils.get_logs_dir", return_value=mock_dir):
-                                with patch("dochris.cli.cli_utils.get_all_manifests", return_value=[]):
+                                with patch(
+                                    "dochris.cli.cli_utils.get_all_manifests", return_value=[]
+                                ):
                                     with patch("builtins.print"):
                                         mock_s.return_value = MagicMock(
                                             source_path=None,

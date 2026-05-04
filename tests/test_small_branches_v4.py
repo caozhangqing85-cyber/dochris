@@ -49,7 +49,9 @@ class TestPluginLoaderNoSpec:
         fake_path = tmp_path / "plugin.xyz"
         fake_path.write_text("not a module")
 
-        with patch("dochris.plugin.loader.importlib.util.spec_from_file_location", return_value=None):
+        with patch(
+            "dochris.plugin.loader.importlib.util.spec_from_file_location", return_value=None
+        ):
             with pytest.raises(ImportError, match="Cannot create spec"):
                 load_plugin_module(fake_path, "fake_plugin")
 

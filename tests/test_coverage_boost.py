@@ -182,11 +182,13 @@ class TestParseWithPypdf2InternalPaths:
         """PyPDF2 抛出 OSError/ValueError/RuntimeError/KeyError（行 56-61）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        with patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=OSError("损坏")), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=OSError("损坏")),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             result = parse_pdf(pdf_file)
             assert isinstance(result, str)
 
@@ -194,11 +196,13 @@ class TestParseWithPypdf2InternalPaths:
         """PyPDF2 抛出未预期异常（行 62-67）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        with patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=MemoryError("OOM")), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=MemoryError("OOM")),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             result = parse_pdf(pdf_file)
             assert isinstance(result, str)
 
@@ -206,11 +210,13 @@ class TestParseWithPypdf2InternalPaths:
         """PyPDF2 成功解析且超过100字符（行 46-52）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        with patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="pypdf2成功" * 30), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="pypdf2成功" * 30),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             result = parse_pdf(pdf_file)
             assert "pypdf2成功" in result
 
@@ -218,11 +224,13 @@ class TestParseWithPypdf2InternalPaths:
         """PyPDF2 提取文本不足100字符返回 None（行 52）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        with patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None), \
-             patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="短"), \
-             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200), \
-             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None):
+        with (
+            patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="短"),
+            patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
+            patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
+        ):
             result = parse_pdf(pdf_file)
             assert "x" in result  # markitdown 兜底
 
@@ -234,13 +242,15 @@ class TestParseWithPdfplumberInternalPaths:
         """pdfplumber 成功提取超过100字符（行 76-80）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        mock_pdf = MagicMock()
         mock_page = MagicMock()
         mock_page.extract_text.return_value = "pdfplumber内容" * 20
+        mock_pdf = MagicMock()
+        mock_pdf.pages = [mock_page]
         mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
         mock_pdf.__exit__ = MagicMock(return_value=False)
-        mock_pdf.pages = [mock_page]
-        with patch("pdfplumber.open", return_value=mock_pdf):
+        mock_module = MagicMock()
+        mock_module.open = MagicMock(return_value=mock_pdf)
+        with patch.dict("sys.modules", {"pdfplumber": mock_module}):
             result = parse_with_pdfplumber(pdf_file)
             assert result is not None
             assert len(result) > 100
@@ -260,7 +270,9 @@ class TestParseWithPdfplumberInternalPaths:
         mock_pdf = MagicMock()
         mock_pdf.__enter__ = MagicMock(side_effect=OSError("打不开"))
         mock_pdf.__exit__ = MagicMock(return_value=False)
-        with patch("pdfplumber.open", return_value=mock_pdf):
+        mock_module = MagicMock()
+        mock_module.open = MagicMock(return_value=mock_pdf)
+        with patch.dict("sys.modules", {"pdfplumber": mock_module}):
             result = parse_with_pdfplumber(pdf_file)
             assert result is None
 
@@ -271,7 +283,9 @@ class TestParseWithPdfplumberInternalPaths:
         mock_pdf = MagicMock()
         mock_pdf.__enter__ = MagicMock(side_effect=MemoryError("OOM"))
         mock_pdf.__exit__ = MagicMock(return_value=False)
-        with patch("pdfplumber.open", return_value=mock_pdf):
+        mock_module = MagicMock()
+        mock_module.open = MagicMock(return_value=mock_pdf)
+        with patch.dict("sys.modules", {"pdfplumber": mock_module}):
             result = parse_with_pdfplumber(pdf_file)
             assert result is None
 
@@ -517,9 +531,7 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.get_all_manifests",
             lambda ws, status="ingested": manifests,
         )
-        monkeypatch.setattr(
-            "dochris.phases.phase2_compilation.BATCH_SIZE", 2
-        )
+        monkeypatch.setattr("dochris.phases.phase2_compilation.BATCH_SIZE", 2)
 
         mock_worker = MagicMock()
         mock_worker.compile_document = AsyncMock(return_value={"status": "ok"})
@@ -533,9 +545,7 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.MonitorWorker",
             MagicMock(return_value=mock_monitor),
         )
-        monkeypatch.setattr(
-            "dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0
-        )
+        monkeypatch.setattr("dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0)
         monkeypatch.setattr(
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
@@ -548,9 +558,7 @@ class TestPhase2CompilationBatchProcessing:
             await compile_all()
 
     @pytest.mark.asyncio
-    async def test_batch_with_exceptions(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_batch_with_exceptions(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """批处理中某个文档编译异常"""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setattr(
@@ -578,9 +586,7 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.MonitorWorker",
             MagicMock(return_value=mock_monitor),
         )
-        monkeypatch.setattr(
-            "dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0
-        )
+        monkeypatch.setattr("dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0)
         monkeypatch.setattr(
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
@@ -592,9 +598,7 @@ class TestPhase2CompilationBatchProcessing:
             await compile_all()
 
     @pytest.mark.asyncio
-    async def test_batch_with_none_result(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_batch_with_none_result(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """批处理中编译返回 None"""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         monkeypatch.setattr(
@@ -620,9 +624,7 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.MonitorWorker",
             MagicMock(return_value=mock_monitor),
         )
-        monkeypatch.setattr(
-            "dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0
-        )
+        monkeypatch.setattr("dochris.phases.phase2_compilation.clear_cache", lambda *a, **kw: 0)
         monkeypatch.setattr(
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
@@ -695,9 +697,7 @@ class TestPromoteToWikiMissingTitle:
             "status": "compiled",
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
 
         from dochris.promote import promote_to_wiki
 
@@ -719,9 +719,7 @@ class TestPromoteToWikiNoSummaryFile:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -751,9 +749,7 @@ class TestPromoteToWikiConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -786,9 +782,7 @@ class TestPromoteToWikiConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -808,9 +802,7 @@ class TestPromoteToWikiConceptPaths:
         result = promote_to_wiki(tmp_path, "SRC-0001")
         assert result is True
 
-    def test_promote_with_other_concept_type(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_promote_with_other_concept_type(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """概念为非 dict/str 类型时 continue（行 141）"""
         manifest = {
             "id": "SRC-0001",
@@ -821,9 +813,7 @@ class TestPromoteToWikiConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -851,9 +841,7 @@ class TestPromoteToWikiConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -868,9 +856,7 @@ class TestPromoteToWikiConceptPaths:
         result = promote_to_wiki(tmp_path, "SRC-0001")
         assert result is True
 
-    def test_promote_no_promotable_files(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_promote_no_promotable_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """无可晋升文件时返回 False（行 149-150）"""
         manifest = {
             "id": "SRC-0001",
@@ -920,9 +906,7 @@ class TestPromoteToCuratedConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         curated_dir = tmp_path / "curated" / "promoted"
@@ -951,9 +935,7 @@ class TestPromoteToCuratedConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         curated_dir = tmp_path / "curated" / "promoted"
@@ -984,9 +966,7 @@ class TestPromoteToCuratedConceptPaths:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         curated_dir = tmp_path / "curated" / "promoted"
@@ -1001,9 +981,7 @@ class TestPromoteToCuratedConceptPaths:
         result = promote_to_curated(tmp_path, "SRC-0001")
         assert result is True
 
-    def test_curated_no_promotable_files(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_curated_no_promotable_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """curated 无可晋升文件（行 233-234）"""
         manifest = {
             "id": "SRC-0001",
@@ -1066,9 +1044,7 @@ class TestPromoteMain:
 
     def test_main_wiki_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """wiki 操作"""
-        monkeypatch.setattr(
-            "dochris.promote.promote_to_wiki", lambda ws, sid: True
-        )
+        monkeypatch.setattr("dochris.promote.promote_to_wiki", lambda ws, sid: True)
         from dochris.promote import main
 
         with patch("sys.argv", ["promote.py", str(tmp_path), "wiki", "SRC-001"]):
@@ -1077,9 +1053,7 @@ class TestPromoteMain:
 
     def test_main_curated_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """curated 操作"""
-        monkeypatch.setattr(
-            "dochris.promote.promote_to_curated", lambda ws, sid: True
-        )
+        monkeypatch.setattr("dochris.promote.promote_to_curated", lambda ws, sid: True)
         from dochris.promote import main
 
         with patch("sys.argv", ["promote.py", str(tmp_path), "curated", "SRC-001"]):
@@ -1088,9 +1062,7 @@ class TestPromoteMain:
 
     def test_main_status_action(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """status 操作"""
-        monkeypatch.setattr(
-            "dochris.promote.show_status", lambda ws, sid: None
-        )
+        monkeypatch.setattr("dochris.promote.show_status", lambda ws, sid: None)
         from dochris.promote import main
 
         with patch("sys.argv", ["promote.py", str(tmp_path), "status", "SRC-001"]):
@@ -1106,9 +1078,7 @@ class TestPromoteMain:
 
     def test_main_wiki_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """wiki 操作失败退出码1"""
-        monkeypatch.setattr(
-            "dochris.promote.promote_to_wiki", lambda ws, sid: False
-        )
+        monkeypatch.setattr("dochris.promote.promote_to_wiki", lambda ws, sid: False)
         from dochris.promote import main
 
         with patch("sys.argv", ["promote.py", str(tmp_path), "wiki", "SRC-001"]):
@@ -1117,9 +1087,7 @@ class TestPromoteMain:
 
     def test_main_curated_failure(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         """curated 操作失败退出码1"""
-        monkeypatch.setattr(
-            "dochris.promote.promote_to_curated", lambda ws, sid: False
-        )
+        monkeypatch.setattr("dochris.promote.promote_to_curated", lambda ws, sid: False)
         from dochris.promote import main
 
         with patch("sys.argv", ["promote.py", str(tmp_path), "curated", "SRC-001"]):
@@ -1227,9 +1195,7 @@ class TestQualityMonitorCheckAlerts:
         """main() 无进度数据时提前返回（行 257-259）"""
         from dochris.quality.quality_monitor import main
 
-        monkeypatch.setattr(
-            "dochris.quality.quality_monitor.load_progress", lambda: None
-        )
+        monkeypatch.setattr("dochris.quality.quality_monitor.load_progress", lambda: None)
         main()  # 不应抛异常
 
 
@@ -1470,9 +1436,7 @@ class TestRetryManagerGetDelay:
         async def trigger_filter():
             raise RuntimeError("ContentFilter triggered")
 
-        result = await RetryManager.llm_retry_with_filter(
-            trigger_filter, max_retries=2
-        )
+        result = await RetryManager.llm_retry_with_filter(trigger_filter, max_retries=2)
         assert result is None
 
     @pytest.mark.asyncio
@@ -1490,9 +1454,7 @@ class TestRetryManagerGetDelay:
             return "success"
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = await RetryManager.llm_retry_with_filter(
-                fail_once, max_retries=3
-            )
+            result = await RetryManager.llm_retry_with_filter(fail_once, max_retries=3)
             assert result == "success"
 
 
@@ -1586,9 +1548,7 @@ class TestCliReviewCmdStatus:
 
         from dochris.cli.cli_review import cmd_status
 
-        monkeypatch.setattr(
-            "dochris.cli.cli_review.show_status", lambda ws: 0
-        )
+        monkeypatch.setattr("dochris.cli.cli_review.show_status", lambda ws: 0)
         args = argparse.Namespace(workspace="/tmp/test_workspace")
         result = cmd_status(args)
         assert result == 0
@@ -1745,9 +1705,7 @@ class TestPromoteWikiConceptCopy:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         outputs_summaries = tmp_path / "outputs" / "summaries"
@@ -1789,9 +1747,7 @@ class TestPromoteCuratedOtherType:
             },
         }
         monkeypatch.setattr("dochris.promote.get_manifest", lambda p, s: manifest)
-        monkeypatch.setattr(
-            "dochris.promote.update_manifest_status", lambda *a, **kw: None
-        )
+        monkeypatch.setattr("dochris.promote.update_manifest_status", lambda *a, **kw: None)
         monkeypatch.setattr("dochris.promote.append_log", lambda *a, **kw: None)
 
         curated_dir = tmp_path / "curated" / "promoted"

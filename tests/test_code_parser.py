@@ -230,11 +230,7 @@ class TestExtractFromCode:
         """解析 Go 文件"""
         go_file = tmp_path / "main.go"
         go_file.write_text(
-            "package main\n\n"
-            "// Main function\n"
-            "func main() {\n"
-            '    fmt.Println("hello")\n'
-            "}\n",
+            'package main\n\n// Main function\nfunc main() {\n    fmt.Println("hello")\n}\n',
             encoding="utf-8",
         )
 
@@ -249,10 +245,7 @@ class TestExtractFromCode:
         """解析 Rust 文件"""
         rs_file = tmp_path / "main.rs"
         rs_file.write_text(
-            "// Rust comment\n"
-            "fn main() {\n"
-            '    println!("hello");\n'
-            "}\n",
+            '// Rust comment\nfn main() {\n    println!("hello");\n}\n',
             encoding="utf-8",
         )
 
@@ -282,10 +275,7 @@ class TestExtractFromCode:
         """包含 Unicode 内容的文件"""
         py_file = tmp_path / "unicode.py"
         py_file.write_text(
-            "# 中文注释\n"
-            "def 计算总和(a, b):\n"
-            "    '''计算两个数的总和'''\n"
-            "    return a + b\n",
+            "# 中文注释\ndef 计算总和(a, b):\n    '''计算两个数的总和'''\n    return a + b\n",
             encoding="utf-8",
         )
 
@@ -309,9 +299,7 @@ class TestExtractFromCode:
         """text 字段包含提取的注释和文档字符串"""
         py_file = tmp_path / "documented.py"
         py_file.write_text(
-            "# 文件注释\n"
-            "def foo():\n"
-            "    pass\n",
+            "# 文件注释\ndef foo():\n    pass\n",
             encoding="utf-8",
         )
 
@@ -344,9 +332,7 @@ class TestExtractFromCodeEdgeCases:
         """嵌套类定义"""
         py_file = tmp_path / "nested.py"
         py_file.write_text(
-            "class Outer:\n"
-            "    class Inner:\n"
-            "        pass\n",
+            "class Outer:\n    class Inner:\n        pass\n",
             encoding="utf-8",
         )
 
@@ -360,9 +346,7 @@ class TestExtractFromCodeEdgeCases:
         """多个函数定义"""
         py_file = tmp_path / "multi.py"
         py_file.write_text(
-            "def foo(): pass\n"
-            "def bar(): pass\n"
-            "def baz(): pass\n",
+            "def foo(): pass\ndef bar(): pass\ndef baz(): pass\n",
             encoding="utf-8",
         )
 
@@ -399,12 +383,7 @@ class TestExtractFromCodeMoreLanguages:
         """解析 Ruby 文件"""
         rb_file = tmp_path / "app.rb"
         rb_file.write_text(
-            "# Ruby comment\n"
-            "def greet\n"
-            "  puts 'hello'\n"
-            "end\n"
-            "class Animal\n"
-            "end\n",
+            "# Ruby comment\ndef greet\n  puts 'hello'\nend\nclass Animal\nend\n",
             encoding="utf-8",
         )
 
@@ -421,7 +400,7 @@ class TestExtractFromCodeMoreLanguages:
         kt_file.write_text(
             "// Kotlin comment\n"
             "fun main() {\n"
-            "    println(\"hello\")\n"
+            '    println("hello")\n'
             "}\n"
             "class Calculator {\n"
             "    fun add(a: Int, b: Int) = a + b\n"
@@ -438,12 +417,7 @@ class TestExtractFromCodeMoreLanguages:
         """解析 Swift 文件"""
         swift_file = tmp_path / "App.swift"
         swift_file.write_text(
-            "// Swift comment\n"
-            "func greet() {\n"
-            "    print(\"hello\")\n"
-            "}\n"
-            "class Vehicle {\n"
-            "}\n",
+            '// Swift comment\nfunc greet() {\n    print("hello")\n}\nclass Vehicle {\n}\n',
             encoding="utf-8",
         )
 
@@ -456,10 +430,7 @@ class TestExtractFromCodeMoreLanguages:
         """解析 Lua 文件"""
         lua_file = tmp_path / "init.lua"
         lua_file.write_text(
-            "-- Lua comment\n"
-            "function hello()\n"
-            "    print('hello')\n"
-            "end\n",
+            "-- Lua comment\nfunction hello()\n    print('hello')\nend\n",
             encoding="utf-8",
         )
 
@@ -472,10 +443,7 @@ class TestExtractFromCodeMoreLanguages:
         """解析 Zig 文件"""
         zig_file = tmp_path / "main.zig"
         zig_file.write_text(
-            "// Zig comment\n"
-            "pub fn main() void {\n"
-            "    std.debug.print(\"hello\", .{});\n"
-            "}\n",
+            '// Zig comment\npub fn main() void {\n    std.debug.print("hello", .{});\n}\n',
             encoding="utf-8",
         )
 
@@ -488,10 +456,7 @@ class TestExtractFromCodeMoreLanguages:
         """解析 C# 文件"""
         cs_file = tmp_path / "Program.cs"
         cs_file.write_text(
-            "// C# comment\n"
-            "class Program {\n"
-            "    static void Main() {}\n"
-            "}\n",
+            "// C# comment\nclass Program {\n    static void Main() {}\n}\n",
             encoding="utf-8",
         )
 
@@ -523,10 +488,7 @@ class TestExtractFromCodeMoreLanguages:
         """混合缩进的文件"""
         py_file = tmp_path / "mixed_indent.py"
         py_file.write_text(
-            "def foo():\n"
-            "    pass\n"
-            "\tdef bar():\n"
-            "\t\tpass\n",
+            "def foo():\n    pass\n\tdef bar():\n\t\tpass\n",
             encoding="utf-8",
         )
 

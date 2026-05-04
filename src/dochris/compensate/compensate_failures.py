@@ -112,7 +112,20 @@ def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
             logger.warning(f"文档提取失败 {file_path.name}: {e}")
 
     # 代码文件（直接读取）
-    elif ext in (".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp", ".h", ".css", ".json", ".xml"):
+    elif ext in (
+        ".py",
+        ".js",
+        ".ts",
+        ".java",
+        ".go",
+        ".rs",
+        ".c",
+        ".cpp",
+        ".h",
+        ".css",
+        ".json",
+        ".xml",
+    ):
         try:
             text = file_path.read_text(encoding="utf-8", errors="replace")
             return text[:MAX_CONTENT_CHARS]
@@ -132,7 +145,11 @@ def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
 
 
 async def generate_summary_with_llm(
-    text: str, title: str, logger: Any, rate_limiter: Any = None, adaptive_delay: float | None = None
+    text: str,
+    title: str,
+    logger: Any,
+    rate_limiter: Any = None,
+    adaptive_delay: float | None = None,
 ) -> dict[str, Any] | None:
     """使用 LLM 生成摘要
 
@@ -169,6 +186,7 @@ async def generate_summary_with_llm(
     except Exception as e:
         logger.error(f"LLM 生成摘要失败: {e}")
         return None
+
 
 # ============================================================
 # 智能重试 + 模型降级
@@ -444,7 +462,13 @@ def find_failed_manifests(compensate_type: str, logger: Any) -> list[dict]:
         elif compensate_type == "all":
             # 所有可补偿的
             if "no_text" in error:
-                if file_type == "ebook" and ext in (".mobi", ".azw3") or file_type == "pdf" or file_type == "other" and ext in (".mhtml", ".pptx", ".ppt"):
+                if (
+                    file_type == "ebook"
+                    and ext in (".mobi", ".azw3")
+                    or file_type == "pdf"
+                    or file_type == "other"
+                    and ext in (".mhtml", ".pptx", ".ppt")
+                ):
                     filtered.append(m)
             elif "llm_failed" in error:
                 filtered.append(m)

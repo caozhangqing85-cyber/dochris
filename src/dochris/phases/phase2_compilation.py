@@ -199,7 +199,9 @@ async def compile_all(
                 for j, result in enumerate(results):
                     if isinstance(result, Exception):
                         fail_count += 1
-                        logger.error(f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}")
+                        logger.error(
+                            f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}"
+                        )
                     elif result:
                         success_count += 1
                     else:
@@ -221,7 +223,9 @@ async def compile_all(
             for j, result in enumerate(results):
                 if isinstance(result, Exception):
                     fail_count += 1
-                    logger.error(f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}")
+                    logger.error(
+                        f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}"
+                    )
                 elif result:
                     success_count += 1
                 else:

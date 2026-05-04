@@ -65,11 +65,14 @@ class TestDiscoverHookimpls:
 
 class TestLoadPluginModule:
     def test_load_valid_module(self):
-        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".py", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("X = 42\ndef hello(): return 'world'\n")
             f.flush()
             mod = load_plugin_module(Path(f.name), "test_plugin_valid")
         import os
+
         os.unlink(f.name)
         assert mod.X == 42
         assert mod.hello() == "world"
@@ -78,12 +81,15 @@ class TestLoadPluginModule:
             del sys.modules["test_plugin_valid"]
 
     def test_load_syntax_error(self):
-        with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False, encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".py", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("def broken(\n")
             f.flush()
             with pytest.raises(SyntaxError):
                 load_plugin_module(Path(f.name), "test_plugin_syntax")
         import os
+
         os.unlink(f.name)
 
     def test_load_nonexistent_file(self):

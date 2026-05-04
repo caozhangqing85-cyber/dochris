@@ -45,9 +45,7 @@ class TestCompileWithModelFallback:
         """无文本时返回 None"""
         from dochris.compensate.compensate_failures import compile_with_model_fallback
 
-        result = await compile_with_model_fallback(
-            "", "title", MagicMock(), ["model1"], 0.1
-        )
+        result = await compile_with_model_fallback("", "title", MagicMock(), ["model1"], 0.1)
         assert result is None
 
     @pytest.mark.asyncio
@@ -55,7 +53,5 @@ class TestCompileWithModelFallback:
         """无模型时返回 None"""
         from dochris.compensate.compensate_failures import compile_with_model_fallback
 
-        result = await compile_with_model_fallback(
-            "some text", "title", MagicMock(), [], 0.1
-        )
+        result = await compile_with_model_fallback("some text", "title", MagicMock(), [], 0.1)
         assert result is None

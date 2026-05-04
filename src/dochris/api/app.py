@@ -18,7 +18,12 @@ def _get_cors_origins() -> list[str]:
     env_origins = os.environ.get("DOCHRIS_CORS_ORIGINS", "")
     if env_origins:
         return [o.strip() for o in env_origins.split(",") if o.strip()]
-    return ["http://localhost:8000", "http://localhost:7860", "http://127.0.0.1:8000", "http://127.0.0.1:7860"]
+    return [
+        "http://localhost:8000",
+        "http://localhost:7860",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:7860",
+    ]
 
 
 def create_app() -> FastAPI:

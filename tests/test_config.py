@@ -197,13 +197,13 @@ class TestFileTypeConfig:
 
     def test_file_type_map_contains_pdf(self):
         """测试文件类型映射包含 PDF"""
-        assert '.pdf' in FILE_TYPE_MAP
-        assert FILE_TYPE_MAP['.pdf'] == 'pdfs'
+        assert ".pdf" in FILE_TYPE_MAP
+        assert FILE_TYPE_MAP[".pdf"] == "pdfs"
 
     def test_file_type_map_contains_audio(self):
         """测试文件类型映射包含音频"""
-        assert '.mp3' in FILE_TYPE_MAP
-        assert FILE_TYPE_MAP['.mp3'] == 'audio'
+        assert ".mp3" in FILE_TYPE_MAP
+        assert FILE_TYPE_MAP[".mp3"] == "audio"
 
     def test_skip_extensions_is_set(self):
         """测试跳过扩展名是集合"""
@@ -211,7 +211,7 @@ class TestFileTypeConfig:
 
     def test_skip_extensions_contains_exe(self):
         """测试跳过扩展名包含 exe"""
-        assert '.exe' in SKIP_EXTENSIONS
+        assert ".exe" in SKIP_EXTENSIONS
 
 
 class TestValidateApiKey:
@@ -220,6 +220,7 @@ class TestValidateApiKey:
     def test_validate_api_key_missing(self, monkeypatch):
         """测试 API 密钥缺失时抛出异常"""
         from dochris.settings import get_settings, reset_settings
+
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         reset_settings()  # 重置以清除缓存的 API key
         with pytest.raises(ValueError, match="OPENAI_API_KEY 环境变量未设置"):
@@ -228,6 +229,7 @@ class TestValidateApiKey:
     def test_validate_api_key_present(self, monkeypatch):
         """测试 API 密钥存在时返回密钥"""
         from dochris.settings import get_settings, reset_settings
+
         monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
         reset_settings()  # 重置以加载新的 API key
         result = get_settings().validate_api_key()
@@ -237,17 +239,20 @@ class TestValidateApiKey:
 class TestGetFileCategory:
     """测试文件分类函数"""
 
-    @pytest.mark.parametrize("ext,expected", [
-        ('.pdf', 'pdfs'),
-        ('.PDF', 'pdfs'),  # 测试大小写不敏感
-        ('.mp3', 'audio'),
-        ('.mp4', 'videos'),
-        ('.md', 'articles'),
-        ('.epub', 'ebooks'),
-        ('.exe', None),  # 跳过
-        ('.zip', None),  # 跳过
-        ('.unknown', 'other'),  # 默认分类
-    ])
+    @pytest.mark.parametrize(
+        "ext,expected",
+        [
+            (".pdf", "pdfs"),
+            (".PDF", "pdfs"),  # 测试大小写不敏感
+            (".mp3", "audio"),
+            (".mp4", "videos"),
+            (".md", "articles"),
+            (".epub", "ebooks"),
+            (".exe", None),  # 跳过
+            (".zip", None),  # 跳过
+            (".unknown", "other"),  # 默认分类
+        ],
+    )
     def test_get_file_category(self, ext, expected):
         """测试各种文件扩展名的分类"""
         result = get_file_category(ext)
@@ -255,8 +260,8 @@ class TestGetFileCategory:
 
     def test_get_file_category_case_insensitive(self):
         """测试文件扩展名大小写不敏感"""
-        assert get_file_category('.PDF') == get_file_category('.pdf')
-        assert get_file_category('.MP3') == get_file_category('.mp3')
+        assert get_file_category(".PDF") == get_file_category(".pdf")
+        assert get_file_category(".MP3") == get_file_category(".mp3")
 
 
 class TestSourcePath:

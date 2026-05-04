@@ -18,11 +18,28 @@ class TestHierarchicalFallbackPaths:
 
         mixed_results = [{"summary": "valid"}, RuntimeError("failed"), None]
 
-        with patch.object(summarizer, "_summarize_chunks_parallel", new_callable=AsyncMock, return_value=mixed_results):
-            with patch.object(summarizer, "_group_chunks_by_section", return_value={"section1": []}):
-                with patch.object(summarizer, "_merge_summaries", new_callable=AsyncMock, return_value={"merged": True}):
-                    with patch("dochris.core.text_chunker.structure_aware_split", return_value=[MagicMock()]):
-                        result = await summarizer.generate_hierarchical_summary("test content", "Test Title")
+        with patch.object(
+            summarizer,
+            "_summarize_chunks_parallel",
+            new_callable=AsyncMock,
+            return_value=mixed_results,
+        ):
+            with patch.object(
+                summarizer, "_group_chunks_by_section", return_value={"section1": []}
+            ):
+                with patch.object(
+                    summarizer,
+                    "_merge_summaries",
+                    new_callable=AsyncMock,
+                    return_value={"merged": True},
+                ):
+                    with patch(
+                        "dochris.core.text_chunker.structure_aware_split",
+                        return_value=[MagicMock()],
+                    ):
+                        result = await summarizer.generate_hierarchical_summary(
+                            "test content", "Test Title"
+                        )
 
         assert result == {"merged": True}
 
@@ -34,9 +51,15 @@ class TestHierarchicalFallbackPaths:
         mock_client = MagicMock()
         summarizer = HierarchicalSummarizer(mock_client)
 
-        with patch.object(summarizer, "_summarize_chunks_parallel", new_callable=AsyncMock, return_value=[]):
-            with patch("dochris.core.text_chunker.structure_aware_split", return_value=[MagicMock()]):
-                result = await summarizer.generate_hierarchical_summary("test content", "Test Title")
+        with patch.object(
+            summarizer, "_summarize_chunks_parallel", new_callable=AsyncMock, return_value=[]
+        ):
+            with patch(
+                "dochris.core.text_chunker.structure_aware_split", return_value=[MagicMock()]
+            ):
+                result = await summarizer.generate_hierarchical_summary(
+                    "test content", "Test Title"
+                )
 
         assert result is None
 
@@ -52,11 +75,31 @@ class TestHierarchicalFallbackPaths:
         sections = {"section1": [{"summary": "s1"}], "section2": [{"summary": "s2"}]}
         section_summaries = [{"summary": "sec1"}, {"summary": "sec2"}]
 
-        with patch.object(summarizer, "_summarize_chunks_parallel", new_callable=AsyncMock, return_value=chunk_summaries):
+        with patch.object(
+            summarizer,
+            "_summarize_chunks_parallel",
+            new_callable=AsyncMock,
+            return_value=chunk_summaries,
+        ):
             with patch.object(summarizer, "_group_chunks_by_section", return_value=sections):
-                with patch.object(summarizer, "_summarize_sections_parallel", new_callable=AsyncMock, return_value=section_summaries):
-                    with patch.object(summarizer, "_merge_summaries", new_callable=AsyncMock, return_value={"final": True}):
-                        with patch("dochris.core.text_chunker.structure_aware_split", return_value=[MagicMock()]):
-                            result = await summarizer.generate_hierarchical_summary("test content", "Test Title")
+                with patch.object(
+                    summarizer,
+                    "_summarize_sections_parallel",
+                    new_callable=AsyncMock,
+                    return_value=section_summaries,
+                ):
+                    with patch.object(
+                        summarizer,
+                        "_merge_summaries",
+                        new_callable=AsyncMock,
+                        return_value={"final": True},
+                    ):
+                        with patch(
+                            "dochris.core.text_chunker.structure_aware_split",
+                            return_value=[MagicMock()],
+                        ):
+                            result = await summarizer.generate_hierarchical_summary(
+                                "test content", "Test Title"
+                            )
 
         assert result == {"final": True}

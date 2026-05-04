@@ -51,35 +51,35 @@ class TestConfigLoading:
 
     def test_get_file_category_pdf(self):
         """测试 PDF 文件分类"""
-        assert get_file_category('.pdf') == 'pdfs'
-        assert get_file_category('.PDF') == 'pdfs'
+        assert get_file_category(".pdf") == "pdfs"
+        assert get_file_category(".PDF") == "pdfs"
 
     def test_get_file_category_audio(self):
         """测试音频文件分类"""
-        assert get_file_category('.mp3') == 'audio'
-        assert get_file_category('.wav') == 'audio'
-        assert get_file_category('.m4a') == 'audio'
+        assert get_file_category(".mp3") == "audio"
+        assert get_file_category(".wav") == "audio"
+        assert get_file_category(".m4a") == "audio"
 
     def test_get_file_category_video(self):
         """测试视频文件分类"""
-        assert get_file_category('.mp4') == 'videos'
-        assert get_file_category('.mkv') == 'videos'
+        assert get_file_category(".mp4") == "videos"
+        assert get_file_category(".mkv") == "videos"
 
     def test_get_file_category_ebook(self):
         """测试电子书文件分类"""
-        assert get_file_category('.epub') == 'ebooks'
-        assert get_file_category('.mobi') == 'ebooks'
+        assert get_file_category(".epub") == "ebooks"
+        assert get_file_category(".mobi") == "ebooks"
 
     def test_get_file_category_unknown(self):
         """测试未知文件分类"""
-        assert get_file_category('.xyz') == 'other'
+        assert get_file_category(".xyz") == "other"
 
     def test_constants_exist(self):
         """测试配置常量存在"""
         assert MIN_QUALITY_SCORE >= 0
         assert MAX_CONTENT_CHARS > 0
         assert isinstance(FILE_TYPE_MAP, dict)
-        assert '.pdf' in FILE_TYPE_MAP
+        assert ".pdf" in FILE_TYPE_MAP
 
 
 class TestQualityScoring:
@@ -94,7 +94,7 @@ class TestQualityScoring:
             "concepts": [
                 {"name": "概念1", "description": "描述1", "explanation": "解释1"},
                 {"name": "概念2", "description": "描述2", "explanation": "解释2"},
-            ]
+            ],
         }
 
         # 检查必要字段
@@ -109,7 +109,7 @@ class TestQualityScoring:
             "one_line": "",
             "key_points": [],
             "detailed_summary": "短内容",
-            "concepts": []
+            "concepts": [],
         }
 
         # 缺少必要内容
@@ -265,9 +265,10 @@ class TestCacheFunctionality:
         """测试缓存失效逻辑"""
         # 模拟缓存时间戳
         import time
+
         cache_entry = {
             "data": "test",
-            "created_at": time.time() - 3600  # 1小时前
+            "created_at": time.time() - 3600,  # 1小时前
         }
 
         # 检查是否过期（假设30分钟有效期）
@@ -304,8 +305,8 @@ class TestEndToEndWorkflow:
                 "one_line": "工作流测试摘要",
                 "key_points": ["要点1", "要点2"],
                 "detailed_summary": "详细内容",
-                "concepts": []
-            }
+                "concepts": [],
+            },
         )
 
         assert compiled["status"] == "compiled"

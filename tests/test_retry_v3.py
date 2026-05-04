@@ -30,6 +30,7 @@ class TestRetryLastError:
     @pytest.mark.asyncio
     async def test_retry_should_not_retry_raises(self):
         """should_retry=False 时立即抛出异常"""
+
         async def always_fail():
             raise ValueError("no retry")
 
@@ -55,8 +56,6 @@ class TestLlmRetryWaitBranches:
 
         with patch.object(RetryManager, "should_retry", return_value=True):
             with patch.object(RetryManager, "get_retry_delay", return_value=0):
-                result = await RetryManager.llm_retry_with_filter(
-                    fail_then_succeed, max_retries=2
-                )
+                result = await RetryManager.llm_retry_with_filter(fail_then_succeed, max_retries=2)
 
         assert result == {"result": "success"}

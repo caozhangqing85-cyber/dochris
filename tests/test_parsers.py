@@ -62,7 +62,7 @@ class TestParserExtraction(unittest.TestCase):
         from dochris.parsers.code_parser import extract_from_code
 
         # 创建测试文件
-        temp_file = tempfile.NamedTemporaryFile(suffix='.py', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         try:
             temp_file.write(b"""
 def hello_world():

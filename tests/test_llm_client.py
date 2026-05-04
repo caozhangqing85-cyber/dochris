@@ -19,11 +19,7 @@ class TestLLMClient(unittest.TestCase):
         """测试客户端初始化"""
         from dochris.core.llm_client import LLMClient
 
-        client = LLMClient(
-            api_key="test_key",
-            base_url="https://api.test.com",
-            model="test_model"
-        )
+        client = LLMClient(api_key="test_key", base_url="https://api.test.com", model="test_model")
 
         self.assertEqual(client.model, "test_model")
         # LLMClient 没有公开 api_key 属性，只检查 model
@@ -48,7 +44,7 @@ class TestLLMClient(unittest.TestCase):
         client = LLMClient(api_key="test", base_url="https://test.com")
 
         # 有效 JSON
-        text_with_json = "Some text {\"key\": \"value\"} more text"
+        text_with_json = 'Some text {"key": "value"} more text'
         result = client._extract_json_from_text(text_with_json)
         self.assertEqual(result, {"key": "value"})
 
@@ -61,7 +57,7 @@ class TestLLMClient(unittest.TestCase):
 class TestLLMClientAsync(unittest.TestCase):
     """测试 LLM 客户端异步功能"""
 
-    @patch('dochris.core.llm_client.AsyncOpenAI')
+    @patch("dochris.core.llm_client.AsyncOpenAI")
     async def test_generate_summary_mock(self, mock_openai):
         """测试摘要生成（mock）"""
         # Mock API 响应

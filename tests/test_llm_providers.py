@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """测试 LLM 提供商抽象层"""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -31,10 +32,14 @@ class TestBaseLLMProvider:
         class ConcreteProvider(BaseLLMProvider):
             name = "concrete"
 
-            async def generate(self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs):
+            async def generate(
+                self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
-            async def generate_with_messages(self, messages, max_tokens=None, temperature=None, **kwargs):
+            async def generate_with_messages(
+                self, messages, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
         provider = ConcreteProvider()
@@ -51,10 +56,14 @@ class TestBaseLLMProvider:
         class ConcreteProvider(BaseLLMProvider):
             name = "concrete"
 
-            async def generate(self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs):
+            async def generate(
+                self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
-            async def generate_with_messages(self, messages, max_tokens=None, temperature=None, **kwargs):
+            async def generate_with_messages(
+                self, messages, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
         provider = ConcreteProvider(
@@ -78,10 +87,14 @@ class TestBaseLLMProvider:
         class ConcreteProvider(BaseLLMProvider):
             name = "concrete"
 
-            async def generate(self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs):
+            async def generate(
+                self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
-            async def generate_with_messages(self, messages, max_tokens=None, temperature=None, **kwargs):
+            async def generate_with_messages(
+                self, messages, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
         provider = ConcreteProvider()
@@ -96,10 +109,14 @@ class TestBaseLLMProvider:
         class ConcreteProvider(BaseLLMProvider):
             name = "concrete"
 
-            async def generate(self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs):
+            async def generate(
+                self, prompt, system_prompt=None, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
-            async def generate_with_messages(self, messages, max_tokens=None, temperature=None, **kwargs):
+            async def generate_with_messages(
+                self, messages, max_tokens=None, temperature=None, **kwargs
+            ):
                 return ""
 
         provider = ConcreteProvider(model="test-model")
@@ -220,7 +237,9 @@ class TestOpenAICompatProvider:
             import asyncio
 
             result = asyncio.run(
-                provider.generate("Hello", system_prompt="You are helpful", max_tokens=100, temperature=0.5)
+                provider.generate(
+                    "Hello", system_prompt="You are helpful", max_tokens=100, temperature=0.5
+                )
             )
 
             assert result == "Generated text"
@@ -349,7 +368,7 @@ class TestOllamaProvider:
 
     @pytest.mark.skipif(
         True,  # 跳过这些测试，因为 aiohttp 的模块级 import 导致 mock 复杂
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        reason="aiohttp module-level import makes mocking complex; skip for now",
     )
     def test_generate_raises_import_error_when_aiohttp_not_installed(self) -> None:
         """测试 aiohttp 未安装时抛出 ImportError"""
@@ -357,8 +376,7 @@ class TestOllamaProvider:
         pass
 
     @pytest.mark.skipif(
-        True,
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        True, reason="aiohttp module-level import makes mocking complex; skip for now"
     )
     def test_generate(self) -> None:
         """测试 generate 方法"""
@@ -366,32 +384,28 @@ class TestOllamaProvider:
         pass
 
     @pytest.mark.skipif(
-        True,
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        True, reason="aiohttp module-level import makes mocking complex; skip for now"
     )
     def test_generate_with_default_values(self) -> None:
         """测试 generate 使用默认参数值"""
         pass
 
     @pytest.mark.skipif(
-        True,
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        True, reason="aiohttp module-level import makes mocking complex; skip for now"
     )
     def test_generate_with_messages(self) -> None:
         """测试 generate_with_messages 方法"""
         pass
 
     @pytest.mark.skipif(
-        True,
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        True, reason="aiohttp module-level import makes mocking complex; skip for now"
     )
     def test_generate_with_custom_base_url(self) -> None:
         """测试自定义 base_url 的 generate"""
         pass
 
     @pytest.mark.skipif(
-        True,
-        reason="aiohttp module-level import makes mocking complex; skip for now"
+        True, reason="aiohttp module-level import makes mocking complex; skip for now"
     )
     def test_generate_handles_empty_response(self) -> None:
         """测试处理空响应"""

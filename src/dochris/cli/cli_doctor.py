@@ -32,9 +32,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(info("1. Python 版本检查"))
     python_version = sys.version_info
     if python_version >= (3, 11):
-        print(f"   {success('✓')} Python {python_version.major}.{python_version.minor}.{python_version.micro}")
+        print(
+            f"   {success('✓')} Python {python_version.major}.{python_version.minor}.{python_version.micro}"
+        )
     else:
-        print(f"   {error('✗')} Python {python_version.major}.{python_version.minor}.{python_version.micro}")
+        print(
+            f"   {error('✗')} Python {python_version.major}.{python_version.minor}.{python_version.micro}"
+        )
         print(f"   {warning('要求: Python 3.11 或更高版本')}")
         issues.append("python_version")
 

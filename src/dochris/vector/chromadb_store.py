@@ -51,9 +51,7 @@ class ChromaDBStore(BaseVectorStore):
             try:
                 import chromadb
             except ImportError as e:
-                raise ImportError(
-                    "chromadb not installed. Run: pip install chromadb"
-                ) from e
+                raise ImportError("chromadb not installed. Run: pip install chromadb") from e
 
             if self._persist_directory:
                 self._persist_directory.mkdir(parents=True, exist_ok=True)

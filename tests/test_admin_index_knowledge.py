@@ -24,13 +24,18 @@ def _mock_chromadb():
     MagicMock()
     mock_chromadb.utils = MagicMock()
     mock_chromadb.utils.embedding_functions = MagicMock()
-    mock_chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction.return_value = MagicMock()
+    mock_chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction.return_value = (
+        MagicMock()
+    )
 
-    with patch.dict(sys.modules, {
-        "chromadb": mock_chromadb,
-        "chromadb.utils": mock_chromadb.utils,
-        "chromadb.utils.embedding_functions": mock_chromadb.utils.embedding_functions,
-    }):
+    with patch.dict(
+        sys.modules,
+        {
+            "chromadb": mock_chromadb,
+            "chromadb.utils": mock_chromadb.utils,
+            "chromadb.utils.embedding_functions": mock_chromadb.utils.embedding_functions,
+        },
+    ):
         yield mock_collection
 
 
@@ -244,7 +249,9 @@ class TestIndexObsidianPriority:
         vault.mkdir()
         # 创建一些优先文件
         (vault / "职业规划").mkdir()
-        (vault / "职业规划" / "AI学习复利系统SOP-最终版.md").write_text("# AI学习\n内容", encoding="utf-8")
+        (vault / "职业规划" / "AI学习复利系统SOP-最终版.md").write_text(
+            "# AI学习\n内容", encoding="utf-8"
+        )
 
         with caplog.at_level(logging.INFO, logger="dochris.admin.index_knowledge"):
             with patch("dochris.admin.index_knowledge.get_settings") as mock_s:
@@ -307,7 +314,9 @@ class TestSearchKnowledge:
 
         _mock_chromadb.query.return_value = {
             "documents": [["内容片段"]],
-            "metadatas": [[{"title": "测试", "path": "/test.md", "type": "markdown", "source": "obsidian"}]],
+            "metadatas": [
+                [{"title": "测试", "path": "/test.md", "type": "markdown", "source": "obsidian"}]
+            ],
         }
 
         with caplog.at_level(logging.INFO, logger="dochris.admin.index_knowledge"):
@@ -357,7 +366,9 @@ class TestIndexFileWithPathFallback:
                     obsidian_vaults=[vault_path],
                     source_path=None,
                 )
-                with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"):
+                with patch(
+                    "dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"
+                ):
                     index_file(md, "obsidian")
 
         _mock_chromadb.add.assert_called()
@@ -378,7 +389,9 @@ class TestIndexFileWithPathFallback:
                     obsidian_vaults=[],
                     source_path=source_path,
                 )
-                with patch("dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"):
+                with patch(
+                    "dochris.admin.index_knowledge.get_workspace", return_value=tmp_path / "other"
+                ):
                     index_file(md, "obsidian")
 
         _mock_chromadb.add.assert_called()

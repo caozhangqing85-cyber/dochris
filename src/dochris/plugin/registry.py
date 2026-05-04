@@ -70,9 +70,7 @@ class PluginManager:
         """
         impls = self._hooks.get(hook_name, [])
         return [
-            (name, func)
-            for name, func in impls
-            if self._plugins.get(name, {}).get("enabled", True)
+            (name, func) for name, func in impls if self._plugins.get(name, {}).get("enabled", True)
         ]
 
     def call_hook(
@@ -290,9 +288,7 @@ class PluginManager:
             self._plugin_order = [n for n in self._plugin_order if n != name]
             # 移除相关的 hook 注册
             for hook_name in list(self._hooks.keys()):
-                self._hooks[hook_name] = [
-                    (n, f) for n, f in self._hooks[hook_name] if n != name
-                ]
+                self._hooks[hook_name] = [(n, f) for n, f in self._hooks[hook_name] if n != name]
             logger.info(f"Unregistered plugin: {name}")
 
 

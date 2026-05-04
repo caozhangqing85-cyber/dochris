@@ -26,6 +26,7 @@ class TestPhase2Compilation(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_manifest_creation(self):
@@ -118,7 +119,15 @@ class TestPhase2Compilation(unittest.TestCase):
 
         # 完整摘要 - 需要更详细的内容来达到85分
         # 添加学习价值关键词以提高评分
-        learning_text = "学习" * 20 + "理解" * 20 + "掌握" * 20 + "应用" * 20 + "方法" * 20 + "策略" * 20 + "技巧" * 20
+        learning_text = (
+            "学习" * 20
+            + "理解" * 20
+            + "掌握" * 20
+            + "应用" * 20
+            + "方法" * 20
+            + "策略" * 20
+            + "技巧" * 20
+        )
         summary = {
             "one_line": "这是一篇关于深度学习与自然语言处理的研究论文",
             "key_points": [
@@ -128,7 +137,8 @@ class TestPhase2Compilation(unittest.TestCase):
                 "开源了代码和预训练模型",
                 "提供了实用的学习方法和应用技巧",
                 "深入理解了模型的本质和机制",
-            ] * 3,
+            ]
+            * 3,
             "detailed_summary": "这是一篇详细的研究论文摘要..." * 50 + learning_text,
             "concepts": [
                 {"name": "Transformer", "description": "注意力机制架构"},
@@ -136,7 +146,8 @@ class TestPhase2Compilation(unittest.TestCase):
                 {"name": "GPT", "description": "生成式预训练模型"},
                 {"name": "Attention", "description": "注意力机制"},
                 {"name": "深度学习", "description": "学习方法和策略"},
-            ] * 2,
+            ]
+            * 2,
         }
 
         score = score_summary_quality_v4(summary)
@@ -148,7 +159,7 @@ class TestPhase2TextExtraction(unittest.TestCase):
 
     def test_markdown_extraction(self):
         """测试 Markdown 文本提取"""
-        temp_file = tempfile.NamedTemporaryFile(suffix='.md', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".md", delete=False)
         try:
             temp_file.write(b"""# Test Document
 
@@ -161,7 +172,7 @@ This is a test document.
 """)
             temp_file.close()
 
-            content = Path(temp_file.name).read_text(encoding='utf-8')
+            content = Path(temp_file.name).read_text(encoding="utf-8")
             self.assertIn("Test Document", content)
             self.assertIn("Key Points", content)
 
@@ -173,7 +184,7 @@ This is a test document.
         from dochris.parsers.pdf_parser import parse_pdf
 
         # 创建临时 PDF 文件（实际上是文本）
-        temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         temp_file.write(b"PDF content")
         temp_file.close()
 
@@ -185,12 +196,12 @@ This is a test document.
 
     def test_empty_file_handling(self):
         """测试空文件处理"""
-        temp_file = tempfile.NamedTemporaryFile(suffix='.txt', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
         temp_file.write(b"")
         temp_file.close()
 
         try:
-            content = Path(temp_file.name).read_text(encoding='utf-8')
+            content = Path(temp_file.name).read_text(encoding="utf-8")
             self.assertEqual(content, "")
         finally:
             Path(temp_file.name).unlink(missing_ok=True)
@@ -222,21 +233,17 @@ class TestPhase2JSONHandling(unittest.TestCase):
 class TestPhase2LLMClient(unittest.TestCase):
     """测试 LLM 客户端"""
 
-    @patch('dochris.core.llm_client.AsyncOpenAI')
+    @patch("dochris.core.llm_client.AsyncOpenAI")
     def test_llm_client_init(self, mock_openai):
         """测试 LLM 客户端初始化"""
         from dochris.core.llm_client import LLMClient
 
-        client = LLMClient(
-            api_key="test_key",
-            base_url="https://api.test.com",
-            model="test_model"
-        )
+        client = LLMClient(api_key="test_key", base_url="https://api.test.com", model="test_model")
 
         self.assertIsNotNone(client)
         self.assertEqual(client.model, "test_model")
 
-    @patch('dochris.core.llm_client.AsyncOpenAI')
+    @patch("dochris.core.llm_client.AsyncOpenAI")
     def test_llm_client_generate_summary(self, mock_openai):
         """测试生成摘要（mock）"""
         from dochris.core.llm_client import LLMClient
@@ -244,25 +251,23 @@ class TestPhase2LLMClient(unittest.TestCase):
         # Mock API 响应
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = json.dumps({
-            "one_line": "测试摘要",
-            "key_points": ["要点1"],
-            "detailed_summary": "详细摘要",
-            "concepts": [{"name": "概念1", "description": "描述1"}]
-        })
+        mock_response.choices[0].message.content = json.dumps(
+            {
+                "one_line": "测试摘要",
+                "key_points": ["要点1"],
+                "detailed_summary": "详细摘要",
+                "concepts": [{"name": "概念1", "description": "描述1"}],
+            }
+        )
 
         mock_client = AsyncMock()
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
         mock_openai.return_value = mock_client
 
-        client = LLMClient(
-            api_key="test_key",
-            base_url="https://api.test.com",
-            model="test_model"
-        )
+        client = LLMClient(api_key="test_key", base_url="https://api.test.com", model="test_model")
 
         # 测试异步方法存在
-        self.assertTrue(hasattr(client, 'generate_summary'))
+        self.assertTrue(hasattr(client, "generate_summary"))
 
 
 class TestPhase2OutputWriting(unittest.TestCase):
@@ -276,6 +281,7 @@ class TestPhase2OutputWriting(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_write_summary_file(self):
@@ -285,7 +291,7 @@ class TestPhase2OutputWriting(unittest.TestCase):
 
         summary_file = summaries_dir / "test_summary.md"
         content = "# Test Summary\n\n## Key Points\n- Point 1\n"
-        summary_file.write_text(content, encoding='utf-8')
+        summary_file.write_text(content, encoding="utf-8")
 
         self.assertTrue(summary_file.exists())
         self.assertIn("Test Summary", summary_file.read_text())
@@ -298,8 +304,8 @@ class TestPhase2OutputWriting(unittest.TestCase):
         concept1 = concepts_dir / "01_概念1.md"
         concept2 = concepts_dir / "02_概念2.md"
 
-        concept1.write_text("# 概念1\n\n描述1", encoding='utf-8')
-        concept2.write_text("# 概念2\n\n描述2", encoding='utf-8')
+        concept1.write_text("# 概念1\n\n描述1", encoding="utf-8")
+        concept2.write_text("# 概念2\n\n描述2", encoding="utf-8")
 
         self.assertTrue(concept1.exists())
         self.assertTrue(concept2.exists())
@@ -312,8 +318,8 @@ class TestPhase2OutputWriting(unittest.TestCase):
         test_file = self.temp_path / "unicode_test.md"
         unicode_content = "# 测试标题\n\n包含中文、日本語、한국어的内容"
 
-        test_file.write_text(unicode_content, encoding='utf-8')
-        read_content = test_file.read_text(encoding='utf-8')
+        test_file.write_text(unicode_content, encoding="utf-8")
+        read_content = test_file.read_text(encoding="utf-8")
 
         self.assertEqual(read_content, unicode_content)
 
@@ -329,12 +335,7 @@ class TestPhase2ErrorHandling(unittest.TestCase):
     def test_handle_api_error_1301(self):
         """测试内容过滤错误（error 1301）"""
         # 模拟 API 返回的错误
-        error_response = {
-            "error": {
-                "code": 1301,
-                "message": "内容被过滤"
-            }
-        }
+        error_response = {"error": {"code": 1301, "message": "内容被过滤"}}
         self.assertEqual(error_response["error"]["code"], 1301)
 
     def test_handle_file_not_found(self):
@@ -359,20 +360,17 @@ class TestPhase2ResumeCapability(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_save_progress_checkpoint(self):
         """测试保存进度检查点"""
         progress_file = self.temp_path / "progress.json"
 
-        progress_data = {
-            "last_processed": "SRC-0050",
-            "processed_count": 50,
-            "failed_count": 2
-        }
+        progress_data = {"last_processed": "SRC-0050", "processed_count": 50, "failed_count": 2}
 
-        progress_file.write_text(json.dumps(progress_data), encoding='utf-8')
-        loaded = json.loads(progress_file.read_text(encoding='utf-8'))
+        progress_file.write_text(json.dumps(progress_data), encoding="utf-8")
+        loaded = json.loads(progress_file.read_text(encoding="utf-8"))
 
         self.assertEqual(loaded["last_processed"], "SRC-0050")
 
@@ -380,13 +378,10 @@ class TestPhase2ResumeCapability(unittest.TestCase):
         """测试从检查点恢复"""
         progress_file = self.temp_path / "progress.json"
 
-        progress_data = {
-            "last_processed": "SRC-0010",
-            "processed_count": 10
-        }
+        progress_data = {"last_processed": "SRC-0010", "processed_count": 10}
 
-        progress_file.write_text(json.dumps(progress_data), encoding='utf-8')
-        loaded = json.loads(progress_file.read_text(encoding='utf-8'))
+        progress_file.write_text(json.dumps(progress_data), encoding="utf-8")
+        loaded = json.loads(progress_file.read_text(encoding="utf-8"))
 
         # 恢复应该从下一个 ID 开始
         self.assertEqual(loaded["last_processed"], "SRC-0010")
@@ -427,23 +422,22 @@ class TestPhase2CompilationWorker(unittest.TestCase):
     def tearDown(self):
         """清理测试环境"""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('dochris.workers.compiler_worker.LLMClient')
+    @patch("dochris.workers.compiler_worker.LLMClient")
     def test_worker_initialization(self, mock_llm):
         """测试 Worker 初始化"""
         from dochris.workers.compiler_worker import CompilerWorker
 
         worker = CompilerWorker(
-            api_key="test_key",
-            base_url="https://api.test.com",
-            model="test_model"
+            api_key="test_key", base_url="https://api.test.com", model="test_model"
         )
 
         self.assertIsNotNone(worker)
         self.assertIsNotNone(worker.llm)
 
-    @patch('dochris.workers.compiler_worker.file_hash')
+    @patch("dochris.workers.compiler_worker.file_hash")
     def test_worker_cache_check(self, mock_hash):
         """测试 Worker 缓存检查"""
 

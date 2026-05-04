@@ -71,7 +71,9 @@ def get_env_bool(env_name: str, default: bool = False) -> bool:
     return default
 
 
-def get_env_list(env_name: str, separator: str = ",", default: list[str] | None = None) -> list[str]:
+def get_env_list(
+    env_name: str, separator: str = ",", default: list[str] | None = None
+) -> list[str]:
     """从环境变量读取列表
 
     Args:

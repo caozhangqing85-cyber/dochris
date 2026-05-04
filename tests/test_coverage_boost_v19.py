@@ -17,9 +17,17 @@ class TestConfigFromEnv:
         env_file = tmp_path / ".env"
         env_file.write_text("OPENAI_API_KEY=test-key-xyz\nMODEL=test-model\n", encoding="utf-8")
 
-        for k in ["OPENAI_API_KEY", "MODEL", "WORKSPACE", "SOURCE_PATH",
-                   "OBSIDIAN_VAULTS", "OBSIDIAN_VAULT", "PLUGIN_DIRS",
-                   "PLUGINS_ENABLED", "PLUGINS_DISABLED"]:
+        for k in [
+            "OPENAI_API_KEY",
+            "MODEL",
+            "WORKSPACE",
+            "SOURCE_PATH",
+            "OBSIDIAN_VAULTS",
+            "OBSIDIAN_VAULT",
+            "PLUGIN_DIRS",
+            "PLUGINS_ENABLED",
+            "PLUGINS_DISABLED",
+        ]:
             monkeypatch.delenv(k, raising=False)
 
         from dochris.settings.config import Settings
@@ -33,9 +41,16 @@ class TestConfigFromEnv:
         scripts.mkdir()
         (scripts / "config.py").write_text("# test\n", encoding="utf-8")
 
-        for k in ["WORKSPACE", "OPENAI_API_KEY", "SOURCE_PATH",
-                   "OBSIDIAN_VAULTS", "OBSIDIAN_VAULT", "PLUGIN_DIRS",
-                   "PLUGINS_ENABLED", "PLUGINS_DISABLED"]:
+        for k in [
+            "WORKSPACE",
+            "OPENAI_API_KEY",
+            "SOURCE_PATH",
+            "OBSIDIAN_VAULTS",
+            "OBSIDIAN_VAULT",
+            "PLUGIN_DIRS",
+            "PLUGINS_ENABLED",
+            "PLUGINS_DISABLED",
+        ]:
             monkeypatch.delenv(k, raising=False)
 
         with patch("pathlib.Path.cwd", return_value=tmp_path):
@@ -53,9 +68,16 @@ class TestConfigFromEnv:
         scripts.mkdir()
         (scripts / "config.py").write_text("# t\n", encoding="utf-8")
 
-        for k in ["WORKSPACE", "OPENAI_API_KEY", "SOURCE_PATH",
-                   "OBSIDIAN_VAULTS", "OBSIDIAN_VAULT", "PLUGIN_DIRS",
-                   "PLUGINS_ENABLED", "PLUGINS_DISABLED"]:
+        for k in [
+            "WORKSPACE",
+            "OPENAI_API_KEY",
+            "SOURCE_PATH",
+            "OBSIDIAN_VAULTS",
+            "OBSIDIAN_VAULT",
+            "PLUGIN_DIRS",
+            "PLUGINS_ENABLED",
+            "PLUGINS_DISABLED",
+        ]:
             monkeypatch.delenv(k, raising=False)
 
         with patch("pathlib.Path.cwd", return_value=child):
@@ -74,7 +96,7 @@ class TestConfigValidateEdge:
 
         s = Settings()
         # Override workspace to None to trigger the empty check
-        object.__setattr__(s, 'workspace', None)
+        object.__setattr__(s, "workspace", None)
         with pytest.raises(ValueError, match="workspace"):
             s.validate()
 
@@ -124,7 +146,9 @@ class TestQualityGateCLI:
         mock_get.return_value = {"status": "compiled", "title": "T", "promoted_to": None}
         from dochris.quality.quality_gate import main
 
-        with patch("sys.argv", ["qg.py", str(tmp_path), "auto-downgrade", "SRC-0001", "--reason", "r"]):
+        with patch(
+            "sys.argv", ["qg.py", str(tmp_path), "auto-downgrade", "SRC-0001", "--reason", "r"]
+        ):
             with pytest.raises(SystemExit) as e:
                 main()
             assert e.value.code == 0
@@ -156,8 +180,11 @@ class TestQualityGateCLI:
     def test_main_quality_gate_pass(self, mock_get, mock_log, tmp_path):
         """main() quality-gate pass"""
         mock_get.return_value = {
-            "status": "compiled", "quality_score": 90,
-            "error_message": None, "summary": "s", "title": "T",
+            "status": "compiled",
+            "quality_score": 90,
+            "error_message": None,
+            "summary": "s",
+            "title": "T",
         }
         from dochris.quality.quality_gate import main
 
@@ -218,7 +245,9 @@ class TestFAISSLoadErrors:
         coll = tmp_path / "c1"
         coll.mkdir()
         (coll / "index.faiss").write_bytes(b"x")
-        (coll / "metadata.json").write_text('{"documents":{"i1":"d1"},"metadatas":{"i1":{}}}', encoding="utf-8")
+        (coll / "metadata.json").write_text(
+            '{"documents":{"i1":"d1"},"metadatas":{"i1":{}}}', encoding="utf-8"
+        )
 
         with patch.dict("sys.modules", {"faiss": fm}):
             from dochris.vector.faiss_store import FAISSStore
@@ -306,7 +335,10 @@ class TestBatchPromoteExtra:
     def test_wiki_dry_many(self, mock_log, mock_p, mock_m, tmp_path, caplog):
         """wiki dry_run >20 (line 68)"""
         import logging
-        mock_m.return_value = [{"id": f"SRC-{i:04d}", "quality_score": 90, "title": f"D{i}"} for i in range(25)]
+
+        mock_m.return_value = [
+            {"id": f"SRC-{i:04d}", "quality_score": 90, "title": f"D{i}"} for i in range(25)
+        ]
         from dochris.admin.batch_promote import batch_promote_to_wiki
 
         with caplog.at_level(logging.INFO, logger="dochris.admin.batch_promote"):
@@ -319,7 +351,9 @@ class TestBatchPromoteExtra:
     @patch("dochris.admin.batch_promote.append_log")
     def test_curated_dry_many(self, mock_log, mock_p, mock_m, tmp_path, capsys):
         """curated dry_run >20 (line 134)"""
-        mock_m.return_value = [{"id": f"SRC-{i:04d}", "quality_score": 95, "title": f"D{i}"} for i in range(25)]
+        mock_m.return_value = [
+            {"id": f"SRC-{i:04d}", "quality_score": 95, "title": f"D{i}"} for i in range(25)
+        ]
         from dochris.admin.batch_promote import batch_promote_to_curated
 
         r = batch_promote_to_curated(tmp_path, dry_run=True)
@@ -358,7 +392,9 @@ class TestBatchPromoteExtra:
     @patch("dochris.admin.batch_promote.append_log")
     def test_obsidian_limit(self, mock_log, mock_p, mock_m, tmp_path):
         """obsidian with limit (line 208)"""
-        mock_m.return_value = [{"id": f"SRC-{i:04d}", "quality_score": 98, "title": f"D{i}"} for i in range(5)]
+        mock_m.return_value = [
+            {"id": f"SRC-{i:04d}", "quality_score": 98, "title": f"D{i}"} for i in range(5)
+        ]
         mock_p.return_value = True
         from dochris.admin.batch_promote import batch_promote_to_obsidian
 
@@ -413,7 +449,9 @@ class TestBatchPromoteCLI:
         mock_s.return_value = MagicMock(min_quality_score=85)
         from dochris.admin.batch_promote import main
 
-        with patch("sys.argv", ["bp.py", "/tmp", "wiki", "--min-score", "90", "--limit", "5", "--dry-run"]):
+        with patch(
+            "sys.argv", ["bp.py", "/tmp", "wiki", "--min-score", "90", "--limit", "5", "--dry-run"]
+        ):
             main()
         mock_w.assert_called_once_with(Path("/tmp"), 90, 5, True)
 
@@ -449,10 +487,13 @@ class TestRecompileExtra:
         """text mode excludes pdf no_text (line 94)"""
         from dochris.admin.recompile import get_recoverable_failed_docs
 
-        with patch("dochris.admin.recompile.get_all_manifests", return_value=[
-            {"id": "S1", "error_message": "no_text", "type": "pdf"},
-            {"id": "S2", "error_message": "llm_failed", "type": "article"},
-        ]):
+        with patch(
+            "dochris.admin.recompile.get_all_manifests",
+            return_value=[
+                {"id": "S1", "error_message": "no_text", "type": "pdf"},
+                {"id": "S2", "error_message": "llm_failed", "type": "article"},
+            ],
+        ):
             r = get_recoverable_failed_docs(tmp_path, mode="text")
         assert len(r) == 1
         assert r[0]["id"] == "S2"
@@ -468,10 +509,15 @@ class TestRecompileExtra:
             s.batch_size = 10
             ms.return_value = s
 
-            with patch("dochris.admin.recompile.get_recoverable_failed_docs", return_value=[
-                {"id": "S1", "error_message": "llm_failed"},
-            ]), \
-                 patch.dict("os.environ", {}, clear=True):
+            with (
+                patch(
+                    "dochris.admin.recompile.get_recoverable_failed_docs",
+                    return_value=[
+                        {"id": "S1", "error_message": "llm_failed"},
+                    ],
+                ),
+                patch.dict("os.environ", {}, clear=True),
+            ):
                 import asyncio
 
                 from dochris.admin.recompile import recompile

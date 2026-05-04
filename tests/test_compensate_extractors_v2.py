@@ -42,7 +42,9 @@ class TestExtractTextFromFileDocTypes:
         docx_file.write_bytes(b"PK\x03\x04")
 
         logger = MagicMock()
-        with patch("dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")):
+        with patch(
+            "dochris.parsers.doc_parser.parse_document", side_effect=TextExtractionError("fail")
+        ):
             result = extract_text_from_file(docx_file, logger)
 
         assert result is None
@@ -151,7 +153,9 @@ class TestExtractEbookTextSuccess:
         mock_run.return_value = mock_result
 
         # 临时文件写入内容
-        with patch("dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile") as mock_tmp:
+        with patch(
+            "dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile"
+        ) as mock_tmp:
             mock_tmp_file = MagicMock()
             mock_tmp_file.name = str(tmp_path / "output.txt")
             mock_tmp_file.__enter__ = MagicMock(return_value=mock_tmp_file)
@@ -181,7 +185,9 @@ class TestExtractEbookTextSuccess:
         mock_result.stderr = ""
         mock_run.return_value = mock_result
 
-        with patch("dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile") as mock_tmp:
+        with patch(
+            "dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile"
+        ) as mock_tmp:
             mock_tmp_file = MagicMock()
             mock_tmp_file.name = str(tmp_path / "empty.txt")
             mock_tmp_file.__enter__ = MagicMock(return_value=mock_tmp_file)
@@ -209,7 +215,9 @@ class TestExtractEbookTextSuccess:
         mock_result.stderr = "error"
         mock_run.return_value = mock_result
 
-        with patch("dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile") as mock_tmp:
+        with patch(
+            "dochris.compensate.compensate_extractors.tempfile.NamedTemporaryFile"
+        ) as mock_tmp:
             mock_tmp_file = MagicMock()
             mock_tmp_file.name = str(tmp_path / "output.txt")
             mock_tmp_file.__enter__ = MagicMock(return_value=mock_tmp_file)
@@ -244,7 +252,9 @@ class TestExtractTextCompensatedOtherType:
         manifest = {"id": "SRC-0001", "type": "other", "file_path": "test.mhtml"}
 
         # 模拟 extract_text_from_file 返回 None（原始提取失败）
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None):
+        with patch(
+            "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+        ):
             logger = MagicMock()
             text, method = extract_text_compensated(mhtml_file, manifest, logger)
 
@@ -267,7 +277,9 @@ class TestExtractTextCompensatedOtherType:
 
         manifest = {"id": "SRC-0001", "type": "other", "file_path": "test.mhtml"}
 
-        with patch("dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None):
+        with patch(
+            "dochris.compensate.compensate_extractors.extract_text_from_file", return_value=None
+        ):
             logger = MagicMock()
             text, method = extract_text_compensated(mhtml_file, manifest, logger)
 

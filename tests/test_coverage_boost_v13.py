@@ -330,8 +330,15 @@ class TestSettingsFromEnv:
         from dochris.settings.config import Settings
 
         # Clear relevant env vars
-        for var in ["WORKSPACE", "OPENAI_API_KEY", "OPENAI_API_BASE", "MODEL",
-                     "SOURCE_PATH", "OBSIDIAN_VAULTS", "OBSIDIAN_VAULT"]:
+        for var in [
+            "WORKSPACE",
+            "OPENAI_API_KEY",
+            "OPENAI_API_BASE",
+            "MODEL",
+            "SOURCE_PATH",
+            "OBSIDIAN_VAULTS",
+            "OBSIDIAN_VAULT",
+        ]:
             monkeypatch.delenv(var, raising=False)
 
         s = Settings.from_env(env_file=tmp_path / "nonexistent.env")
@@ -453,7 +460,9 @@ class TestSettingsValidate:
     def test_validate_api_key_missing_no_config(self, tmp_path, monkeypatch):
         from dochris.settings.config import Settings
 
-        s = Settings(workspace=tmp_path, api_key=None, openclaw_config_path=tmp_path / "nonexistent.json")
+        s = Settings(
+            workspace=tmp_path, api_key=None, openclaw_config_path=tmp_path / "nonexistent.json"
+        )
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
         warnings = s.validate()

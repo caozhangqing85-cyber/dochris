@@ -15,7 +15,9 @@ class TestOllamaGenerate:
 
         provider = OllamaProvider(base_url="http://localhost:11434", model="test")
 
-        with patch.object(provider, "generate_with_messages", new_callable=AsyncMock, return_value="response") as mock_gwm:
+        with patch.object(
+            provider, "generate_with_messages", new_callable=AsyncMock, return_value="response"
+        ) as mock_gwm:
             with patch("dochris.llm.ollama.aiohttp", MagicMock()):  # 确保 aiohttp 可用
                 result = await provider.generate("hello", system_prompt="你是一个助手")
 
@@ -34,7 +36,9 @@ class TestOllamaGenerate:
 
         provider = OllamaProvider(base_url="http://localhost:11434", model="test")
 
-        with patch.object(provider, "generate_with_messages", new_callable=AsyncMock, return_value="ok") as mock_gwm:
+        with patch.object(
+            provider, "generate_with_messages", new_callable=AsyncMock, return_value="ok"
+        ) as mock_gwm:
             with patch("dochris.llm.ollama.aiohttp", MagicMock()):
                 result = await provider.generate("hello")
 

@@ -13,8 +13,10 @@ class TestCliServe:
         import importlib
 
         import dochris.cli.cli_serve as serve_mod
+
         mock_uvicorn = MagicMock()
         import sys
+
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 
@@ -30,8 +32,10 @@ class TestCliServe:
         import importlib
 
         import dochris.cli.cli_serve as serve_mod
+
         mock_uvicorn = MagicMock()
         import sys
+
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 
@@ -46,6 +50,7 @@ class TestCliServe:
         import sys
 
         import dochris.cli.cli_serve as serve_mod
+
         # 移除 uvicorn 模拟 ImportError
         sys.modules.pop("uvicorn", None)
         try:
@@ -55,6 +60,7 @@ class TestCliServe:
             assert result == 1
         finally:
             import uvicorn
+
             sys.modules["uvicorn"] = uvicorn
             importlib.reload(serve_mod)
 
@@ -62,8 +68,10 @@ class TestCliServe:
         import importlib
 
         import dochris.cli.cli_serve as serve_mod
+
         mock_uvicorn = MagicMock()
         import sys
+
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 

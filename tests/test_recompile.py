@@ -78,9 +78,11 @@ def mock_settings(mock_workspace, monkeypatch):
 class TestGetRecoverableFailedDocs:
     """测试获取可恢复失败文档功能"""
 
-    @patch('dochris.admin.recompile.get_all_manifests')
-    @patch('dochris.admin.recompile.get_settings')
-    def test_get_recoverable_filters_all_mode(self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace):
+    @patch("dochris.admin.recompile.get_all_manifests")
+    @patch("dochris.admin.recompile.get_settings")
+    def test_get_recoverable_filters_all_mode(
+        self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace
+    ):
         """测试 all 模式正确过滤"""
         from dochris.admin.recompile import get_recoverable_failed_docs
 
@@ -94,9 +96,11 @@ class TestGetRecoverableFailedDocs:
         # 所有四个都是可恢复的
         assert len(recoverable) == 4
 
-    @patch('dochris.admin.recompile.get_all_manifests')
-    @patch('dochris.admin.recompile.get_settings')
-    def test_get_recoverable_filters_llm_failed_mode(self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace):
+    @patch("dochris.admin.recompile.get_all_manifests")
+    @patch("dochris.admin.recompile.get_settings")
+    def test_get_recoverable_filters_llm_failed_mode(
+        self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace
+    ):
         """测试 llm_failed 模式"""
         from dochris.admin.recompile import get_recoverable_failed_docs
 
@@ -111,9 +115,11 @@ class TestGetRecoverableFailedDocs:
         assert len(recoverable) == 1
         assert recoverable[0]["id"] == "SRC-0001"
 
-    @patch('dochris.admin.recompile.get_all_manifests')
-    @patch('dochris.admin.recompile.get_settings')
-    def test_get_recoverable_filters_text_mode(self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace):
+    @patch("dochris.admin.recompile.get_all_manifests")
+    @patch("dochris.admin.recompile.get_settings")
+    def test_get_recoverable_filters_text_mode(
+        self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace
+    ):
         """测试 text 模式"""
         from dochris.admin.recompile import get_recoverable_failed_docs
 
@@ -127,9 +133,11 @@ class TestGetRecoverableFailedDocs:
         # pdf, article, ebook 都是文本类型（排除 no_text 的 pdf）
         assert len(recoverable) == 3
 
-    @patch('dochris.admin.recompile.get_all_manifests')
-    @patch('dochris.admin.recompile.get_settings')
-    def test_get_recoverable_custom_error_filter(self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace):
+    @patch("dochris.admin.recompile.get_all_manifests")
+    @patch("dochris.admin.recompile.get_settings")
+    def test_get_recoverable_custom_error_filter(
+        self, mock_get_settings, mock_get_all, sample_failed_manifests, mock_workspace
+    ):
         """测试自定义错误过滤"""
         from dochris.admin.recompile import get_recoverable_failed_docs
 
@@ -138,7 +146,9 @@ class TestGetRecoverableFailedDocs:
         mock_get_settings.return_value = mock_settings
         mock_get_all.return_value = sample_failed_manifests
 
-        recoverable = get_recoverable_failed_docs(mock_workspace, mode="custom", error_filter="timeout")
+        recoverable = get_recoverable_failed_docs(
+            mock_workspace, mode="custom", error_filter="timeout"
+        )
 
         # 只有 timeout
         assert len(recoverable) == 1
@@ -149,17 +159,22 @@ class TestRecompileFunction:
     """测试重新编译功能"""
 
     @pytest.mark.asyncio
-    async def test_recompile_with_limit(self, sample_failed_manifests, mock_workspace, mock_settings):
+    async def test_recompile_with_limit(
+        self, sample_failed_manifests, mock_workspace, mock_settings
+    ):
         """测试限制重编译数量"""
         from dochris.admin.recompile import recompile
 
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.admin.recompile.get_settings') as mock_get_settings, \
-             patch('dochris.admin.recompile.get_all_manifests', return_value=sample_failed_manifests), \
-             patch('dochris.admin.recompile.CompilerWorker', return_value=mock_worker):
-
+        with (
+            patch("dochris.admin.recompile.get_settings") as mock_get_settings,
+            patch(
+                "dochris.admin.recompile.get_all_manifests", return_value=sample_failed_manifests
+            ),
+            patch("dochris.admin.recompile.CompilerWorker", return_value=mock_worker),
+        ):
             mock_settings_obj = MagicMock()
             mock_settings_obj.workspace = mock_workspace
             mock_settings_obj.api_key = "test-key"
@@ -175,9 +190,10 @@ class TestRecompileFunction:
         """测试没有可恢复文档"""
         from dochris.admin.recompile import recompile
 
-        with patch('dochris.admin.recompile.get_settings') as mock_get_settings, \
-             patch('dochris.admin.recompile.get_all_manifests', return_value=[]):
-
+        with (
+            patch("dochris.admin.recompile.get_settings") as mock_get_settings,
+            patch("dochris.admin.recompile.get_all_manifests", return_value=[]),
+        ):
             mock_settings_obj = MagicMock()
             mock_settings_obj.workspace = mock_workspace
             mock_settings_obj.api_key = "test-key"
@@ -186,17 +202,22 @@ class TestRecompileFunction:
             await recompile(mode="all", error_filter=None, max_concurrent=1, limit=None)
 
     @pytest.mark.asyncio
-    async def test_recompile_handles_exceptions(self, sample_failed_manifests, mock_workspace, mock_settings):
+    async def test_recompile_handles_exceptions(
+        self, sample_failed_manifests, mock_workspace, mock_settings
+    ):
         """测试处理异常"""
         from dochris.admin.recompile import recompile
 
         mock_worker = AsyncMock()
         mock_worker.compile_document.side_effect = Exception("测试异常")
 
-        with patch('dochris.admin.recompile.get_settings') as mock_get_settings, \
-             patch('dochris.admin.recompile.get_all_manifests', return_value=sample_failed_manifests), \
-             patch('dochris.admin.recompile.CompilerWorker', return_value=mock_worker):
-
+        with (
+            patch("dochris.admin.recompile.get_settings") as mock_get_settings,
+            patch(
+                "dochris.admin.recompile.get_all_manifests", return_value=sample_failed_manifests
+            ),
+            patch("dochris.admin.recompile.CompilerWorker", return_value=mock_worker),
+        ):
             mock_settings_obj = MagicMock()
             mock_settings_obj.workspace = mock_workspace
             mock_settings_obj.api_key = "test-key"
@@ -212,9 +233,9 @@ class TestRecompileFunction:
 class TestRecompileCLI:
     """测试命令行接口"""
 
-    @patch('sys.argv', ['recompile.py', '--mode', 'all', '--concurrency', '4', '--limit', '10'])
-    @patch('dochris.admin.recompile.setup_logging')
-    @patch('dochris.admin.recompile.recompile')
+    @patch("sys.argv", ["recompile.py", "--mode", "all", "--concurrency", "4", "--limit", "10"])
+    @patch("dochris.admin.recompile.setup_logging")
+    @patch("dochris.admin.recompile.recompile")
     def test_main_with_args(self, mock_recompile, mock_logging):
         """测试带参数的主函数"""
         from dochris.admin.recompile import main
@@ -226,9 +247,9 @@ class TestRecompileCLI:
 
         mock_recompile.assert_called_once()
 
-    @patch('sys.argv', ['recompile.py', '--mode', 'llm_failed'])
-    @patch('dochris.admin.recompile.setup_logging')
-    @patch('dochris.admin.recompile.recompile')
+    @patch("sys.argv", ["recompile.py", "--mode", "llm_failed"])
+    @patch("dochris.admin.recompile.setup_logging")
+    @patch("dochris.admin.recompile.recompile")
     def test_main_with_llm_failed_mode(self, mock_recompile, mock_logging):
         """测试 llm_failed 模式"""
         from dochris.admin.recompile import main
@@ -239,11 +260,11 @@ class TestRecompileCLI:
         main()
 
         call_kwargs = mock_recompile.call_args[1]
-        assert call_kwargs['mode'] == 'llm_failed'
+        assert call_kwargs["mode"] == "llm_failed"
 
-    @patch('sys.argv', ['recompile.py', '--error', 'timeout'])
-    @patch('dochris.admin.recompile.setup_logging')
-    @patch('dochris.admin.recompile.recompile')
+    @patch("sys.argv", ["recompile.py", "--error", "timeout"])
+    @patch("dochris.admin.recompile.setup_logging")
+    @patch("dochris.admin.recompile.recompile")
     def test_main_with_custom_error(self, mock_recompile, mock_logging):
         """测试自定义错误过滤"""
         from dochris.admin.recompile import main
@@ -254,5 +275,5 @@ class TestRecompileCLI:
         main()
 
         call_kwargs = mock_recompile.call_args[1]
-        assert call_kwargs['mode'] == 'custom'
-        assert call_kwargs['error_filter'] == 'timeout'
+        assert call_kwargs["mode"] == "custom"
+        assert call_kwargs["error_filter"] == "timeout"

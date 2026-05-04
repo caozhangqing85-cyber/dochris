@@ -119,7 +119,12 @@ def process_pdf(manifest: dict) -> bool:
 
     # Update manifest
     try:
-        update_manifest_status(get_default_workspace(), src_id, "transcribed", error_message=str({"text_length": len(full_text)}))
+        update_manifest_status(
+            get_default_workspace(),
+            src_id,
+            "transcribed",
+            error_message=str({"text_length": len(full_text)}),
+        )
         logger.info(f"✓ Manifest已更新: {src_id}")
     except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Manifest更新失败: {e}")

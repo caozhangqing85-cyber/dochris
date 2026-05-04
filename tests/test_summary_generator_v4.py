@@ -39,7 +39,12 @@ class TestGenerateSummaryJsonRepair:
     @pytest.mark.asyncio
     async def test_invalid_json_extract_from_text_fallback(self, generator, mock_llm_client):
         """json_repair 不可用时，使用 _extract_json_from_text 回退"""
-        result_data = {"one_line": "extracted", "key_points": [], "detailed_summary": "", "concepts": []}
+        result_data = {
+            "one_line": "extracted",
+            "key_points": [],
+            "detailed_summary": "",
+            "concepts": [],
+        }
         mock_llm_client._extract_json_from_text.return_value = result_data
 
         resp = _make_response("not valid json at all")

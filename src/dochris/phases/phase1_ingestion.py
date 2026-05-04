@@ -146,6 +146,7 @@ def get_audio_duration(filepath: Path) -> float | None:
         时长（秒），失败时返回 None
     """
     import logging
+
     _logger = logging.getLogger(__name__)
     # 安全验证：确保文件路径存在
     try:
@@ -454,7 +455,9 @@ def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
         logger.info("=" * 60)
         logger.info("将要处理的文件列表:")
         for i, entry in enumerate(new_files, 1):
-            logger.info(f"  [{i}] [{entry['category']}] {entry['name']} ({entry.get('size', 0)} bytes)")
+            logger.info(
+                f"  [{i}] [{entry['category']}] {entry['name']} ({entry.get('size', 0)} bytes)"
+            )
         logger.info("=" * 60)
         return {
             "total": len(new_files),

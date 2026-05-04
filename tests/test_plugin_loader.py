@@ -23,6 +23,7 @@ class TestDiscoverHookimpls:
 
     def test_discover_hookimpls_finds_marked_functions(self):
         """测试发现带 @hookimpl 标记的函数"""
+
         # 带标记的函数
         def hook1():
             pass

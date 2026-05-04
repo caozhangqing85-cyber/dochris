@@ -47,14 +47,14 @@ def sample_manifests(mock_workspace):
     manifests = []
     for i in range(5):
         manifest = {
-            "id": f"SRC-{i+1:04d}",
+            "id": f"SRC-{i + 1:04d}",
             "status": "ingested",
-            "title": f"测试文档 {i+1}",
+            "title": f"测试文档 {i + 1}",
             "file_path": f"raw/test{i}.pdf",
             "type": "pdf",
             "created_at": "2026-04-16T10:00:00",
         }
-        manifest_file = mock_workspace / "manifests" / "sources" / f"SRC-{i+1:04d}.json"
+        manifest_file = mock_workspace / "manifests" / "sources" / f"SRC-{i + 1:04d}.json"
         manifest_file.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
         manifests.append(manifest)
     return manifests
@@ -71,7 +71,7 @@ def mock_api_key(monkeypatch):
 class TestPhase2V7SetupLogging:
     """测试日志设置功能"""
 
-    @patch('dochris.phases.phase2_compilation.get_logs_dir')
+    @patch("dochris.phases.phase2_compilation.get_logs_dir")
     def test_setup_logging_creates_log_directory(self, mock_get_logs_dir, mock_workspace):
         """测试 setup_logging 创建日志目录"""
         from dochris.phases.phase2_compilation import setup_logging
@@ -83,7 +83,7 @@ class TestPhase2V7SetupLogging:
         assert logger is not None
         assert logger.name == "root"
 
-    @patch('dochris.phases.phase2_compilation.get_logs_dir')
+    @patch("dochris.phases.phase2_compilation.get_logs_dir")
     def test_setup_logging_creates_log_file(self, mock_get_logs_dir, mock_workspace):
         """测试 setup_logging 创建日志文件"""
         from dochris.phases.phase2_compilation import setup_logging
@@ -109,7 +109,9 @@ class TestPhase2V7CompileAll:
 
         # 不创建任何 manifest
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace):
+        with patch(
+            "dochris.phases.phase2_compilation.get_default_workspace", return_value=mock_workspace
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
         # 应该不报错，直接返回
 
@@ -121,10 +123,14 @@ class TestPhase2V7CompileAll:
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker') as mock_monitor_class:
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker") as mock_monitor_class,
+        ):
             mock_monitor = MagicMock()
             mock_monitor_class.return_value = mock_monitor
 
@@ -138,24 +144,34 @@ class TestPhase2V7CompileAll:
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+        ):
             await compile_all(max_concurrent=1, limit=2, use_openrouter=False)
 
     @pytest.mark.asyncio
-    async def test_compile_all_with_openrouter(self, mock_workspace, sample_manifests, mock_api_key):
+    async def test_compile_all_with_openrouter(
+        self, mock_workspace, sample_manifests, mock_api_key
+    ):
         """测试使用 OpenRouter"""
         from dochris.phases.phase2_compilation import compile_all
 
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=True)
 
     @pytest.mark.asyncio
@@ -166,14 +182,20 @@ class TestPhase2V7CompileAll:
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+        ):
             await compile_all(max_concurrent=3, limit=None, use_openrouter=False)
 
     @pytest.mark.asyncio
-    async def test_compile_all_handles_failures(self, mock_workspace, sample_manifests, mock_api_key):
+    async def test_compile_all_handles_failures(
+        self, mock_workspace, sample_manifests, mock_api_key
+    ):
         """测试处理编译失败"""
         from dochris.phases.phase2_compilation import compile_all
 
@@ -181,20 +203,24 @@ class TestPhase2V7CompileAll:
         # 第一个成功，第二个失败
         mock_worker.compile_document.side_effect = [True, False, True, False, True]
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
 
 
 class TestPhase2V7Main:
     """测试主函数入口"""
 
-    @patch('sys.argv', ['phase2_compilation.py', '--concurrency', '2', '--limit', '10'])
-    @patch('dochris.phases.phase2_compilation.DEFAULT_API_KEY', 'test-key-12345')
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.compile_all')
+    @patch("sys.argv", ["phase2_compilation.py", "--concurrency", "2", "--limit", "10"])
+    @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", "test-key-12345")
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.compile_all")
     def test_main_with_concurrency_and_limit(self, mock_compile, mock_logging):
         """测试带并发数和限制的主函数"""
         from dochris.phases.phase2_compilation import main
@@ -207,10 +233,10 @@ class TestPhase2V7Main:
 
         mock_compile.assert_called_once()
 
-    @patch('sys.argv', ['phase2_compilation.py', '--openrouter'])
-    @patch('dochris.phases.phase2_compilation.DEFAULT_API_KEY', 'test-key-12345')
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.compile_all')
+    @patch("sys.argv", ["phase2_compilation.py", "--openrouter"])
+    @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", "test-key-12345")
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.compile_all")
     def test_main_with_openrouter_flag(self, mock_compile, mock_logging):
         """测试使用 OpenRouter 标志的主函数"""
         from dochris.phases.phase2_compilation import main
@@ -223,14 +249,16 @@ class TestPhase2V7Main:
 
         # 验证调用参数
         call_kwargs = mock_compile.call_args[1]
-        assert call_kwargs['use_openrouter'] is True
+        assert call_kwargs["use_openrouter"] is True
 
-    @patch('sys.argv', ['phase2_compilation.py', '--clear-cache'])
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.clear_cache')
-    @patch('dochris.phases.phase2_compilation.cache_dir')
-    @patch('dochris.phases.phase2_compilation.get_default_workspace')
-    def test_main_clear_cache(self, mock_workspace, mock_cache_dir, mock_clear, mock_logging, monkeypatch):
+    @patch("sys.argv", ["phase2_compilation.py", "--clear-cache"])
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.clear_cache")
+    @patch("dochris.phases.phase2_compilation.cache_dir")
+    @patch("dochris.phases.phase2_compilation.get_default_workspace")
+    def test_main_clear_cache(
+        self, mock_workspace, mock_cache_dir, mock_clear, mock_logging, monkeypatch
+    ):
         """测试清理缓存功能"""
         from dochris.phases.phase2_compilation import main
 
@@ -247,10 +275,10 @@ class TestPhase2V7Main:
 
         mock_clear.assert_called_once()
 
-    @patch('sys.argv', ['phase2_compilation.py'])
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.compile_all')
-    @patch('dochris.phases.phase2_compilation.DEFAULT_API_KEY', None)
+    @patch("sys.argv", ["phase2_compilation.py"])
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.compile_all")
+    @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", None)
     def test_main_without_api_key(self, mock_compile, mock_logging):
         """测试没有 API 密钥时的情况"""
         import sys
@@ -260,14 +288,14 @@ class TestPhase2V7Main:
         mock_logger = MagicMock()
         mock_logging.return_value = mock_logger
 
-        with patch.object(sys, 'exit') as mock_exit:
+        with patch.object(sys, "exit") as mock_exit:
             main()
             mock_exit.assert_called_once_with(1)
 
-    @patch('sys.argv', ['phase2_compilation.py', '--model', 'custom-model'])
-    @patch('dochris.phases.phase2_compilation.DEFAULT_API_KEY', 'test-key-12345')
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.compile_all')
+    @patch("sys.argv", ["phase2_compilation.py", "--model", "custom-model"])
+    @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", "test-key-12345")
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.compile_all")
     def test_main_with_custom_model(self, mock_compile, mock_logging):
         """测试自定义模型"""
         from dochris.phases.phase2_compilation import main
@@ -280,10 +308,10 @@ class TestPhase2V7Main:
 
         mock_compile.assert_called_once()
 
-    @patch('sys.argv', ['phase2_compilation.py', '--api-base', 'https://custom.api/v1'])
-    @patch('dochris.phases.phase2_compilation.DEFAULT_API_KEY', 'test-key-12345')
-    @patch('dochris.phases.phase2_compilation.setup_logging')
-    @patch('dochris.phases.phase2_compilation.compile_all')
+    @patch("sys.argv", ["phase2_compilation.py", "--api-base", "https://custom.api/v1"])
+    @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", "test-key-12345")
+    @patch("dochris.phases.phase2_compilation.setup_logging")
+    @patch("dochris.phases.phase2_compilation.compile_all")
     def test_main_with_custom_api_base(self, mock_compile, mock_logging):
         """测试自定义 API 基础 URL"""
         from dochris.phases.phase2_compilation import main
@@ -308,22 +336,26 @@ class TestPhase2V7BatchProcessing:
         # 创建 60 个 manifest (超过默认批大小)
         for i in range(60):
             manifest = {
-                "id": f"SRC-{i+1:04d}",
+                "id": f"SRC-{i + 1:04d}",
                 "status": "ingested",
-                "title": f"测试文档 {i+1}",
+                "title": f"测试文档 {i + 1}",
                 "file_path": f"raw/test{i}.pdf",
                 "type": "pdf",
             }
-            manifest_file = mock_workspace / "manifests" / "sources" / f"SRC-{i+1:04d}.json"
+            manifest_file = mock_workspace / "manifests" / "sources" / f"SRC-{i + 1:04d}.json"
             manifest_file.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
 
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
 
             # 验证所有文件都被处理
@@ -344,11 +376,15 @@ class TestPhase2V7Reporting:
         mock_monitor = MagicMock()
         mock_monitor.print_report = MagicMock()
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker', return_value=mock_monitor), \
-             patch('dochris.phases.phase2_compilation.clear_cache', return_value=0):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
 
             # 验证报告被打印
@@ -362,11 +398,15 @@ class TestPhase2V7Reporting:
         mock_worker = AsyncMock()
         mock_worker.compile_document.return_value = True
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'), \
-             patch('dochris.phases.phase2_compilation.clear_cache', return_value=0):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+        ):
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
 
 
@@ -374,18 +414,24 @@ class TestPhase2V7ErrorHandling:
     """测试错误处理"""
 
     @pytest.mark.asyncio
-    async def test_handles_exception_in_compile(self, mock_workspace, sample_manifests, mock_api_key):
+    async def test_handles_exception_in_compile(
+        self, mock_workspace, sample_manifests, mock_api_key
+    ):
         """测试处理编译中的异常"""
         from dochris.phases.phase2_compilation import compile_all
 
         mock_worker = AsyncMock()
         mock_worker.compile_document.side_effect = Exception("测试异常")
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker', return_value=mock_worker), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'), \
-             patch('dochris.phases.phase2_compilation.clear_cache', return_value=0):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+        ):
             # 应该不抛出异常
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)
 
@@ -398,10 +444,14 @@ class TestPhase2V7ErrorHandling:
         invalid_file = mock_workspace / "manifests" / "sources" / "SRC-0001.json"
         invalid_file.write_text("{ invalid json", encoding="utf-8")
 
-        with patch('dochris.phases.phase2_compilation.get_default_workspace', return_value=mock_workspace), \
-             patch('dochris.phases.phase2_compilation.CompilerWorker'), \
-             patch('dochris.phases.phase2_compilation.MonitorWorker'), \
-             patch('dochris.phases.phase2_compilation.clear_cache', return_value=0):
-
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.get_default_workspace",
+                return_value=mock_workspace,
+            ),
+            patch("dochris.phases.phase2_compilation.CompilerWorker"),
+            patch("dochris.phases.phase2_compilation.MonitorWorker"),
+            patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+        ):
             # 应该不抛出异常
             await compile_all(max_concurrent=1, limit=None, use_openrouter=False)

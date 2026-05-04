@@ -153,9 +153,7 @@ class TestPluginManager:
             pass
 
         # 使用 _register_module 注册插件（会更新 _plugin_order）
-        clean_pm._register_module(
-            "plugin_a", None, [("hook_x", hook1), ("hook_y", hook2)]
-        )
+        clean_pm._register_module("plugin_a", None, [("hook_x", hook1), ("hook_y", hook2)])
         clean_pm._register_module("plugin_b", None, [("hook_x", hook1)])
 
         # 设置启用状态

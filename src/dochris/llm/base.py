@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """LLM 提供商抽象基类"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

@@ -61,6 +61,7 @@ class SummaryGenerator:
             - 内容过滤: 不重试，直接返回 None
             - 其他错误: 指数退避（10s, 20s, 40s...）
         """
+
         async def _do_llm_call() -> dict[str, Any]:
             """执行实际的 LLM API 调用"""
             # 速率限制：确保两次请求之间有足够间隔
@@ -86,6 +87,7 @@ class SummaryGenerator:
                 # 尝试使用 json_repair
                 try:
                     import json_repair
+
                     return cast(dict[str, Any], json_repair.loads(content))
                 except ImportError:
                     logger.warning("json_repair not installed, trying simple extraction")

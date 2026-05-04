@@ -45,10 +45,12 @@ class TestDiscoverHookimpls:
 
         def func_a():
             pass
+
         func_a._is_hookimpl = True
 
         def func_b():
             pass
+
         func_b._is_hookimpl = True
 
         module.func_a = func_a
@@ -150,8 +152,7 @@ class TestHookspecDecorator:
         from dochris.plugin.hookspec import hookspec
 
         @hookspec
-        def my_test_hook(x: int) -> int:
-            ...
+        def my_test_hook(x: int) -> int: ...
 
         assert getattr(my_test_hook, "_is_hookspec", False) is True
 
@@ -159,8 +160,7 @@ class TestHookspecDecorator:
         from dochris.plugin.hookspec import get_hookspec, hookspec
 
         @hookspec
-        def unique_test_hook_xyz():
-            ...
+        def unique_test_hook_xyz(): ...
 
         spec = get_hookspec("unique_test_hook_xyz")
         assert spec is not None

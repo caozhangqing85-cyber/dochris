@@ -469,11 +469,15 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
     if settings.api_key:
         try:
             if settings.api_base:
-                _llm_client_cache = openai.OpenAI(api_key=settings.api_key, base_url=settings.api_base, timeout=60)
+                _llm_client_cache = openai.OpenAI(
+                    api_key=settings.api_key, base_url=settings.api_base, timeout=60
+                )
             else:
                 _llm_client_cache = openai.OpenAI(api_key=settings.api_key, timeout=60)
             if logger:
-                logger.info(f"OpenAI 兼容客户端创建成功（使用 settings，Base URL: {settings.api_base}）")
+                logger.info(
+                    f"OpenAI 兼容客户端创建成功（使用 settings，Base URL: {settings.api_base}）"
+                )
             return _llm_client_cache
         except (openai.OpenAIError, ValueError) as e:
             if logger:
@@ -485,7 +489,9 @@ def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
         try:
             base_url = provider.get("baseUrl", "") or ""
             if base_url:
-                _llm_client_cache = openai.OpenAI(api_key=provider["apiKey"], base_url=base_url, timeout=60)
+                _llm_client_cache = openai.OpenAI(
+                    api_key=provider["apiKey"], base_url=base_url, timeout=60
+                )
             else:
                 _llm_client_cache = openai.OpenAI(api_key=provider["apiKey"], timeout=60)
             if logger:
