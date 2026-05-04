@@ -65,9 +65,9 @@
 - [x] Dependabot（pip + github-actions）
 - [x] CHANGELOG 自动生成（git-cliff）
 - [x] Dockerfile
-- [ ] P3-1: Web UI 查询面板（40 小时）
-- [ ] P3-3: API 文档站点（mkdocs-material）
-- [ ] P3-4: 知识图谱可视化（15 小时）
+- [x] P3-1: Web UI 查询面板增强 ✅ (v1.4.0)
+- [x] P3-3: API 文档站点（mkdocs-material）✅ (v1.4.0)
+- [x] P3-4: 知识图谱可视化 ✅ (v1.3.1)
 
 ---
 
