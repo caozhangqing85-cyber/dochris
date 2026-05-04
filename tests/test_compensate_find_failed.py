@@ -33,7 +33,7 @@ class TestFindFailedManifests:
         (raw_dir / "test.epub").write_bytes(b"epub")
         (raw_dir / "test.pdf").write_bytes(b"pdf")
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=manifests):
                 result = compensate_failures.find_failed_manifests("ebook", MagicMock())
 
@@ -55,7 +55,7 @@ class TestFindFailedManifests:
         raw_dir.mkdir()
         (raw_dir / "test.pdf").write_bytes(b"pdf")
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=manifests):
                 result = compensate_failures.find_failed_manifests("pdf", MagicMock())
 
@@ -76,7 +76,7 @@ class TestFindFailedManifests:
         raw_dir.mkdir()
         (raw_dir / "test.pdf").write_bytes(b"pdf")
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=manifests):
                 result = compensate_failures.find_failed_manifests("llm", MagicMock())
 
@@ -98,7 +98,7 @@ class TestFindFailedManifests:
         (raw_dir / "test.mhtml").write_text("mhtml", encoding="utf-8")
         (raw_dir / "test.exe").write_bytes(b"exe")
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=manifests):
                 result = compensate_failures.find_failed_manifests("other", MagicMock())
 
@@ -121,7 +121,7 @@ class TestFindFailedManifests:
         (raw_dir / "test.pdf").write_bytes(b"pdf")
         (raw_dir / "test.mhtml").write_text("mhtml", encoding="utf-8")
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=manifests):
                 result = compensate_failures.find_failed_manifests("all", MagicMock())
 
@@ -134,7 +134,7 @@ class TestFindFailedManifests:
         """无失败 manifest"""
         from dochris.compensate import compensate_failures
 
-        with patch.object(compensate_failures, "KB_PATH", tmp_path):
+        with patch.object(compensate_failures, "KB_PATH", tmp_path, create=True):
             with patch.object(compensate_failures, "get_all_manifests", return_value=[]):
                 result = compensate_failures.find_failed_manifests("all", MagicMock())
 

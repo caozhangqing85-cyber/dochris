@@ -148,10 +148,11 @@ class TestAppendLogToFile:
     def test_handles_corrupted_log_file(self, tmp_path):
         """损坏的日志文件被跳过并继续写入"""
         from datetime import datetime
+
         logs_dir = tmp_path / "logs"
         logs_dir.mkdir(parents=True)
         # 使用与函数相同的文件名格式
-        date_str = datetime.now().strftime('%Y%m%d')
+        date_str = datetime.now().strftime("%Y%m%d")
         log_file = logs_dir / f"test_corrupted_{date_str}.json"
         log_file.write_text("{broken", encoding="utf-8")
         # 不应抛异常

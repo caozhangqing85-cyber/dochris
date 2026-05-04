@@ -76,8 +76,8 @@ class TestOCRImage:
 
 
 class TestFindExistingTranscript:
-    @patch("dochris.admin.ocr_failed_pdf.TRANSCRIPTS_DIR")
-    @patch("dochris.admin.ocr_failed_pdf.RAW_DIR")
+    @patch("dochris.admin.ocr_failed_pdf.TRANSCRIPTS_DIR", create=True)
+    @patch("dochris.admin.ocr_failed_pdf.RAW_DIR", create=True)
     def test_find_existing_transcript(self, mock_raw, mock_transcripts, tmp_path):
         from dochris.admin.ocr_failed_pdf import find_existing_transcript
 

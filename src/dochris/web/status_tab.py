@@ -10,9 +10,8 @@ import gradio as gr  # type: ignore[import-untyped]
 import pandas as pd  # type: ignore[import-untyped]
 
 from dochris import __version__
-from dochris.settings import get_settings
 
-from .utils import EMPTY_STATUS_DF, EMPTY_TYPE_DF, get_manifest_data, sanitize_path
+from .utils import EMPTY_STATUS_DF, EMPTY_TYPE_DF, get_manifest_data, get_settings, sanitize_path
 
 logger = logging.getLogger(__name__)
 

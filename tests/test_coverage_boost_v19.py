@@ -421,7 +421,7 @@ class TestBatchPromoteCLI:
         with patch("sys.argv", ["bp.py"]):
             with pytest.raises(SystemExit) as e:
                 main()
-            assert e.value.code == 1
+            assert e.value.code == 2
 
     @patch("dochris.admin.batch_promote.batch_promote_to_wiki")
     @patch("dochris.admin.batch_promote.get_settings")
@@ -461,7 +461,7 @@ class TestBatchPromoteCLI:
         with patch("sys.argv", ["bp.py", "/tmp", "bad"]):
             with pytest.raises(SystemExit) as e:
                 main()
-            assert e.value.code == 1
+            assert e.value.code == 2
 
 
 # ============================================================

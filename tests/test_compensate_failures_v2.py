@@ -24,7 +24,7 @@ class TestSanitizeFallbacks:
 
     def test_sanitize_prompt_fallback(self):
         """sanitize_prompt fallback 原样返回"""
-        from dochris.compensate.compensate_failures import sanitize_prompt
+        from dochris.admin.sanitize_sensitive_words import sanitize_prompt
 
         result = sanitize_prompt("测试提示词")
         assert result == "测试提示词"

@@ -44,7 +44,9 @@ class TestExtractJSON:
 
     def test_extract_unmatched_braces(self):
         result = self.client._extract_json_from_text('{"key": "value"')
-        assert result is None
+        # json_repair fallback 会修复不完整的 JSON
+        assert result is not None
+        assert result.get("key") == "value"
 
     def test_extract_empty_json(self):
         result = self.client._extract_json_from_text("{}")

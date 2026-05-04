@@ -178,9 +178,7 @@ class TestUpdateManifestStatus:
     def test_sets_error_message(self, tmp_path):
         """设置错误消息"""
         self._create_simple(tmp_path)
-        result = update_manifest_status(
-            tmp_path, "SRC-0001", "failed", error_message="OOM"
-        )
+        result = update_manifest_status(tmp_path, "SRC-0001", "failed", error_message="OOM")
         assert result["error_message"] == "OOM"
 
     def test_sets_compiled_timestamp(self, tmp_path):
@@ -261,9 +259,19 @@ class TestUpdateIndexEntry:
 
         sources = tmp_path / "manifests" / "sources"
         sources.mkdir(parents=True)
-        append_to_index(tmp_path, {"id": "SRC-0001", "title": "T", "type": "pdf",
-                                   "date_ingested": "2026-01-01", "file_path": "f",
-                                   "content_hash": "h", "status": "ingested", "quality_score": 0})
+        append_to_index(
+            tmp_path,
+            {
+                "id": "SRC-0001",
+                "title": "T",
+                "type": "pdf",
+                "date_ingested": "2026-01-01",
+                "file_path": "f",
+                "content_hash": "h",
+                "status": "ingested",
+                "quality_score": 0,
+            },
+        )
         update_index_entry(tmp_path, "SRC-0001", "compiled", quality_score=95)
         content = (tmp_path / "manifests" / "source_index.csv").read_text(encoding="utf-8")
         assert "compiled" in content
@@ -287,9 +295,16 @@ class TestRebuildIndex:
         for i, st in enumerate(["compiled", "ingested"], 1):
             _write_manifest(
                 sources / f"SRC-{i:04d}.json",
-                {"id": f"SRC-{i:04d}", "title": f"File{i}", "type": "pdf",
-                 "date_ingested": "2026-01-01", "file_path": f"f{i}",
-                 "content_hash": f"h{i}", "status": st, "quality_score": 80},
+                {
+                    "id": f"SRC-{i:04d}",
+                    "title": f"File{i}",
+                    "type": "pdf",
+                    "date_ingested": "2026-01-01",
+                    "file_path": f"f{i}",
+                    "content_hash": f"h{i}",
+                    "status": st,
+                    "quality_score": 80,
+                },
             )
         rebuild_index(tmp_path)
         index_file = tmp_path / "manifests" / "source_index.csv"

@@ -8,10 +8,13 @@ import logging
 import gradio as gr  # type: ignore[import-untyped]
 import pandas as pd  # type: ignore[import-untyped]
 
-from dochris.manifest import get_all_manifests
-from dochris.settings import get_settings
-
-from .utils import EMPTY_QUALITY_DF, STATUS_LABELS, get_manifest_data
+from .utils import (
+    EMPTY_QUALITY_DF,
+    STATUS_LABELS,
+    get_all_manifests,
+    get_manifest_data,
+    get_settings,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -17,18 +17,48 @@ from dochris.web.quality_tab import (
 def _mock_manifests():
     """生成模拟 manifest 数据"""
     return [
-        {"id": "SRC-0001", "original_filename": "优秀.pdf", "type": "pdf",
-         "status": "compiled", "quality_score": 95},
-        {"id": "SRC-0002", "original_filename": "良好.pdf", "type": "pdf",
-         "status": "compiled", "quality_score": 75},
-        {"id": "SRC-0003", "original_filename": "较差.pdf", "type": "audio",
-         "status": "compiled", "quality_score": 30},
-        {"id": "SRC-0004", "original_filename": "低分.pdf", "type": "pdf",
-         "status": "compiled", "quality_score": 15},
-        {"id": "SRC-0005", "original_filename": "未评分.txt", "type": "other",
-         "status": "ingested", "quality_score": 0},
-        {"id": "SRC-0006", "original_filename": "满分.pdf", "type": "pdf",
-         "status": "compiled", "quality_score": 100},
+        {
+            "id": "SRC-0001",
+            "original_filename": "优秀.pdf",
+            "type": "pdf",
+            "status": "compiled",
+            "quality_score": 95,
+        },
+        {
+            "id": "SRC-0002",
+            "original_filename": "良好.pdf",
+            "type": "pdf",
+            "status": "compiled",
+            "quality_score": 75,
+        },
+        {
+            "id": "SRC-0003",
+            "original_filename": "较差.pdf",
+            "type": "audio",
+            "status": "compiled",
+            "quality_score": 30,
+        },
+        {
+            "id": "SRC-0004",
+            "original_filename": "低分.pdf",
+            "type": "pdf",
+            "status": "compiled",
+            "quality_score": 15,
+        },
+        {
+            "id": "SRC-0005",
+            "original_filename": "未评分.txt",
+            "type": "other",
+            "status": "ingested",
+            "quality_score": 0,
+        },
+        {
+            "id": "SRC-0006",
+            "original_filename": "满分.pdf",
+            "type": "pdf",
+            "status": "compiled",
+            "quality_score": 100,
+        },
     ]
 
 
@@ -84,10 +114,20 @@ class TestGetQualityDashboard:
     def test_rating_green(self, mock_settings, mock_data):
         """平均分 >= 80 时评级为绿色"""
         manifests = [
-            {"id": "SRC-0001", "original_filename": "a.pdf", "type": "pdf",
-             "status": "compiled", "quality_score": 90},
-            {"id": "SRC-0002", "original_filename": "b.pdf", "type": "pdf",
-             "status": "compiled", "quality_score": 85},
+            {
+                "id": "SRC-0001",
+                "original_filename": "a.pdf",
+                "type": "pdf",
+                "status": "compiled",
+                "quality_score": 90,
+            },
+            {
+                "id": "SRC-0002",
+                "original_filename": "b.pdf",
+                "type": "pdf",
+                "status": "compiled",
+                "quality_score": 85,
+            },
         ]
         mock_data.return_value = (manifests, {}, {})
         mock_settings.return_value = MagicMock(min_quality_score=85)
@@ -99,8 +139,13 @@ class TestGetQualityDashboard:
     def test_rating_yellow(self, mock_settings, mock_data):
         """平均分 60-80 时评级为黄色"""
         manifests = [
-            {"id": "SRC-0001", "original_filename": "a.pdf", "type": "pdf",
-             "status": "compiled", "quality_score": 70},
+            {
+                "id": "SRC-0001",
+                "original_filename": "a.pdf",
+                "type": "pdf",
+                "status": "compiled",
+                "quality_score": 70,
+            },
         ]
         mock_data.return_value = (manifests, {}, {})
         mock_settings.return_value = MagicMock(min_quality_score=85)
@@ -112,8 +157,13 @@ class TestGetQualityDashboard:
     def test_rating_red(self, mock_settings, mock_data):
         """平均分 < 60 时评级为红色"""
         manifests = [
-            {"id": "SRC-0001", "original_filename": "a.pdf", "type": "pdf",
-             "status": "compiled", "quality_score": 30},
+            {
+                "id": "SRC-0001",
+                "original_filename": "a.pdf",
+                "type": "pdf",
+                "status": "compiled",
+                "quality_score": 30,
+            },
         ]
         mock_data.return_value = (manifests, {}, {})
         mock_settings.return_value = MagicMock(min_quality_score=85)
@@ -179,8 +229,13 @@ class TestGetLowQualityTable:
     def test_row_limit_100(self, mock_settings, mock_data):
         """最多返回 100 行"""
         manifests = [
-            {"id": f"SRC-{i:04d}", "original_filename": f"low{i}.pdf",
-             "type": "pdf", "status": "compiled", "quality_score": 10}
+            {
+                "id": f"SRC-{i:04d}",
+                "original_filename": f"low{i}.pdf",
+                "type": "pdf",
+                "status": "compiled",
+                "quality_score": 10,
+            }
             for i in range(200)
         ]
         mock_data.return_value = (manifests, {}, {})

@@ -97,17 +97,13 @@ def sample_manifests(tmp_path: Path) -> list[dict[str, Any]]:
 class TestCreateWebApp:
     """测试 Gradio 应用工厂"""
 
-    @patch("dochris.web.app.get_settings")
-    def test_create_web_app_returns_blocks(self, mock_get_settings: MagicMock) -> None:
+    def test_create_web_app_returns_blocks(self) -> None:
         """create_web_app 返回 gr.Blocks 实例"""
-        mock_get_settings.return_value = MagicMock()
         app = create_web_app()
         assert isinstance(app, gr.Blocks)
 
-    @patch("dochris.web.app.get_settings")
-    def test_create_web_app_has_title(self, mock_get_settings: MagicMock) -> None:
+    def test_create_web_app_has_title(self) -> None:
         """应用标题设置正确"""
-        mock_get_settings.return_value = MagicMock()
         app = create_web_app()
         assert app.title == "dochris - 个人知识库"
 
@@ -180,20 +176,21 @@ class TestFormatQueryResults:
 class TestSystemStatus:
     """测试系统状态获取"""
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.status_tab.get_manifest_data")
+    @patch("dochris.web.status_tab.get_settings")
     def test_system_status_basic(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
         """基本状态信息"""
         mock_get_settings.return_value = mock_settings
-        mock_manifests.return_value = [
-            {"status": "compiled", "type": "pdf"},
-            {"status": "ingested", "type": "markdown"},
-        ]
+        mock_manifest_data.return_value = (
+            [{"status": "compiled", "type": "pdf"}, {"status": "ingested", "type": "markdown"}],
+            MagicMock(),
+            MagicMock(),
+        )
 
         output = _get_system_status()
         assert "系统信息" in output
@@ -201,12 +198,12 @@ class TestSystemStatus:
         assert "已配置" in output
         assert "文件统计" in output
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.status_tab.get_manifest_data")
+    @patch("dochris.web.status_tab.get_settings")
     def test_system_status_with_chromadb(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         tmp_path: Path,
     ) -> None:
         """包含 ChromaDB 状态"""
@@ -219,7 +216,7 @@ class TestSystemStatus:
         settings.api_key = "k"
         settings.min_quality_score = 85
         mock_get_settings.return_value = settings
-        mock_manifests.return_value = []
+        mock_manifest_data.return_value = ([], MagicMock(), MagicMock())
 
         # 创建 chroma 数据库文件
         data_dir = tmp_path / "data"
@@ -239,55 +236,63 @@ class TestSystemStatus:
 class TestQualityDashboard:
     """测试质量仪表盘"""
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.quality_tab.get_manifest_data")
+    @patch("dochris.web.quality_tab.get_settings")
     def test_quality_no_scores(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
     ) -> None:
         """无评分数据"""
         mock_get_settings.return_value = MagicMock(min_quality_score=85)
-        mock_manifests.return_value = [{"status": "ingested"}]
+        mock_manifest_data.return_value = ([{"status": "ingested"}], MagicMock(), MagicMock())
         output = _get_quality_dashboard()
         assert "暂无质量评分数据" in output
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.quality_tab.get_manifest_data")
+    @patch("dochris.web.quality_tab.get_settings")
     def test_quality_with_scores(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
     ) -> None:
         """有评分数据"""
         mock_get_settings.return_value = MagicMock(min_quality_score=85)
-        mock_manifests.return_value = [
-            {"original_filename": "good.pdf", "quality_score": 95},
-            {"original_filename": "bad.pdf", "quality_score": 60},
-            {"original_filename": "ok.pdf", "quality_score": 88},
-        ]
+        mock_manifest_data.return_value = (
+            [
+                {"original_filename": "good.pdf", "quality_score": 95},
+                {"original_filename": "bad.pdf", "quality_score": 60},
+                {"original_filename": "ok.pdf", "quality_score": 88},
+            ],
+            MagicMock(),
+            MagicMock(),
+        )
         output = _get_quality_dashboard()
         assert "质量概览" in output
         assert "平均分" in output
         assert "未达标" in output
         assert "bad.pdf" in output
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.quality_tab.get_manifest_data")
+    @patch("dochris.web.quality_tab.get_settings")
     def test_quality_distribution(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
     ) -> None:
         """质量分布统计"""
         mock_get_settings.return_value = MagicMock(min_quality_score=85)
-        mock_manifests.return_value = [
-            {"quality_score": 10},
-            {"quality_score": 30},
-            {"quality_score": 50},
-            {"quality_score": 70},
-            {"quality_score": 90},
-        ]
+        mock_manifest_data.return_value = (
+            [
+                {"quality_score": 10},
+                {"quality_score": 30},
+                {"quality_score": 50},
+                {"quality_score": 70},
+                {"quality_score": 90},
+            ],
+            MagicMock(),
+            MagicMock(),
+        )
         output = _get_quality_dashboard()
         assert "质量分布" in output
         assert "81-100" in output
@@ -301,18 +306,18 @@ class TestQualityDashboard:
 class TestFileTable:
     """测试文件列表获取"""
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.file_tab.get_manifest_data")
+    @patch("dochris.web.file_tab.get_settings")
     def test_file_table_data(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         mock_settings: MagicMock,
         sample_manifests: list[dict[str, Any]],
     ) -> None:
         """文件列表数据正确"""
         mock_get_settings.return_value = mock_settings
-        mock_manifests.return_value = sample_manifests
+        mock_manifest_data.return_value = (sample_manifests, MagicMock(), MagicMock())
 
         rows = _get_file_table()
         assert len(rows) == 4
@@ -320,12 +325,12 @@ class TestFileTable:
         assert rows[0][2] == "pdf"
         assert rows[0][3] == "compiled"
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.file_tab.get_manifest_data")
+    @patch("dochris.web.file_tab.get_settings")
     def test_file_table_limit(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
         """文件列表限制 200 条"""
@@ -334,7 +339,7 @@ class TestFileTable:
         many_manifests = [
             {"id": f"SRC-{i:04d}", "type": "pdf", "status": "compiled"} for i in range(250)
         ]
-        mock_manifests.return_value = many_manifests
+        mock_manifest_data.return_value = (many_manifests, MagicMock(), MagicMock())
 
         rows = _get_file_table()
         assert len(rows) == 200
@@ -358,7 +363,7 @@ class TestEventHandlers:
         result = handle_query("   ", 5)
         assert "请输入查询内容" in result
 
-    @patch("dochris.web.app._do_query")
+    @patch("dochris.web.query_tab._do_query")
     def test_handle_query_success(self, mock_query: MagicMock) -> None:
         """查询成功"""
         mock_query.return_value = {
@@ -370,59 +375,63 @@ class TestEventHandlers:
         result = handle_query("测试", 5)
         assert "测试回答" in result
 
-    @patch("dochris.web.app._do_query")
+    @patch("dochris.web.query_tab._do_query")
     def test_handle_query_error(self, mock_query: MagicMock) -> None:
         """查询失败"""
         mock_query.side_effect = RuntimeError("API 错误")
         result = handle_query("测试", 5)
         assert "查询出错" in result
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.file_tab.get_manifest_data")
+    @patch("dochris.web.file_tab.get_settings")
     def test_handle_refresh_files(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
         """刷新文件列表"""
         mock_get_settings.return_value = mock_settings
-        mock_manifests.return_value = [
-            {
-                "id": "SRC-0001",
-                "original_filename": "test.pdf",
-                "type": "pdf",
-                "status": "compiled",
-            },
-        ]
+        mock_manifest_data.return_value = (
+            [
+                {
+                    "id": "SRC-0001",
+                    "original_filename": "test.pdf",
+                    "type": "pdf",
+                    "status": "compiled",
+                },
+            ],
+            MagicMock(),
+            MagicMock(),
+        )
         rows, status = handle_refresh_files()
         assert len(rows) == 1
         assert "1 条记录" in status
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.status_tab.get_manifest_data")
+    @patch("dochris.web.status_tab.get_settings")
     def test_handle_refresh_status(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
         mock_settings: MagicMock,
     ) -> None:
         """刷新系统状态"""
         mock_get_settings.return_value = mock_settings
-        mock_manifests.return_value = []
+        mock_manifest_data.return_value = ([], MagicMock(), MagicMock())
         result = handle_refresh_status()
         assert "系统信息" in result
 
-    @patch("dochris.web.app.get_settings")
-    @patch("dochris.web.app.get_all_manifests")
+    @patch("dochris.web.quality_tab.get_manifest_data")
+    @patch("dochris.web.quality_tab.get_settings")
     def test_handle_refresh_quality(
         self,
-        mock_manifests: MagicMock,
         mock_get_settings: MagicMock,
+        mock_manifest_data: MagicMock,
     ) -> None:
         """刷新质量数据"""
         mock_get_settings.return_value = MagicMock(min_quality_score=85)
-        mock_manifests.return_value = []
+        mock_manifest_data.return_value = ([], MagicMock(), MagicMock())
         result = handle_refresh_quality()
         assert "暂无" in result or "质量概览" in result
 

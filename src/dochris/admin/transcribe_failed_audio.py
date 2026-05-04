@@ -21,8 +21,8 @@ WORKSPACE: Path
 TRANSCRIPTS_DIR: Path
 LOGS_PATH: Path
 
-# 延迟初始化的 logger（避免导入时创建日志文件）
-logger: logging.Logger
+# logger — 延迟初始化由 setup_logging() 在 main() 中设置，但提供模块级默认值避免 NameError
+logger = logging.getLogger(__name__)
 
 # 延迟检查的依赖状态
 FASTER_WHISPER_AVAILABLE: bool = False

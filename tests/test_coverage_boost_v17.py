@@ -306,7 +306,7 @@ class TestFindFailedManifests:
         ]
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
             ),
@@ -341,7 +341,7 @@ class TestFindFailedManifests:
         ]
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
             ),
@@ -362,7 +362,7 @@ class TestFindFailedManifests:
         ]
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
             ),
@@ -387,7 +387,7 @@ class TestFindFailedManifests:
 
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
             ),
@@ -415,7 +415,7 @@ class TestFindFailedManifests:
         ]
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.get_all_manifests", return_value=manifests
             ),
@@ -427,7 +427,7 @@ class TestFindFailedManifests:
         cf = self._make_cf()
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch("dochris.compensate.compensate_failures.get_all_manifests", return_value=[]),
         ):
             result = cf.find_failed_manifests("all", logger)
@@ -441,7 +441,7 @@ class TestRunCompensate:
 
         logger = MagicMock()
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch("dochris.compensate.compensate_failures.find_failed_manifests", return_value=[]),
         ):
             await cf.run_compensate(logger, "all")
@@ -456,7 +456,7 @@ class TestRunCompensate:
         mock_settings.api_key = None
 
         with (
-            patch.object(cf, "KB_PATH", tmp_path),
+            patch.object(cf, "KB_PATH", tmp_path, create=True),
             patch(
                 "dochris.compensate.compensate_failures.find_failed_manifests",
                 return_value=[{"id": "S1", "type": "pdf"}],
@@ -475,7 +475,7 @@ class TestRetryLLMFailed:
 
         manifest = {"id": "SRC-0001", "file_path": "raw/nonexistent.pdf", "title": "Missing"}
         logger = MagicMock()
-        with patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path):
+        with patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path, create=True):
             src_id, ok, status, comp = await retry_llm_failed(
                 manifest, None, logger, 0.1, ["model-a"]
             )
@@ -495,8 +495,8 @@ class TestRetryLLMFailed:
         logger = MagicMock()
 
         with (
-            patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path),
-            patch("dochris.compensate.compensate_failures.MIN_AUDIO_TEXT_LENGTH", 100),
+            patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path, create=True),
+            patch("dochris.compensate.compensate_failures.MIN_AUDIO_TEXT_LENGTH", 100, create=True),
         ):
             src_id, ok, status, comp = await retry_llm_failed(manifest, None, logger, 0.1, ["m1"])
         assert ok is False
@@ -519,7 +519,7 @@ class TestCompensateSingle:
         sem.__aenter__ = AsyncMock(return_value=None)
         sem.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path):
+        with patch("dochris.compensate.compensate_failures.KB_PATH", tmp_path, create=True):
             src_id, ok, status, comp = await compensate_single(
                 manifest, logger, sem, 0.1, ["m1"], "all"
             )

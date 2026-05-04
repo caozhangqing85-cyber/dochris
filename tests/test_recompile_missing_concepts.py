@@ -41,7 +41,7 @@ def sample_missing_concepts(mock_workspace):
 
 
 class TestFindMissingConceptsData:
-    @patch("dochris.admin.recompile_missing_concepts.KB_PATH")
+    @patch("dochris.admin.recompile_missing_concepts.KB_PATH", create=True)
     def test_find_missing_concepts_data(self, mock_kb, mock_workspace):
         from dochris.admin.recompile_missing_concepts import find_missing_concepts_data
 
@@ -75,7 +75,7 @@ class TestCompileStats:
 
 
 class TestRecompileMissingConceptsMain:
-    @patch("dochris.admin.recompile_missing_concepts.KB_PATH")
+    @patch("dochris.admin.recompile_missing_concepts.KB_PATH", create=True)
     def test_verify_results(self, mock_kb, mock_workspace):
         from dochris.admin.recompile_missing_concepts import verify_results
 

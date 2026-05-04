@@ -9,9 +9,7 @@ from typing import Any
 
 import gradio as gr  # type: ignore[import-untyped]
 
-from dochris.settings import get_settings
-
-from .utils import STATUS_FILTER_LABELS, STATUS_LABEL_REVERSE, get_manifest_data
+from .utils import STATUS_FILTER_LABELS, STATUS_LABEL_REVERSE, get_manifest_data, get_settings
 
 logger = logging.getLogger(__name__)
 

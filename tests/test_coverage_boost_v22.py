@@ -292,7 +292,7 @@ class TestWebAppHandlers:
         """查询异常返回错误"""
         from dochris.web.app import handle_query
 
-        with patch("dochris.web.app._do_query", side_effect=RuntimeError("fail")):
+        with patch("dochris.web.query_tab._do_query", side_effect=RuntimeError("fail")):
             result = handle_query("test", 5)
         assert "查询出错" in result
 
@@ -300,7 +300,7 @@ class TestWebAppHandlers:
         """刷新文件异常"""
         from dochris.web.app import handle_refresh_files
 
-        with patch("dochris.web.app._get_file_table", side_effect=RuntimeError("fail")):
+        with patch("dochris.web.file_tab._get_file_table", side_effect=RuntimeError("fail")):
             rows, status = handle_refresh_files()
         assert rows == []
         assert "刷新失败" in status
@@ -309,7 +309,7 @@ class TestWebAppHandlers:
         """获取状态异常"""
         from dochris.web.app import handle_refresh_status
 
-        with patch("dochris.web.app._get_system_status", side_effect=RuntimeError("fail")):
+        with patch("dochris.web.status_tab.get_system_status", side_effect=RuntimeError("fail")):
             result = handle_refresh_status()
         assert "获取状态失败" in result
 
@@ -317,7 +317,9 @@ class TestWebAppHandlers:
         """获取质量数据异常"""
         from dochris.web.app import handle_refresh_quality
 
-        with patch("dochris.web.app._get_quality_dashboard", side_effect=RuntimeError("fail")):
+        with patch(
+            "dochris.web.quality_tab._get_quality_dashboard", side_effect=RuntimeError("fail")
+        ):
             result = handle_refresh_quality()
         assert "获取质量数据失败" in result
 
@@ -385,7 +387,7 @@ class TestWebAppHandlers:
         mock_file = MagicMock()
         mock_file.name = "/tmp/source/test.pdf"
 
-        with patch("dochris.web.app.get_settings", return_value=mock_settings):
+        with patch("dochris.web.utils.get_settings", return_value=mock_settings):
             with patch("pathlib.Path.mkdir"):
                 with patch("pathlib.Path.exists", return_value=False):
                     with patch("shutil.copy2"):
@@ -396,16 +398,15 @@ class TestWebAppHandlers:
         """编译异常"""
         from dochris.web.app import handle_compile
 
-        with patch("dochris.web.app.get_settings"):
-            with patch("asyncio.run", side_effect=RuntimeError("compile fail")):
-                result = handle_compile(10)
+        with patch("asyncio.run", side_effect=RuntimeError("compile fail")):
+            result = handle_compile(10)
         assert "编译出错" in result
 
     def test_handle_graph_refresh_exception(self):
         """图谱刷新异常"""
         from dochris.web.app import _handle_graph_refresh
 
-        with patch("dochris.web.app._get_graph_html", side_effect=RuntimeError("graph fail")):
+        with patch("dochris.web.graph_tab._get_graph_html", side_effect=RuntimeError("graph fail")):
             result = _handle_graph_refresh()
         assert "获取知识图谱失败" in result
 
