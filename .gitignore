@@ -87,3 +87,4 @@ REFACTOR_*.md
 
 # Runtime state
 progress.json
+site/

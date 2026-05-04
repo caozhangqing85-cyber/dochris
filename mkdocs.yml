@@ -1,12 +1,16 @@
-site_name: dochris
+site_name: dochris 文档
 site_description: AI 驱动的个人知识库编译系统
 site_url: https://caozhangqing85-cyber.github.io/dochris
 repo_url: https://github.com/caozhangqing85-cyber/dochris
 repo_name: caozhangqing85-cyber/dochris
+edit_uri: edit/main/docs/
 
 theme:
   name: material
   language: zh
+  font:
+    text: Noto Sans SC
+    code: JetBrains Mono
   palette:
     - scheme: default
       primary: indigo
@@ -20,54 +24,109 @@ theme:
       toggle:
         icon: material/brightness-4
         name: 切换到亮色模式
+  icon:
+    repo: fontawesome/brands/github
   features:
     - navigation.instant
+    - navigation.tracking
     - navigation.sections
+    - navigation.expand
     - navigation.top
+    - navigation.footer
     - search.suggest
+    - search.highlight
     - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
     - toc.follow
 
 plugins:
-  - search
+  - search:
+      lang:
+        - zh
+        - en
   - mkdocstrings:
       handlers:
         python:
+          paths: [src]
           options:
             docstring_style: google
             show_source: true
+            show_root_heading: true
+            show_root_full_path: false
             members_order: source
+            heading_level: 2
+            show_category_heading: true
+            show_if_no_docstring: false
+  - markdown-exec
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
   - toc:
       permalink: true
+      toc_depth: 3
   - tables
+  - footnotes
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 nav:
   - 首页: index.md
   - 快速开始:
-    - 安装: getting-started/installation.md
+    - 安装指南: getting-started/installation.md
     - 快速上手: getting-started/quickstart.md
-    - CLI 命令: getting-started/cli.md
+    - CLI 命令参考: getting-started/cli.md
   - 用户指南:
+    - 核心概念: guide/concepts.md
     - 摄入文件: guide/ingestion.md
     - 编译文档: guide/compilation.md
     - 查询知识库: guide/query.md
     - 质量管理: guide/quality.md
     - 晋升到 Wiki: guide/promote.md
-  - 进阶功能:
+    - 知识图谱: guide/graph.md
+    - 配置详解: guide/configuration.md
+  - API 参考:
+    - 概览: api/overview.md
+    - 核心模块:
+      - LLM 客户端: api/core/llm-client.md
+      - 质量评分: api/core/quality-scorer.md
+      - 文本分块: api/core/text-chunker.md
+      - 重试管理: api/core/retry-manager.md
+      - 缓存: api/core/cache.md
+    - 流水线:
+      - Phase 1 摄入: api/phases/phase1.md
+      - Phase 2 编译: api/phases/phase2.md
+      - Phase 3 查询: api/phases/phase3.md
+    - 解析器:
+      - PDF 解析: api/parsers/pdf-parser.md
+      - 文档解析: api/parsers/doc-parser.md
+      - 代码解析: api/parsers/code-parser.md
+    - 设置与异常:
+      - 配置: api/settings.md
+      - 异常: api/exceptions.md
+    - 插件系统: api/plugin.md
+    - 向量存储: api/vector.md
+    - HTTP API: api/http-api.md
+  - 开发:
+    - 项目架构: development/architecture.md
+    - 贡献指南: development/contributing.md
+    - 测试策略: development/testing.md
+  - 高级话题:
     - 插件系统: advanced/plugins.md
     - 多 LLM 支持: advanced/llm-providers.md
     - 向量数据库: advanced/vector-stores.md
     - 结构化日志: advanced/logging.md
     - HTTP API: advanced/api.md
-  - 开发:
-    - 项目结构: development/architecture.md
-    - 贡献指南: CONTRIBUTING.md
-    - 变更日志: CHANGELOG.md
+    - Docker 部署: advanced/docker.md
