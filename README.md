@@ -9,6 +9,7 @@
 [![PyPI](https://img.shields.io/pypi/v/dochris)](https://pypi.org/project/dochris/)
 [![Downloads](https://img.shields.io/pypi/dm/dochris)](https://pypi.org/project/dochris/)
 [![Coverage](https://img.shields.io/codecov/c/github/caozhangqing85-cyber/dochris)](https://codecov.io/github/caozhangqing85-cyber/dochris)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-material-blue)](https://caozhangqing85-cyber.github.io/dochris/)
 
 **"Doc"** 代表文档，**"Chris"** 是作者的名字。Dochris 意味着：**让文档为 Chris 服务** — 将海量信息锻造为可用的知识。
 
@@ -24,6 +25,9 @@ Dochris 是一个 AI 驱动的知识库编译系统，通过**四阶段流水线
 - **插件系统**：6 个扩展点，支持自定义解析器、编译前后处理、查询增强
 - **多 LLM 提供商**：OpenAI 兼容、Ollama 本地模型，轻松切换
 - **多向量库**：ChromaDB、FAISS，按需选择
+- **Web UI**：Gradio 可视化界面（查询、管理、编译、质量仪表盘、知识图谱）
+- **知识图谱**：D3.js 力导向图可视化概念关系
+- **API 文档**：mkdocs-material 自动生成文档站，GitHub Pages 部署
 
 ## 系统架构
 
@@ -139,6 +143,9 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 安装依赖
 pip install -e .
+
+# 安装全部可选依赖（Web UI、API、PDF、音频、OCR、开发工具）
+pip install -e ".[all]"
 
 # 创建配置文件
 cp .env.example .env
@@ -387,7 +394,7 @@ VECTOR_STORE=faiss
 | 代码规范 | ruff 0 errors |
 | Python | 3.11+ |
 | 许可证 | MIT |
-| 版本 | 1.3.1 |
+| 版本 | 1.4.0 |
 
 ## 常见问题
 

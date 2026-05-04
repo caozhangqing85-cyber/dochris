@@ -293,6 +293,10 @@ class TestParseWithPdfplumberInternalPaths:
 class TestParseWithPymupdfInternalPaths:
     """覆盖 parse_with_pymupdf 行 104-109, 111-112"""
 
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("fitz"),
+        reason="PyMuPDF (fitz) 未安装",
+    )
     def test_pymupdf_success(self, tmp_path: Path):
         """PyMuPDF 成功解析（行 104-109）"""
         pdf_file = tmp_path / "test.pdf"
@@ -315,6 +319,10 @@ class TestParseWithPymupdfInternalPaths:
             result = parse_with_pymupdf(pdf_file)
             assert result is None
 
+    @pytest.mark.skipif(
+        not __import__("importlib").util.find_spec("fitz"),
+        reason="PyMuPDF (fitz) 未安装",
+    )
     def test_pymupdf_exception(self, tmp_path: Path):
         """PyMuPDF 抛出异常（行 113-118）"""
         pdf_file = tmp_path / "test.pdf"

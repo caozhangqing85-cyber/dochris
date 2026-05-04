@@ -235,13 +235,24 @@ def _get_system_status() -> str:
         lines.extend(["", "## 向量数据库", "- **状态:** 未初始化"])
 
     lines.extend(["", "## 关键依赖"])
-    for pkg in ["gradio", "chromadb", "pandas", "openai"]:
+    for pkg in [
+        "gradio",
+        "chromadb",
+        "pandas",
+        "openai",
+        "sentence_transformers",
+        "markitdown",
+        "json_repair",
+        "rich",
+    ]:
         try:
             mod = __import__(pkg)
             ver = getattr(mod, "__version__", "未知")
-            lines.append(f"- **{pkg}:** {ver}")
+            display_name = pkg.replace("_", "-")
+            lines.append(f"- **{display_name}:** {ver}")
         except ImportError:
-            lines.append(f"- **{pkg}:** 未安装")
+            display_name = pkg.replace("_", "-")
+            lines.append(f"- **{display_name}:** 未安装")
 
     return "\n".join(lines)
 
@@ -288,14 +299,38 @@ def _get_quality_dashboard() -> str:
         "## 质量概览",
         f"- **已评分文件数:** {len(scores)}",
         f"- **平均分:** {avg_score:.1f}",
+        f"- **最高分:** {max(scores)}",
+        f"- **最低分:** {min(scores)}",
+        f"- **中位数:** {sorted(scores)[len(scores) // 2]}",
         f"- **达标 (≥{threshold}):** {above_threshold}",
         f"- **未达标 (<{threshold}):** {below_threshold}",
+        f"- **优良率:** {above_threshold / len(scores) * 100:.1f}%",
         "",
         "## 质量分布",
     ]
     for bucket, count in buckets.items():
         bar = "█" * count if count < 50 else "█" * 50
         lines.append(f"- **{bucket}:** {bar} ({count})")
+
+    # 质量总结
+    excellent = buckets["81-100"]
+    good = buckets["61-80"]
+    poor = buckets["0-20"] + buckets["21-40"]
+    lines.extend(
+        [
+            "",
+            "## 质量总结",
+            f"- **优秀 (81-100):** {excellent} 个文件",
+            f"- **良好 (61-80):** {good} 个文件",
+            f"- **较差 (<40):** {poor} 个文件",
+        ]
+    )
+    if avg_score >= 80:
+        lines.append("- **评级:** 🟢 整体质量优秀")
+    elif avg_score >= 60:
+        lines.append("- **评级:** 🟡 整体质量良好，仍有提升空间")
+    else:
+        lines.append("- **评级:** 🔴 整体质量偏低，建议重新编译低分文件")
 
     if low_quality:
         lines.extend(["", f"## 未达标文件 (<{threshold})", *low_quality[:50]])

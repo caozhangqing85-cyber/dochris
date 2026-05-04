@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-04
+
+### Added
+- **API 文档站**：mkdocs-material 静态站点（22 个页面），GitHub Pages 自动部署
+- **Web UI 增强**：中文状态标签、搜索过滤、知识图谱 D3.js 可视化
+- **查询历史**：Web UI 保存最近 20 条查询记录
+- **系统信息面板**：显示 dochris 版本号及各依赖版本
+- **CLAUDE.md 文档全面更新**：项目结构同步至实际代码（新增 api/, graph/, llm/, settings/, web/, admin/, plugin/, vector/ 子包）
+
+### Fixed
+- **CI 全面修复**：依赖安装、测试兼容性、安全扫描配置
+- **json_repair 返回值验证**：防御性编程，防止空值导致崩溃
+- **ruff lint**：0 errors
+
+### Changed
+- **ROADMAP P3 全部完成**
+- **Dependabot**：自动更新 GitHub Actions 版本
+
 ## [1.3.1] - 2026-05-02
 
 ### Fixed
@@ -119,19 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 添加 SECURITY.md 安全策略
 - 实现敏感词过滤和内容审核
 
-## [Unreleased]
-
-### Added
-- Test coverage for Phase 1 ingestion pipeline
-- Test coverage for Phase 2 quality scoring
-- Test coverage for manifest management
-- Configuration management via `config.py`
-
-### Changed
-- Refactored worker system for better modularity
-- Improved error handling with custom exceptions
-- Updated dependencies in pyproject.toml
-
 ## [0.5.0] - 2026-04-15
 
 ### Added
@@ -241,6 +246,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Major Features |
 |---------|------|----------------|
+| 1.4.0 | 2026-05-04 | API 文档站 (mkdocs), Web UI 增强, 知识图谱可视化, CLAUDE.md 文档同步 |
+| 1.3.1 | 2026-05-02 | 知识图谱 D3.js 可视化, CORS/API 认证, Logger 迁移, Gradio+FastAPI 统一 |
+| 1.3.0 | 2026-05-02 | Gradio Web UI (5 页面), Docker 部署优化, Benchmark 测试, 80% 覆盖率 |
+| 1.2.0 | 2026-05-02 | HTTP API 层 (FastAPI), API 文档站, 异常规范化, mypy 0 errors |
+| 1.1.0 | 2026-05-01 | 插件系统, LLM/Ollama 抽象, FAISS 向量后端, 类型系统, 2000+ tests |
 | 1.0.0 | 2026-04-30 | Production release: init/doctor commands, CI/CD, comprehensive tests |
 | 0.5.0 | 2026-04-15 | Code quality, test coverage, modularization |
 | 0.4.0 | 2026-04-10 | Async compilation, caching, resume support |
