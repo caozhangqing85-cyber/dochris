@@ -88,7 +88,11 @@ class SummaryGenerator:
                 try:
                     import json_repair
 
-                    return cast(dict[str, Any], json_repair.loads(content))
+                    repaired = json_repair.loads(content)
+                    if isinstance(repaired, dict):
+                        return cast(dict[str, Any], repaired)
+                    logger.warning("json_repair returned non-dict: %s", type(repaired).__name__)
+                    raise ValueError("json_repair returned non-dict value") from None
                 except ImportError:
                     logger.warning("json_repair not installed, trying simple extraction")
                     result = self.llm_client._extract_json_from_text(content)

@@ -403,10 +403,10 @@ class TestWebAppHandlers:
 
     def test_handle_graph_refresh_exception(self):
         """图谱刷新异常"""
-        from dochris.web.app import handle_graph_refresh
+        from dochris.web.app import _handle_graph_refresh
 
         with patch("dochris.web.app._get_graph_html", side_effect=RuntimeError("graph fail")):
-            result = handle_graph_refresh()
+            result = _handle_graph_refresh()
         assert "获取知识图谱失败" in result
 
     def test_build_graph_with_manifest_concepts(self, tmp_path):

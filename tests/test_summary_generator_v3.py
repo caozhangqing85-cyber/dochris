@@ -113,12 +113,12 @@ class TestGenerateSummary:
 
     @pytest.mark.asyncio
     async def test_empty_response_returns_empty_string(self, generator, mock_llm_client):
-        """空字符串响应: JSON 解析失败后重试耗尽，返回 None"""
+        """空字符串响应: json_repair 返回非 dict，重试后返回 None"""
         resp = _make_response("")
         mock_llm_client.client.chat.completions.create = AsyncMock(return_value=resp)
 
         result = await generator.generate_summary("text", "title", max_retries=1)
-        # 空字符串无法解析为 JSON，重试后返回 None
+        # json_repair.loads('') 返回 ''，不是 dict，触发重试，最终返回 None
         assert result is None
 
     @pytest.mark.asyncio
