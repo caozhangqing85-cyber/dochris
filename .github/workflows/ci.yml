@@ -60,7 +60,7 @@ jobs:
           echo "Line coverage: **${COVERAGE}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "See [coverage.xml](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." >> $GITHUB_STEP_SUMMARY
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v6
         if: matrix.python-version == '3.12'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
