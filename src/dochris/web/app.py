@@ -435,6 +435,7 @@ def handle_query(query_str: str, top_k: int) -> str:
         result["time_seconds"] = result.get("time_seconds", time.time() - t0)
         return _format_query_results(result)
     except Exception as e:
+        # UI 事件处理器顶层守卫：调用链深，需捕获所有异常防止页面崩溃
         logger.error(f"查询失败: {e}")
         return f"**查询出错:** {e}"
 
@@ -445,6 +446,7 @@ def handle_refresh_files() -> tuple[list[list[str]], str]:
         rows = _get_file_table()
         return rows, f"共 {len(rows)} 条记录（最多显示 200 条）"
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"刷新文件列表失败: {e}")
         return [], f"刷新失败: {e}"
 
@@ -454,6 +456,7 @@ def handle_refresh_status() -> str:
     try:
         return _get_system_status()
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"获取系统状态失败: {e}")
         return f"**获取状态失败:** {e}"
 
@@ -463,6 +466,7 @@ def handle_refresh_quality() -> str:
     try:
         return _get_quality_dashboard()
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"获取质量数据失败: {e}")
         return f"**获取质量数据失败:** {e}"
 
@@ -483,6 +487,7 @@ def handle_upload(files: list[Any]) -> str:
                 shutil.copy2(src, dst)
                 count += 1
         except Exception as e:
+            # 文件上传守卫：单个文件失败不应中断整个上传批次
             logger.warning(f"上传文件 {f.name} 失败: {e}")
     return f"已上传 {count}/{len(files)} 个文件到 raw/ 目录"
 
@@ -497,6 +502,7 @@ def handle_compile(limit: int) -> str:
         asyncio.run(compile_all(limit=limit))
         return f"编译完成: 已处理最多 {limit} 个文件"
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"编译失败: {e}")
         return f"**编译出错:** {e}"
 
@@ -539,6 +545,7 @@ def _handle_query_v2(
         export_path = _export_markdown(formatted, f"query_{now.replace(':', '')}")
         return formatted, new_history, _history_to_table(new_history), export_path
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"查询失败: {e}")
         return f"**查询出错:** {e}", history_state, _history_to_table(history_state), None
 
@@ -566,6 +573,7 @@ def _export_markdown(content: str, prefix: str = "export") -> str | None:
         tmp.close()
         return tmp.name
     except Exception as e:
+        # 临时文件创建守卫：导出失败不应影响主流程
         logger.warning(f"导出失败: {e}")
         return None
 
@@ -577,6 +585,7 @@ def _handle_filter_files(search: str, status_filter: str) -> tuple[list[list[str
         filter_desc = f"搜索='{search or '全部'}' 状态='{status_filter}'"
         return rows, f"{filter_desc} — 共 {len(rows)} 条记录（最多 200 条）"
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"刷新文件列表失败: {e}")
         return [], f"刷新失败: {e}"
 
@@ -603,6 +612,7 @@ def _handle_compile_v2(limit: int, concurrency: int, dry_run: bool) -> tuple[str
         result_msg = f"**编译完成** — 已处理最多 {limit} 个文件（并发: {concurrency}）"
         return result_msg, _get_compile_info()
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"编译失败: {e}")
         return f"**编译出错:** {e}", _get_compile_info()
 
@@ -639,6 +649,7 @@ def _handle_recompile_low_quality() -> str:
             return "没有需要重新编译的低质量文件"
         return f"已将 {reset_count} 个低质量文件重置为待编译状态。请在「编译控制」Tab 中点击「开始编译」。"
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"重新编译准备失败: {e}")
         return f"**操作失败:** {e}"
 
@@ -648,6 +659,7 @@ def _handle_graph_refresh() -> str:
     try:
         return _get_graph_html()
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"获取知识图谱失败: {e}")
         return f"<p style='color:red;'>获取知识图谱失败: {e}</p>"
 

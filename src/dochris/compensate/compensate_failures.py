@@ -23,39 +23,18 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from dochris.log import append_log
-from dochris.manifest import (
-    get_all_manifests,
-    update_manifest_status,
-)
-from dochris.settings import get_settings
-
-# 导入内容清洗模块
-try:
-    from dochris.admin.sanitize_sensitive_words import (
-        sanitize_filename,
-        sanitize_pdf_content,
-        sanitize_prompt,
-        should_skip_file,
-    )
-except ImportError:
-
-    def sanitize_filename(filename: str) -> str:
-        return Path(filename).stem
-
-    def sanitize_pdf_content(content: str) -> str:
-        return content
-
-    def sanitize_prompt(prompt: str) -> str:
-        return prompt
-
-    def should_skip_file(filename: str) -> tuple[bool, str | None]:
-        return False, None
-
-
 import contextlib
 
-from dochris.compensate.compensate_extractors import extract_text_compensated
+# 内容清洗函数统一从 sanitize_sensitive_words 导入
+from dochris.admin.sanitize_sensitive_words import (
+    sanitize_filename,
+    sanitize_pdf_content,
+    should_skip_file,
+)
+from dochris.compensate.compensate_extractors import (
+    extract_text_compensated,
+    extract_text_from_file,
+)
 from dochris.compensate.compensate_utils import (
     BATCH_DELAY,
     BATCH_SIZE,
@@ -63,6 +42,12 @@ from dochris.compensate.compensate_utils import (
     MODEL_CHAIN,
     setup_logging,
 )
+from dochris.log import append_log
+from dochris.manifest import (
+    get_all_manifests,
+    update_manifest_status,
+)
+from dochris.settings import get_settings
 
 _s = get_settings()
 KB_PATH = _s.workspace
@@ -71,77 +56,8 @@ MIN_AUDIO_TEXT_LENGTH = _s.min_text_length
 from dochris.core.quality_scorer import score_summary_quality_v4 as score_summary_quality
 
 # ============================================================
-# 本地文本提取和 LLM 生成函数（替代不存在的 phase2 函数）
+# LLM 生成函数
 # ============================================================
-
-
-def extract_text_from_file(file_path: Path, logger: Any) -> str | None:
-    """从文件提取文本，根据扩展名选择解析器
-
-    Args:
-        file_path: 文件路径
-        logger: 日志记录器
-
-    Returns:
-        提取的文本，失败返回 None
-    """
-    ext = file_path.suffix.lower()
-
-    # PDF 使用 markitdown
-    if ext == ".pdf":
-        from dochris.parsers.pdf_parser import parse_pdf
-
-        try:
-            text = parse_pdf(file_path)
-            if text:
-                logger.debug(f"PDF 提取成功: {file_path.name}")
-                return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
-            logger.warning(f"PDF 提取失败 {file_path.name}: {e}")
-
-    # 文档文件
-    elif ext in (".md", ".txt", ".rst", ".html", ".htm", ".docx", ".doc", ".pptx", ".ppt", ".xlsx"):
-        from dochris.parsers.doc_parser import parse_document
-
-        try:
-            text = parse_document(file_path)  # type: ignore[assignment]
-            if text:
-                logger.debug(f"文档提取成功: {file_path.name}")
-                return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
-            logger.warning(f"文档提取失败 {file_path.name}: {e}")
-
-    # 代码文件（直接读取）
-    elif ext in (
-        ".py",
-        ".js",
-        ".ts",
-        ".java",
-        ".go",
-        ".rs",
-        ".c",
-        ".cpp",
-        ".h",
-        ".css",
-        ".json",
-        ".xml",
-    ):
-        try:
-            text = file_path.read_text(encoding="utf-8", errors="replace")
-            return text[:MAX_CONTENT_CHARS]
-        except Exception as e:
-            logger.warning(f"代码文件读取失败 {file_path.name}: {e}")
-
-    # 默认尝试直接读取
-    else:
-        try:
-            text = file_path.read_text(encoding="utf-8", errors="replace")
-            if len(text) > 100:
-                return text[:MAX_CONTENT_CHARS]
-        except Exception:
-            pass
-
-    return None
 
 
 async def generate_summary_with_llm(
@@ -184,6 +100,7 @@ async def generate_summary_with_llm(
         result = await client.generate_summary(text, title)
         return result
     except Exception as e:
+        # LLM 调用可能抛出网络/API/JSON 解析等多种异常，统一捕获
         logger.error(f"LLM 生成摘要失败: {e}")
         return None
 

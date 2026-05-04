@@ -59,7 +59,9 @@ class OpenAICompatProvider(BaseLLMProvider):
                 max_retries=0,
                 timeout=self.timeout,
                 http_client=httpx.AsyncClient(
-                    limits=httpx.Limits(max_connections=1),
+                    # 连接池扩大：max_concurrency=3 配置需要匹配的连接池上限
+                    # 原先 max_connections=1 导致所有请求串行（性能评审）
+                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
                     timeout=self.timeout,
                 ),
             )

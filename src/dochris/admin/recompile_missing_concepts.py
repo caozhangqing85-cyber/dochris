@@ -22,37 +22,19 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import contextlib
+
+# 内容清洗函数统一从 sanitize_sensitive_words 导入
+from dochris.admin.sanitize_sensitive_words import (
+    sanitize_filename,
+    sanitize_pdf_content,
+    should_skip_file,
+)
+from dochris.core.quality_scorer import score_summary_quality_v4
 from dochris.log import append_log
 from dochris.manifest import (
     update_manifest_status,
 )
-
-# 导入内容清洗模块
-try:
-    from dochris.admin.sanitize_sensitive_words import (
-        sanitize_filename,
-        sanitize_pdf_content,
-        sanitize_prompt,
-        should_skip_file,
-    )
-except ImportError:
-
-    def sanitize_filename(filename: str) -> str:
-        return Path(filename).stem
-
-    def sanitize_pdf_content(content: str) -> str:
-        return content
-
-    def sanitize_prompt(prompt: str) -> str:
-        return prompt
-
-    def should_skip_file(filename: str) -> tuple[bool, str | None]:
-        return False, None
-
-
-import contextlib
-
-from dochris.core.quality_scorer import score_summary_quality_v4
 from dochris.settings import Settings, get_settings
 from dochris.workers.compiler_worker import CompilerWorker
 

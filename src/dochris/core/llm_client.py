@@ -25,6 +25,8 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+import httpx
+
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 else:
@@ -66,6 +68,7 @@ def cleanup_all_clients() -> None:
                 if hasattr(client, "close"):
                     await client.close()
             except Exception:
+                # 资源清理守卫：close() 不应抛异常影响其他客户端清理
                 pass
         _client_instances.clear()
 
@@ -147,8 +150,6 @@ class LLMClient:
             # 注意：这不会完全兼容所有用法，但能防止 AttributeError
             if AsyncOpenAI is None:
                 raise ImportError("openai package not installed")
-
-            import httpx
 
             self.client = AsyncOpenAI(
                 api_key=api_key,
