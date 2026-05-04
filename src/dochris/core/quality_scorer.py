@@ -80,7 +80,8 @@ def _tiered_score(value: int, tiers: list[tuple[int, int]], default: int = 0) ->
 
 
 # 常见构词后缀：当这些字紧跟在关键词后时，关键词可能是更长词的组成部分
-_COMPOUND_SUFFIXES = frozenset("词性化者论学法术理式量度型级人家物图库树点面线体")
+# 仅包含明确构成不同概念的后缀（如 "关键"+"词"="关键词"）
+_COMPOUND_SUFFIXES = frozenset("词性化者论学")
 
 
 def _count_keyword_matches(text: str, keywords: list[str]) -> int:
