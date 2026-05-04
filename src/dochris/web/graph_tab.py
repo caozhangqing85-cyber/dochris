@@ -1,4 +1,4 @@
-"""知识图谱 Tab — D3.js 可视化与刷新逻辑"""
+"""Tab 6: 知识图谱 — D3.js 可视化"""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ import html
 import json
 import logging
 
-from .utils import get_settings
+import gradio as gr  # type: ignore[import-untyped]
+
+from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
-
 
 _GRAPH_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -172,6 +173,7 @@ def _get_graph_html() -> str:
             if link["source"] in keep_ids and link["target"] in keep_ids
         ]
 
+    # 转义节点数据中的 HTML 特殊字符，防止 XSS（JS 通过 innerHTML 插入 label/id/metadata）
     for node in d3_data["nodes"]:
         if "label" in node and isinstance(node["label"], str):
             node["label"] = html.escape(node["label"], quote=True)
@@ -183,6 +185,7 @@ def _get_graph_html() -> str:
                 if isinstance(v, str):
                     metadata[k] = html.escape(v, quote=True)
 
+    # json.dumps 已处理引号和反斜牌转义，额外转义 </script> 防止 HTML 注入
     data_json = json.dumps(d3_data, ensure_ascii=False).replace("</script", "<\\/script")
     stats_json = json.dumps(graph_stats, ensure_ascii=False, indent=2).replace(
         "</script", "<\\/script"
@@ -198,5 +201,23 @@ def _handle_graph_refresh() -> str:
     try:
         return _get_graph_html()
     except Exception as e:
+        # UI 事件处理器顶层守卫
         logger.error(f"获取知识图谱失败: {e}")
         return f"<p style='color:red;'>获取知识图谱失败: {e}</p>"
+
+
+def create_graph_tab() -> None:
+    """创建知识图谱 Tab"""
+    with gr.Tab("🕸️ 知识图谱"):
+        graph_refresh_btn = gr.Button("加载知识图谱")
+        graph_output = gr.HTML(
+            value=(
+                "<p style='color:#888;text-align:center;padding:40px;'>"
+                "点击「加载知识图谱」按钮开始可视化</p>"
+            ),
+            label="知识图谱可视化",
+        )
+        graph_refresh_btn.click(
+            fn=_handle_graph_refresh,
+            outputs=graph_output,
+        )
