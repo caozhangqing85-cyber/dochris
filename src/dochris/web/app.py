@@ -6,7 +6,6 @@ import json
 import logging
 import platform
 import shutil
-import sys
 import tempfile
 import time
 from collections import Counter
@@ -33,6 +32,18 @@ _QUERY_MODE_LABELS: dict[str, str] = {
     "all": "全量搜索",
 }
 _STATUS_FILTERS = ["全部", "compiled", "ingested", "failed", "promoted_to_wiki", "promoted"]
+
+_STATUS_LABELS: dict[str, str] = {
+    "compiled": "✅ 已编译",
+    "ingested": "📥 已摄入",
+    "failed": "❌ 失败",
+    "promoted_to_wiki": "🌟 已推广(Wiki)",
+    "promoted": "🔒 已推广(Curated)",
+    "unknown": "❓ 未知",
+}
+
+_STATUS_FILTER_LABELS = ["全部"] + [_STATUS_LABELS.get(s, s) for s in _STATUS_FILTERS[1:]]
+_STATUS_LABEL_REVERSE = {v: k for k, v in _STATUS_LABELS.items()}
 
 
 # ============================================================
@@ -61,9 +72,7 @@ def _format_query_results(result: dict[str, Any]) -> str:
     lines: list[str] = []
     elapsed = result.get("time_seconds", 0)
     mode = result.get("mode", "combined")
-    lines.append(
-        f"**查询耗时:** {elapsed:.2f}s | **模式:** {_QUERY_MODE_LABELS.get(mode, mode)}\n"
-    )
+    lines.append(f"**查询耗时:** {elapsed:.2f}s | **模式:** {_QUERY_MODE_LABELS.get(mode, mode)}\n")
 
     answer = result.get("answer")
     if answer:
@@ -113,6 +122,8 @@ def _format_query_results(result: dict[str, Any]) -> str:
 
 def _get_file_table(search: str = "", status_filter: str = "全部") -> list[list[str]]:
     """获取文件列表（用于 Dataframe 展示），支持搜索和过滤"""
+    # 将中文标签还原为内部值
+    internal_filter = _STATUS_LABEL_REVERSE.get(status_filter, status_filter)
     manifests, _, _ = _get_manifest_data()
     rows: list[list[str]] = []
     search_lower = search.lower().strip()
@@ -121,15 +132,21 @@ def _get_file_table(search: str = "", status_filter: str = "全部") -> list[lis
         name = m.get("original_filename", m.get("source_file", "unknown"))
         file_type = m.get("type", "unknown")
         status = m.get("status", "unknown")
+        status_label = _STATUS_LABELS.get(status, status)
         quality = str(m.get("quality_score", "-"))
         manifest_id = m.get("id", "")
 
-        if status_filter != "全部" and status != status_filter:
+        if internal_filter != "全部" and status != internal_filter:
             continue
-        if search_lower and search_lower not in name.lower() and search_lower not in manifest_id.lower() and search_lower not in file_type.lower():
+        if (
+            search_lower
+            and search_lower not in name.lower()
+            and search_lower not in manifest_id.lower()
+            and search_lower not in file_type.lower()
+        ):
             continue
 
-        rows.append([manifest_id, name, file_type, status, quality])
+        rows.append([manifest_id, name, file_type, status_label, quality])
         if len(rows) >= 200:
             break
     return rows
@@ -158,7 +175,9 @@ def _get_system_status() -> str:
         used_gb = disk.used / (1024**3)
         free_gb = disk.free / (1024**3)
         pct = disk.used / disk.total * 100
-        lines.append(f"- **磁盘:** {used_gb:.1f}/{total_gb:.1f}GB ({pct:.0f}%) — 剩余 {free_gb:.1f}GB")
+        lines.append(
+            f"- **磁盘:** {used_gb:.1f}/{total_gb:.1f}GB ({pct:.0f}%) — 剩余 {free_gb:.1f}GB"
+        )
     except (OSError, ValueError):
         pass
 
@@ -172,6 +191,33 @@ def _get_system_status() -> str:
             f"- **已推广 (wiki):** {status_counter.get('promoted_to_wiki', 0)}",
             f"- **已推广 (curated):** {status_counter.get('promoted', 0)}",
             f"- **失败:** {status_counter.get('failed', 0)}",
+        ]
+    )
+
+    # 知识库统计（概念数、摘要数）
+    wiki_dir = settings.workspace / "wiki"
+    concepts_count = 0
+    summaries_count = 0
+    try:
+        concepts_dir = wiki_dir / "concepts"
+        if concepts_dir.exists():
+            concepts_count = sum(1 for p in concepts_dir.iterdir() if p.is_file())
+        summaries_dir = wiki_dir / "summaries"
+        if summaries_dir.exists():
+            summaries_count = sum(1 for p in summaries_dir.iterdir() if p.is_file())
+    except OSError:
+        pass
+    lines.extend(
+        [
+            "",
+            "## 知识库统计",
+            f"- **概念数:** {concepts_count}",
+            f"- **摘要数:** {summaries_count}",
+        ]
+    )
+
+    lines.extend(
+        [
             "",
             "## 文件类型分布",
         ]
@@ -322,7 +368,7 @@ def _get_low_quality_table() -> list[list[str]]:
         if qs is not None and isinstance(qs, (int, float)) and int(qs) < threshold:
             name = m.get("original_filename", m.get("source_file", "unknown"))
             status = m.get("status", "unknown")
-            rows.append([m.get("id", ""), name, str(int(qs)), status])
+            rows.append([m.get("id", ""), name, str(int(qs)), _STATUS_LABELS.get(status, status)])
             if len(rows) >= 100:
                 break
     return rows
@@ -539,17 +585,21 @@ def _handle_recompile_low_quality() -> str:
         for m in manifests:
             qs = m.get("quality_score")
             status = m.get("status", "")
-            if qs is not None and isinstance(qs, (int, float)) and int(qs) < threshold:
-                if status == "compiled":
-                    m["status"] = "ingested"
-                    m_id = m.get("id", "")
-                    if m_id:
-                        manifest_path = manifests_dir / f"{m_id}.json"
-                        if manifest_path.exists():
-                            manifest_path.write_text(
-                                json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8"
-                            )
-                            reset_count += 1
+            if (
+                qs is not None
+                and isinstance(qs, (int, float))
+                and int(qs) < threshold
+                and status == "compiled"
+            ):
+                m["status"] = "ingested"
+                m_id = m.get("id", "")
+                if m_id:
+                    manifest_path = manifests_dir / f"{m_id}.json"
+                    if manifest_path.exists():
+                        manifest_path.write_text(
+                            json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+                        reset_count += 1
 
         if reset_count == 0:
             return "没有需要重新编译的低质量文件"
@@ -752,13 +802,9 @@ def create_web_app() -> gr.Blocks:
     Returns:
         gr.Blocks 实例
     """
-    with gr.Blocks(
-        title="dochris - 个人知识库",
-        theme=gr.themes.Soft(),
-    ) as app:
+    with gr.Blocks(title="dochris - 个人知识库") as app:
         gr.Markdown(
-            f"# 📚 dochris 个人知识库 v{__version__}\n"
-            "四阶段流水线: 摄入 → 编译 → 审核 → 分发"
+            f"# 📚 dochris 个人知识库 v{__version__}\n四阶段流水线: 摄入 → 编译 → 审核 → 分发"
         )
 
         with gr.Tabs():
@@ -773,9 +819,7 @@ def create_web_app() -> gr.Blocks:
                     )
                     with gr.Column(scale=1):
                         query_mode = gr.Dropdown(
-                            choices=[
-                                (label, mode) for mode, label in _QUERY_MODE_LABELS.items()
-                            ],
+                            choices=[(label, mode) for mode, label in _QUERY_MODE_LABELS.items()],
                             value="combined",
                             label="查询模式",
                         )
@@ -787,9 +831,7 @@ def create_web_app() -> gr.Blocks:
                             label="返回结果数量 (top_k)",
                         )
                 query_btn = gr.Button("🔍 查询", variant="primary")
-                query_output = gr.Markdown(
-                    label="查询结果", value="*输入查询内容后点击查询*"
-                )
+                query_output = gr.Markdown(label="查询结果", value="*输入查询内容后点击查询*")
 
                 with gr.Row():
                     export_btn = gr.Button("📥 导出当前结果", size="sm")
@@ -824,7 +866,7 @@ def create_web_app() -> gr.Blocks:
                         scale=3,
                     )
                     status_filter = gr.Dropdown(
-                        choices=_STATUS_FILTERS,
+                        choices=_STATUS_FILTER_LABELS,
                         value="全部",
                         label="状态筛选",
                         scale=1,
@@ -837,7 +879,7 @@ def create_web_app() -> gr.Blocks:
                         file_count="multiple",
                         scale=3,
                     )
-                    file_status = gr.Markdown(value="*点击筛选或上传文件*", scale=2)
+                    file_status = gr.Markdown(value="*点击筛选或上传文件*")
 
                 file_table = gr.Dataframe(
                     headers=["ID", "文件名", "类型", "状态", "质量分"],
@@ -941,9 +983,7 @@ def create_web_app() -> gr.Blocks:
                         interactive=False,
                         wrap=True,
                     )
-                    recompile_btn = gr.Button(
-                        "🔄 重置低质量文件为待编译", variant="secondary"
-                    )
+                    recompile_btn = gr.Button("🔄 重置低质量文件为待编译", variant="secondary")
                     recompile_output = gr.Markdown()
                 recompile_btn.click(
                     fn=_handle_recompile_low_quality,
@@ -991,4 +1031,5 @@ def launch_web(server_name: str = "0.0.0.0", server_port: int = 7860) -> None:
     app.launch(
         server_name=server_name,
         server_port=server_port,
+        theme=gr.themes.Soft(),
     )
