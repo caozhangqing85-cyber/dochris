@@ -43,7 +43,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev,api,web,pdf]"
-      - run: pytest tests/ --tb=short -q --cov=dochris --cov-report=xml
+      - name: Run tests with coverage
+        run: pytest tests/ --tb=short -q --cov=dochris --cov-report=xml --cov-report=term-missing
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+      - name: Coverage summary
+        if: matrix.python-version == '3.12'
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; e=ET.parse('coverage.xml').getroot(); print(f'{float(e.attrib.get(\"line-rate\", 0))*100:.1f}%')")
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "Line coverage: **${COVERAGE}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See [coverage.xml](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." >> $GITHUB_STEP_SUMMARY
       - uses: codecov/codecov-action@v4
         if: matrix.python-version == '3.12'
         with:

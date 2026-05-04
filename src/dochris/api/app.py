@@ -73,6 +73,23 @@ def create_app() -> FastAPI:
         graph_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
     )
 
+    @application.get("/", tags=["root"])
+    async def root() -> dict[str, object]:
+        """API 根路径欢迎页"""
+        return {
+            "name": "Dochris API",
+            "version": __version__,
+            "docs": "/docs",
+            "health": "/health",
+            "endpoints": {
+                "query": "/api/v1/query",
+                "status": "/api/v1/status",
+                "compile": "/api/v1/compile",
+                "promote": "/api/v1/promote/{src_id}",
+                "graph": "/api/v1/graph",
+            },
+        }
+
     @application.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}

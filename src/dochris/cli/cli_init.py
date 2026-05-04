@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 kb init 命令：交互式初始化知识库工作区
+支持 --non-interactive 非交互模式（CI/CD、脚本场景）
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -17,13 +19,20 @@ def cmd_init(args: Any) -> int:
     """初始化知识库工作区
 
     Args:
-        args: 命令行参数（本命令不接受额外参数）
+        args: 命令行参数
+            - non_interactive: 是否非交互模式
+            - api_key: API Key（非交互模式可选）
 
     Returns:
         退出码（0 表示成功，非 0 表示错误）
     """
+    non_interactive = getattr(args, "non_interactive", False)
+    api_key_arg = getattr(args, "api_key", None)
+
     print("\n" + "=" * 60)
     print("📚 Dochris 知识库初始化向导")
+    if non_interactive:
+        print("   (非交互模式)")
     print("=" * 60 + "\n")
 
     # 1. 检查 Python 版本
@@ -45,10 +54,13 @@ def cmd_init(args: Any) -> int:
         env_file = workspace / ".env"
         if env_file.exists():
             print(f"\n⚠️  工作区已存在: {workspace}")
-            response = input("   是否要重新初始化？这会覆盖现有 .env 文件。[y/N]: ")
-            if response.lower() != "y":
-                print("   已取消初始化")
-                return 0
+            if non_interactive:
+                print("   非交互模式，跳过确认，将覆盖现有 .env 文件")
+            else:
+                response = input("   是否要重新初始化？这会覆盖现有 .env 文件。[y/N]: ")
+                if response.lower() != "y":
+                    print("   已取消初始化")
+                    return 0
 
     # 3. 创建目录结构
     print("\n📁 创建工作区目录结构...")
@@ -102,7 +114,16 @@ def cmd_init(args: Any) -> int:
         except OSError:
             pass
 
-    if existing_key:
+    if non_interactive:
+        # 非交互模式：参数 > 环境变量 > 现有key > 占位符
+        api_key = api_key_arg or os.environ.get("OPENAI_API_KEY") or existing_key
+        if not api_key:
+            print("   ⚠️  未提供 API Key（--api-key 或 OPENAI_API_KEY 环境变量）")
+            print("   将使用占位符，请后续编辑 .env 文件配置 API Key")
+            api_key = "your_api_key_here"
+        else:
+            print(f"   使用 API Key: {api_key[:10]}...")
+    elif existing_key:
         print(f"   检测到现有 API Key: {existing_key[:10]}...")
         use_existing = input("   是否使用现有 API Key？[Y/n]: ")
         api_key = existing_key if use_existing.lower() != "n" else _prompt_api_key()
@@ -124,12 +145,9 @@ def cmd_init(args: Any) -> int:
     # 6. 验证配置
     print("\n🔍 验证配置...")
     try:
-        # 临时设置环境变量以加载新配置
-        import os
+        os.environ["WORKSPACE"] = str(workspace)
 
         from dochris.settings import get_settings
-
-        os.environ["WORKSPACE"] = str(workspace)
 
         settings = get_settings()
         warnings = settings.validate()

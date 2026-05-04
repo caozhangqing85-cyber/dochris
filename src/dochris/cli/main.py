@@ -27,12 +27,12 @@ import traceback
 from typing import Any
 
 from dochris import __version__
+from dochris.cli.cli_clean import cmd_clean
 from dochris.cli.cli_compile import cmd_compile
-
-# 导入命令模块
 from dochris.cli.cli_completion import completion_script
 from dochris.cli.cli_config import cmd_config, cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
+from dochris.cli.cli_export import cmd_export
 from dochris.cli.cli_graph import cmd_graph
 from dochris.cli.cli_ingest import cmd_ingest
 from dochris.cli.cli_init import cmd_init
@@ -59,8 +59,6 @@ from dochris.exceptions import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
-
-# 导入日志配置
 from dochris.log_config import setup_logging
 from dochris.settings import get_settings
 
@@ -162,10 +160,21 @@ def main() -> int:
     )
 
     # init 命令
-    subparsers.add_parser(
+    parser_init = subparsers.add_parser(
         "init",
         help="初始化工作区",
-        description="交互式初始化知识库工作区，创建目录结构和配置文件",
+        description="初始化知识库工作区，创建目录结构和配置文件",
+    )
+    parser_init.add_argument(
+        "--non-interactive",
+        "-n",
+        action="store_true",
+        help="非交互模式（跳过所有 input 提示，适合 CI/CD）",
+    )
+    parser_init.add_argument(
+        "--api-key",
+        default=None,
+        help="API Key（非交互模式下使用，也可通过 OPENAI_API_KEY 环境变量设置）",
     )
 
     # doctor 命令
@@ -294,6 +303,54 @@ def main() -> int:
     # plugin 命令
     setup_plugin_parser(subparsers)
 
+    # export 命令
+    parser_export = subparsers.add_parser(
+        "export",
+        help="导出知识库",
+        description="将知识库内容打包为 ZIP 归档",
+    )
+    parser_export.add_argument(
+        "--type",
+        "-t",
+        choices=["summaries", "concepts", "all"],
+        default="all",
+        help="导出类型（默认: all）",
+    )
+    parser_export.add_argument(
+        "--output",
+        "-o",
+        default="knowledge-export.zip",
+        help="输出 ZIP 文件路径（默认: knowledge-export.zip）",
+    )
+
+    # clean 命令
+    parser_clean = subparsers.add_parser(
+        "clean",
+        help="清理工作区",
+        description="清理缓存、旧日志和失败记录",
+    )
+    clean_group = parser_clean.add_mutually_exclusive_group()
+    clean_group.add_argument(
+        "--cache",
+        action="store_true",
+        help="清理 .cache/ 目录",
+    )
+    clean_group.add_argument(
+        "--logs",
+        action="store_true",
+        help="清理 30 天前的日志",
+    )
+    clean_group.add_argument(
+        "--failed",
+        action="store_true",
+        help="清理失败的 manifest 记录",
+    )
+    parser_clean.add_argument(
+        "--all",
+        action="store_true",
+        help="全部清理（需确认）",
+    )
+
     # graph 命令
     parser_graph = subparsers.add_parser(
         "graph",
@@ -355,6 +412,10 @@ def main() -> int:
             return cmd_serve(args)
         elif args.command == "graph":
             return cmd_graph(args)
+        elif args.command == "export":
+            return cmd_export(args)
+        elif args.command == "clean":
+            return cmd_clean(args)
         else:
             print(
                 format_error(

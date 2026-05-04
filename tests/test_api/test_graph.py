@@ -42,6 +42,11 @@ def _setup_workspace(workspace: Path) -> None:
     (workspace / "wiki" / "concepts" / "神经网络.md").write_text("# 神经网络\n", encoding="utf-8")
 
 
+def _unwrap(resp_json: dict) -> dict:
+    """从统一响应中提取 data 字段"""
+    return resp_json["data"]
+
+
 class TestGraphAPI:
     """知识图谱 API 端点测试"""
 
@@ -51,7 +56,10 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph?format=json")
             assert resp.status_code == 200
-            data = resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            assert "version" in body
+            data = _unwrap(body)
             assert "nodes" in data
             assert "edges" in data
 
@@ -61,8 +69,11 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph?format=stats")
             assert resp.status_code == 200
-            assert "total_nodes" in resp.json()
-            assert "node_types" in resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            data = _unwrap(body)
+            assert "total_nodes" in data
+            assert "node_types" in data
 
     def test_get_graph_d3(self, client: TestClient, tmp_path: Path) -> None:
         """测试获取 D3 格式图谱"""
@@ -71,7 +82,9 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph?format=d3")
             assert resp.status_code == 200
-            data = resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            data = _unwrap(body)
             assert "nodes" in data
             assert "links" in data
             assert data["nodes"][0]["group"] in ("source", "concept", "summary")
@@ -83,7 +96,9 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph/search?q=深度&limit=5")
             assert resp.status_code == 200
-            data = resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            data = _unwrap(body)
             assert "query" in data
             assert data["query"] == "深度"
             assert "nodes" in data
@@ -93,8 +108,10 @@ class TestGraphAPI:
         with patch("dochris.api.routes.graph.get_settings") as gs:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph/node/NONEXISTENT")
-            assert resp.status_code == 200
-            assert resp.json()["node"] is None
+            assert resp.status_code == 404
+            detail = resp.json()["detail"]
+            assert detail["success"] is False
+            assert "error" in detail
 
     def test_get_node_with_data(self, client: TestClient, tmp_path: Path) -> None:
         """测试获取存在的节点"""
@@ -103,7 +120,9 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph/node/SRC-0001")
             assert resp.status_code == 200
-            data = resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            data = _unwrap(body)
             assert data["node"] is not None
             assert data["node"]["id"] == "SRC-0001"
             assert "neighbors" in data
@@ -115,5 +134,7 @@ class TestGraphAPI:
             gs.return_value.workspace = tmp_path
             resp = client.get("/api/v1/graph?format=json")
             assert resp.status_code == 200
-            data = resp.json()
+            body = resp.json()
+            assert body["success"] is True
+            data = _unwrap(body)
             assert len(data["nodes"]) >= 2  # 至少有 source 和 concept

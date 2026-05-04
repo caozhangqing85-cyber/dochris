@@ -10,6 +10,8 @@
 [![Downloads](https://img.shields.io/pypi/dm/dochris)](https://pypi.org/project/dochris/)
 [![Coverage](https://img.shields.io/codecov/c/github/caozhangqing85-cyber/dochris)](https://codecov.io/github/caozhangqing85-cyber/dochris)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-material-blue)](https://caozhangqing85-cyber.github.io/dochris/)
+[![Tests](https://img.shields.io/badge/tests-2402%20passing-brightgreen)](https://github.com/caozhangqing85-cyber/dochris)
+[![Version](https://img.shields.io/badge/version-1.4.0-orange)](https://pypi.org/project/dochris/)
 
 **"Doc"** 代表文档，**"Chris"** 是作者的名字。Dochris 意味着：**让文档为 Chris 服务** — 将海量信息锻造为可用的知识。
 
@@ -124,6 +126,8 @@ Layer 3: locked/      — 锁定保护，不可修改
 
 ## 快速开始
 
+📖 **新手？** 先看 [5 分钟快速上手指南](docs/QUICKSTART.md)，从安装到查询一步步带你走通。
+
 ### 系统要求
 
 - Python 3.11+
@@ -214,6 +218,24 @@ kb compile
 # 5. 查看结果
 cat ~/test-kb/outputs/summaries/SRC-0001.md
 ```
+
+## 使用示例
+
+📖 **想看看实际使用场景？** 查看 [使用示例](docs/EXAMPLES.md)，包含 5 个真实场景：
+
+| 场景 | 说明 |
+|------|------|
+| 学术论文管理 | PDF 论文 → 知识库 → 语义查询 |
+| 播客/课程笔记 | 音频转录 → 编译 → 关键观点提取 |
+| Obsidian 笔记增强 | 双向同步，高质量内容自动推送 |
+| 电子书知识提取 | EPUB/MOBI → 概念 + 摘要 |
+| 团队知识共享 | API 服务 + Web UI + Docker 部署 |
+
+## 常见问题
+
+📖 **遇到问题？** 查看 [快速上手指南的常见问题部分](docs/QUICKSTART.md#常见问题) 和下方的常见问题。
+
+### Q: 编译时出现 API 内容过滤错误（400, error 1301）
 
 ## 目录结构
 
@@ -397,6 +419,8 @@ VECTOR_STORE=faiss
 | 版本 | 1.4.0 |
 
 ## 常见问题
+
+📖 更多常见问题和解决方案请参阅 [快速上手指南 - 常见问题](docs/QUICKSTART.md#常见问题)。
 
 ### Q: 编译时出现 API 内容过滤错误（400, error 1301）
 
