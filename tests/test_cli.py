@@ -524,11 +524,17 @@ class TestCLICompile:
         """编译失败返回 1"""
         from dochris.cli.cli_compile import cmd_compile
 
-        args = MagicMock(named_limit=None, limit=None, concurrency=3, openrouter=False, dry_run=False)
+        args = MagicMock(
+            named_limit=None, limit=None, concurrency=3, openrouter=False, dry_run=False
+        )
 
         with patch("dochris.manifest.get_all_manifests", return_value=[{"id": "DOC-001"}]):
             with patch("dochris.settings.get_default_workspace", return_value="/tmp/kb"):
-                with patch("dochris.phases.phase2_compilation.compile_all", new_callable=AsyncMock, side_effect=RuntimeError("API error")):
+                with patch(
+                    "dochris.phases.phase2_compilation.compile_all",
+                    new_callable=AsyncMock,
+                    side_effect=RuntimeError("API error"),
+                ):
                     with patch("dochris.phases.phase2_compilation.setup_logging"):
                         with patch("builtins.print"):
                             rc = cmd_compile(args)

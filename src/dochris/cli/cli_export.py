@@ -129,7 +129,7 @@ def _read_json_simple(path: Path) -> dict | None:
     import json
 
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return dict(json.loads(path.read_text(encoding="utf-8")))  # type: ignore[arg-type]
     except (OSError, json.JSONDecodeError):
         return None
 
