@@ -65,7 +65,7 @@ class TestCliMainBranches:
         with (
             patch("sys.argv", ["kb", "config"]),
             patch("dochris.cli.main.get_settings", return_value=self._make_settings()),
-            patch("dochris.cli.main.cmd_config", return_value=0),
+            patch("dochris.cli.cli_config.cmd_config", return_value=0),
         ):
             assert main() == 0
 

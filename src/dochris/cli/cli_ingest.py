@@ -1,6 +1,7 @@
 """CLI 命令：Phase 1 摄入"""
 
 import argparse
+from pathlib import Path
 
 from dochris.cli.cli_utils import error, info, success, warning
 
@@ -10,10 +11,23 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     from dochris.phases.phase1_ingestion import run_phase1, setup_logging
 
     logger = setup_logging()
-    print(info("Phase 1: 开始摄入文件..."))
+
+    # 解析用户传入的路径参数
+    source_path = None
+    if hasattr(args, "path") and args.path:
+        source_path = Path(args.path).resolve()
+        if not source_path.exists():
+            print(f"\n{error('✗ 路径不存在')}: {source_path}")
+            return 1
+        if not source_path.is_dir():
+            print(f"\n{error('✗ 不是目录')}: {source_path}")
+            return 1
+        print(info(f"Phase 1: 开始摄入文件... (源: {source_path})"))
+    else:
+        print(info("Phase 1: 开始摄入文件..."))
 
     try:
-        stats = run_phase1(logger, dry_run=args.dry_run)
+        stats = run_phase1(logger, dry_run=args.dry_run, source_path=source_path)
         if args.dry_run:
             print(f"\n{warning('⚠ Dry-run 模式')}: 未实际执行任何操作")
         print(f"\n{success('✓ Phase 1 完成!')}")

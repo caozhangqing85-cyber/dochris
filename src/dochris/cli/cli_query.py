@@ -2,6 +2,8 @@
 
 import argparse
 
+from dochris.cli.cli_utils import dim
+
 
 def cmd_query(args: argparse.Namespace) -> int:
     """Phase 3: 查询"""
@@ -25,4 +27,10 @@ def cmd_query(args: argparse.Namespace) -> int:
 
     if result.get("answer"):
         return 0
+
+    # 空结果友好提示
+    if not result.get("results") and not result.get("answer"):
+        print(
+            f"\n{dim('💡 提示: 知识库为空。请先运行 kb ingest 添加文件，再运行 kb compile 编译。')}"
+        )
     return 1

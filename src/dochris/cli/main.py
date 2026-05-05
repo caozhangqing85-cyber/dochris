@@ -30,7 +30,7 @@ from dochris import __version__
 from dochris.cli.cli_clean import cmd_clean
 from dochris.cli.cli_compile import cmd_compile
 from dochris.cli.cli_completion import completion_script
-from dochris.cli.cli_config import cmd_config, cmd_version
+from dochris.cli.cli_config import cmd_version
 from dochris.cli.cli_doctor import cmd_doctor
 from dochris.cli.cli_export import cmd_export
 from dochris.cli.cli_graph import cmd_graph
@@ -268,6 +268,8 @@ def main() -> int:
     )
     parser_quality.add_argument("--report", action="store_true", help="生成详细报告")
     parser_quality.add_argument("--fix", action="store_true", help="自动修复可修复的问题")
+    parser_quality.add_argument("--check-pollution", action="store_true", help="检查 wiki 污染")
+    parser_quality.add_argument("--src-id", type=str, help="指定来源 ID 进行质量门禁检查")
 
     # vault 命令
     parser_vault = subparsers.add_parser(
@@ -280,8 +282,14 @@ def main() -> int:
     vault_subparsers.add_parser("push", help="推送知识到 Obsidian")
     vault_subparsers.add_parser("status", help="显示同步状态")
 
-    # config 命令
-    subparsers.add_parser("config", help="显示配置", description="显示当前配置信息")
+    # config 命令（子命令组）
+    parser_config = subparsers.add_parser("config", help="配置管理", description="查看和修改配置")
+    config_subparsers = parser_config.add_subparsers(dest="config_command")
+    parser_config_set = config_subparsers.add_parser("set", help="设置配置项（写入 .env）")
+    parser_config_set.add_argument("key", help="配置项名称")
+    parser_config_set.add_argument("value", help="配置项值")
+    parser_config_get = config_subparsers.add_parser("get", help="查看单个配置项")
+    parser_config_get.add_argument("key", help="配置项名称")
 
     # version 命令
     subparsers.add_parser("version", help="显示版本", description="显示版本信息")
@@ -321,6 +329,19 @@ def main() -> int:
         "-o",
         default="knowledge-export.zip",
         help="输出 ZIP 文件路径（默认: knowledge-export.zip）",
+    )
+
+    # list 命令
+    parser_list = subparsers.add_parser(
+        "list",
+        help="列出 manifest",
+        description="列出所有 manifest 记录，支持按状态、类型过滤和排序",
+    )
+    parser_list.add_argument("--status", type=str, help="按状态过滤（如 ingested, compiled）")
+    parser_list.add_argument("--type", type=str, help="按文件类型过滤（如 pdf, audio, videos）")
+    parser_list.add_argument("--limit", "-n", type=int, default=20, help="显示数量（默认: 20）")
+    parser_list.add_argument(
+        "--sort", type=str, default="id", help="排序方式（默认: id，可选: quality, size, time）"
     )
 
     # clean 命令
@@ -403,6 +424,8 @@ def main() -> int:
         elif args.command == "vault":
             return cmd_vault(args)
         elif args.command == "config":
+            from dochris.cli.cli_config import cmd_config
+
             return cmd_config(args)
         elif args.command == "version":
             return cmd_version(args)
@@ -416,6 +439,10 @@ def main() -> int:
             return cmd_export(args)
         elif args.command == "clean":
             return cmd_clean(args)
+        elif args.command == "list":
+            from dochris.cli.cli_list import cmd_list
+
+            return cmd_list(args)
         else:
             print(
                 format_error(
@@ -457,6 +484,11 @@ def main() -> int:
         return EXIT_FAILURE
     except KnowledgeBaseError as e:
         print(format_error("知识库系统", str(e)))
+        return EXIT_FAILURE
+    except AttributeError as e:
+        print(format_error("命令参数", str(e), hint="这可能是命令行参数注册错误，请提交 issue"))
+        if args.verbose:
+            traceback.print_exc()
         return EXIT_FAILURE
     except Exception as e:
         print(format_error("未知错误", str(e)))

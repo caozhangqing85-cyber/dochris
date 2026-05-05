@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -60,7 +60,7 @@ class TestCLIMain:
         """config 子命令正确分发"""
         from dochris.cli.main import main
 
-        with patch("dochris.cli.main.cmd_config", return_value=0) as mock_cmd:
+        with patch("dochris.cli.cli_config.cmd_config", return_value=0) as mock_cmd:
             with patch("sys.argv", ["kb", "config"]):
                 rc = main()
         assert rc == 0
@@ -524,26 +524,28 @@ class TestCLICompile:
         """编译失败返回 1"""
         from dochris.cli.cli_compile import cmd_compile
 
-        args = MagicMock(limit=None, concurrency=3, openrouter=False)
+        args = MagicMock(named_limit=None, limit=None, concurrency=3, openrouter=False, dry_run=False)
 
-        with patch("dochris.phases.phase2_compilation.setup_logging"):
-            with patch("asyncio.run", side_effect=Exception("API error")):
-                rc = cmd_compile(args)
+        with patch("dochris.manifest.get_all_manifests", return_value=[{"id": "DOC-001"}]):
+            with patch("dochris.settings.get_default_workspace", return_value="/tmp/kb"):
+                with patch("dochris.phases.phase2_compilation.compile_all", new_callable=AsyncMock, side_effect=RuntimeError("API error")):
+                    with patch("dochris.phases.phase2_compilation.setup_logging"):
+                        with patch("builtins.print"):
+                            rc = cmd_compile(args)
         assert rc == 1
 
     def test_cmd_compile_with_limit(self):
         """compile 命令传递 limit 参数"""
         from dochris.cli.cli_compile import cmd_compile
 
-        args = MagicMock(limit=5, concurrency=3, openrouter=False)
+        args = MagicMock(named_limit=5, limit=None, concurrency=3, openrouter=False, dry_run=False)
 
-        with patch("dochris.phases.phase2_compilation.setup_logging"):
-            with patch("asyncio.run") as mock_run:
-                with patch("builtins.print"):
-                    mock_run.return_value = None
-                    rc = cmd_compile(args)
+        with patch("dochris.manifest.get_all_manifests", return_value=[{"id": "DOC-001"}]):
+            with patch("dochris.settings.get_default_workspace", return_value="/tmp/kb"):
+                with patch("dochris.phases.phase2_compilation.setup_logging"):
+                    with patch("builtins.print"):
+                        rc = cmd_compile(args)
         assert rc == 0
-        mock_run.assert_called_once()
 
     def test_cmd_compile_openrouter(self):
         """compile 命令传递 openrouter 参数"""
@@ -571,9 +573,9 @@ class TestCLIIngest:
         """摄入成功返回 0"""
         from dochris.cli.cli_ingest import cmd_ingest
 
-        args = MagicMock()
+        args = MagicMock(path=None, dry_run=False)
 
-        with patch("dochris.phases.phase1_ingestion.setup_logging"):
+        with patch("dochris.phases.phase1_ingestion.setup_logging", return_value=MagicMock()):
             with patch(
                 "dochris.phases.phase1_ingestion.run_phase1",
                 return_value={

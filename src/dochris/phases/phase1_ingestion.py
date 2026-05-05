@@ -58,17 +58,14 @@ def setup_logging() -> logging.Logger:
     logger = logging.getLogger("phase1")
     logger.setLevel(logging.DEBUG)
 
-    fh = logging.FileHandler(log_file, encoding="utf-8")
-    fh.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-
-    fmt = logging.Formatter(LOG_FORMAT_SIMPLE)
-    fh.setFormatter(fmt)
-    ch.setFormatter(fmt)
-
-    logger.addHandler(fh)
-    logger.addHandler(ch)
+    # 避免重复添加 handler
+    if not logger.handlers:
+        fh = logging.FileHandler(log_file, encoding="utf-8")
+        fh.setLevel(logging.DEBUG)
+        fmt = logging.Formatter(LOG_FORMAT_SIMPLE)
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+        # 不再添加 StreamHandler，CLI 层通过 main.py 的日志配置输出到控制台
     return logger
 
 
@@ -394,12 +391,15 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     return True
 
 
-def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
+def run_phase1(
+    logger: logging.Logger, dry_run: bool = False, source_path: Path | None = None
+) -> dict:
     """执行 Phase 1 数据摄入
 
     Args:
         logger: 日志记录器
         dry_run: 模拟运行，只显示将要执行的操作
+        source_path: 可选的自定义源目录路径（覆盖 SOURCE_PATH 配置）
 
     Returns:
         统计信息字典
@@ -415,10 +415,13 @@ def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
     # 扫描所有源
     all_files: list[dict] = []
 
-    # 扫描主源目录（如果配置了）
-    if SOURCE_PATH:
-        logger.info(f"扫描源目录: {SOURCE_PATH}")
-        files = scan_source_dir(SOURCE_PATH, logger)
+    # 确定实际使用的源目录
+    effective_source = source_path or SOURCE_PATH
+
+    # 扫描主源目录（如果配置了或传入了）
+    if effective_source:
+        logger.info(f"扫描源目录: {effective_source}")
+        files = scan_source_dir(effective_source, logger)
         logger.info(f"  发现 {len(files)} 个文件")
         all_files.extend(files)
     else:
@@ -511,15 +514,11 @@ def run_phase1(logger: logging.Logger, dry_run: bool = False) -> dict:
     progress["phase1"]["stats"]["total"] = len(progress["phase1"]["ingested_files"])
     save_progress(progress)
 
-    # 输出统计
+    # 输出统计（仅写日志文件，CLI 层在 cmd_ingest 中负责打印）
     stats = progress["phase1"]["stats"]
-    logger.info("=" * 60)
-    logger.info("Phase 1 完成!")
-    logger.info(f"  总计: {stats['total']} 文件")
-    logger.info(f"  本次新增: {stats['linked']} 文件")
-    logger.info(f"  跳过(重复): {stats['skipped']} 文件")
-    logger.info(f"  失败: {stats['failed']} 文件")
-    logger.info("=" * 60)
+    logger.debug(
+        f"Phase 1 完成: 总计={stats['total']}, 新增={stats['linked']}, 跳过={stats['skipped']}, 失败={stats['failed']}"
+    )
 
     append_log(
         KB_PATH,
