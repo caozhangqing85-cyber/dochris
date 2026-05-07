@@ -243,6 +243,13 @@ def semantic_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> lis
     # 按段落分割（保留空行作为段落分隔）
     paragraphs = text.split("\n\n")
 
+    # 当文本没有双换行分隔（如播客转录、日志文件），回退到单换行分割
+    if len(paragraphs) == 1 and len(paragraphs[0]) > chunk_size:
+        paragraphs = text.split("\n")
+        logger.debug(
+            f"文本无双换行分隔，回退到单换行分割: {len(paragraphs)} 行"
+        )
+
     current_chunk: list[str] = []
     current_length = 0
     chunk_index = 0
