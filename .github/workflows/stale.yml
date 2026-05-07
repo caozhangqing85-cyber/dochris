@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Mark stale issues and PRs
-        uses: actions/stale@v9
+        uses: actions/stale@v10
         with:
           # ==================== Issues 配置 ====================
           stale-issue-message: >
@@ -79,7 +79,7 @@ jobs:
 
     steps:
       - name: Close stale items
-        uses: actions/stale@v9
+        uses: actions/stale@v10
         with:
           # 立即关闭已被标记为 stale 超过关闭天数的项目
           days-before-close: 0
