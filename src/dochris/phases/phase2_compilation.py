@@ -156,11 +156,11 @@ async def compile_all(
         logger.info("=" * 60)
         return
 
-    # 创建 worker
-    worker = CompilerWorker(api_key=DEFAULT_API_KEY, base_url=api_base, model=model)
+    # 创建 worker（显式传入 workspace，避免全局 Settings 缓存导致路径不一致）
+    worker = CompilerWorker(api_key=DEFAULT_API_KEY, base_url=api_base, model=model, workspace=workspace)
 
-    # 创建监控
-    monitor = MonitorWorker()
+    # 创建监控（显式传入 workspace）
+    monitor = MonitorWorker(workspace=workspace)
 
     # 并发编译
     semaphore = asyncio.Semaphore(max_concurrent)

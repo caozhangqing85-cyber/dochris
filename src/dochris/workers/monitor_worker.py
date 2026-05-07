@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class MonitorWorker:
     """监控 Worker"""
 
-    def __init__(self) -> None:
-        self.workspace = get_default_workspace()
+    def __init__(self, workspace: Path | None = None) -> None:
+        self.workspace = workspace if workspace is not None else get_default_workspace()
 
     def generate_progress_report(self) -> dict[str, Any]:
         """生成进度报告"""

@@ -57,6 +57,8 @@ class CompilerWorker:
         fallback_api_key: str = "",
         # 其他参数
         enable_fallback: bool = True,
+        # 工作区路径（由调用方传入，避免全局 Settings 缓存问题）
+        workspace: Path | None = None,
     ) -> None:
         # 从 settings 获取本地 LLM 默认配置
         settings = get_settings()
@@ -95,7 +97,7 @@ class CompilerWorker:
             self.fallback_llm = None
 
         self.enable_fallback = enable_fallback
-        self.workspace = get_default_workspace()
+        self.workspace = workspace if workspace is not None else get_default_workspace()
         self.cache_dir = cache_dir(self.workspace)
 
         # 插件管理器
