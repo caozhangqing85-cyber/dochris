@@ -215,9 +215,18 @@ class HierarchicalSummarizer:
                 on_content_filter=None,
             )
 
-        # 并行处理所有块
+        # 使用信号量控制并发，避免同时发出过多请求触发 API 限流
+        max_parallel = 3
+        sem = asyncio.Semaphore(max_parallel)
+
+        async def limited_summarize(chunk_idx: tuple[int, "TextChunk"]) -> dict[str, Any] | Exception:
+            i, chunk = chunk_idx
+            async with sem:
+                result = await summarize_one(chunk, i)
+                return result if result is not None else Exception(f"Chunk {i + 1}: returned None")
+
         results = await asyncio.gather(
-            *[summarize_one(chunk, i) for i, chunk in enumerate(chunks)], return_exceptions=True
+            *[limited_summarize((i, c)) for i, c in enumerate(chunks)], return_exceptions=True
         )
 
         # 过滤掉 None 和异常
@@ -534,9 +543,17 @@ class HierarchicalSummarizer:
             # 合并该章节的所有摘要
             return await self._merge_summaries(summaries, f"{title} - {section_title}", max_retries)
 
-        # 并行处理所有章节
+        # 使用信号量控制并发，避免同时发出过多请求触发 API 限流
+        sem = asyncio.Semaphore(3)
+
+        async def limited_summarize_section(item: tuple[str, list[dict[str, Any]]]) -> dict[str, Any] | Exception:
+            st, sums = item
+            async with sem:
+                result = await summarize_section(st, sums)
+                return result if result is not None else Exception(f"Section {st}: returned None")
+
         results = await asyncio.gather(
-            *[summarize_section(st, sums) for st, sums in sections.items()], return_exceptions=True
+            *[limited_summarize_section((st, sums)) for st, sums in sections.items()], return_exceptions=True
         )
 
         # 过滤掉 None 和异常
