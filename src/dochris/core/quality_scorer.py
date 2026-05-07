@@ -204,8 +204,16 @@ def _score_one_line(text: str) -> DimensionScore:
 
 
 def _score_concepts(concepts: list) -> DimensionScore:
-    """概念完整性评分 (0-10)，过滤空字符串"""
+    """概念完整性评分 (0-10)，过滤空字符串
+
+    支持 list[str] 和 list[dict] 两种格式：
+    - list[str]: 直接计数有效字符串
+    - list[dict]: 统计包含 'name' 键的有效字典
+    """
     valid = [c for c in concepts if isinstance(c, str) and c.strip()]
+    if not valid:
+        # LLM 可能返回 list[dict] 格式，如 [{"name": "概念", "description": "..."}]
+        valid = [c for c in concepts if isinstance(c, dict) and c.get("name") and str(c.get("name", "")).strip()]
     c_len = len(valid)
     tiers = [
         (5, 10),
@@ -224,8 +232,15 @@ def _score_concepts(concepts: list) -> DimensionScore:
 
 
 def _detect_template(text: str) -> DimensionScore:
-    """模板文字检测 (-10)"""
-    detected = any(pattern in text for pattern in TEMPLATE_PATTERNS)
+    """模板文字检测 (-10)
+
+    使用词边界匹配避免误报。例如正文中的"播客总结了..."不应被判定为模板。
+    只匹配出现在文本开头 200 字符内的模板模式，因为模板文字通常出现在
+    摘要的开头而非正文中间。
+    """
+    # 只在文本前 200 字符内检测模板模式
+    header = text[:200]
+    detected = any(pattern in header for pattern in TEMPLATE_PATTERNS)
     points = -TEMPLATE_DEDUCTION if detected else 0
     return DimensionScore(
         name="template",
