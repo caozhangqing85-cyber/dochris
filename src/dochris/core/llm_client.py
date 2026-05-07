@@ -339,14 +339,14 @@ class LLMClient:
         return await self._summary_generator.generate_summary(text, title, max_retries)
 
     async def generate_summary_smart(
-        self, text: str, title: str, direct_limit: int = 10000, max_retries: int = 8
+        self, text: str, title: str, direct_limit: int = 20000, max_retries: int = 8
     ) -> dict[str, Any] | None:
         """智能摘要：根据文本长度自动选择策略
 
         Args:
             text: 待摘要的文本
             title: 文本标题
-            direct_limit: 直接摘要的字符数上限（默认 1 万字）
+            direct_limit: 直接摘要的字符数上限（默认 2 万字）
             max_retries: 最大重试次数
 
         Returns:

@@ -213,7 +213,11 @@ def _score_concepts(concepts: list) -> DimensionScore:
     valid = [c for c in concepts if isinstance(c, str) and c.strip()]
     if not valid:
         # LLM 可能返回 list[dict] 格式，如 [{"name": "概念", "description": "..."}]
-        valid = [c for c in concepts if isinstance(c, dict) and c.get("name") and str(c.get("name", "")).strip()]
+        valid = [
+            c
+            for c in concepts
+            if isinstance(c, dict) and c.get("name") and str(c.get("name", "")).strip()
+        ]
     c_len = len(valid)
     tiers = [
         (5, 10),

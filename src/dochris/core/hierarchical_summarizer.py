@@ -21,7 +21,7 @@ from .retry_manager import RetryManager
 logger = logging.getLogger(__name__)
 
 # 分层摘要最大字符数（超过此大小会截断）
-MAX_HIERARCHICAL_CHARS = 100000  # 10 万字
+MAX_HIERARCHICAL_CHARS = 200000  # 20 万字
 
 
 class HierarchicalSummarizer:
@@ -219,7 +219,9 @@ class HierarchicalSummarizer:
         max_parallel = 3
         sem = asyncio.Semaphore(max_parallel)
 
-        async def limited_summarize(chunk_idx: tuple[int, "TextChunk"]) -> dict[str, Any] | Exception:
+        async def limited_summarize(
+            chunk_idx: tuple[int, "TextChunk"],
+        ) -> dict[str, Any] | Exception:
             i, chunk = chunk_idx
             async with sem:
                 result = await summarize_one(chunk, i)
@@ -302,9 +304,7 @@ class HierarchicalSummarizer:
             async with sem:
                 results[idx] = await self._merge_batch(batch, title, max_retries)
 
-        await asyncio.gather(
-            *[merge_batch(i, batch) for i, batch in enumerate(batches)]
-        )
+        await asyncio.gather(*[merge_batch(i, batch) for i, batch in enumerate(batches)])
 
         # 过滤失败的结果
         merged = [r for r in results if r is not None]
@@ -515,7 +515,8 @@ class HierarchicalSummarizer:
             concepts_str = ""
             for c in s.get("concepts", []):
                 if isinstance(c, dict):
-                    concepts_str += f"  - {c.get('name', '?')}: {c.get('explanation', '')[:60]}\n"
+                    desc = c.get("explanation") or c.get("description", "")
+                    concepts_str += f"  - {c.get('name', '?')}: {desc[:60]}\n"
                 else:
                     concepts_str += f"  - {c}\n"
             summary_texts.append(f"""
@@ -614,14 +615,17 @@ class HierarchicalSummarizer:
         # 使用信号量控制并发，避免同时发出过多请求触发 API 限流
         sem = asyncio.Semaphore(3)
 
-        async def limited_summarize_section(item: tuple[str, list[dict[str, Any]]]) -> dict[str, Any] | Exception:
+        async def limited_summarize_section(
+            item: tuple[str, list[dict[str, Any]]],
+        ) -> dict[str, Any] | Exception:
             st, sums = item
             async with sem:
                 result = await summarize_section(st, sums)
                 return result if result is not None else Exception(f"Section {st}: returned None")
 
         results = await asyncio.gather(
-            *[limited_summarize_section((st, sums)) for st, sums in sections.items()], return_exceptions=True
+            *[limited_summarize_section((st, sums)) for st, sums in sections.items()],
+            return_exceptions=True,
         )
 
         # 过滤掉 None 和异常

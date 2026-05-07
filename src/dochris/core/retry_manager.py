@@ -15,8 +15,8 @@ class RetryManager:
 
     # 错误类型到重试配置的映射
     RETRY_CONFIG = {
-        "rate_limit_429": {"max_retries": 5, "base_delay": 10, "exponential": True},
-        "timeout": {"max_retries": 3, "base_delay": 5, "exponential": True},
+        "rate_limit_429": {"max_retries": 8, "base_delay": 30, "exponential": True},
+        "timeout": {"max_retries": 5, "base_delay": 20, "exponential": True},
         "other": {"max_retries": 2, "base_delay": 5, "exponential": True},
     }
 

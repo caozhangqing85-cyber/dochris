@@ -246,9 +246,7 @@ def semantic_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> lis
     # 当文本没有双换行分隔（如播客转录、日志文件），回退到单换行分割
     if len(paragraphs) == 1 and len(paragraphs[0]) > chunk_size:
         paragraphs = text.split("\n")
-        logger.debug(
-            f"文本无双换行分隔，回退到单换行分割: {len(paragraphs)} 行"
-        )
+        logger.debug(f"文本无双换行分隔，回退到单换行分割: {len(paragraphs)} 行")
 
     current_chunk: list[str] = []
     current_length = 0
@@ -417,12 +415,12 @@ def count_chars(text: str) -> int:
     return len(text)
 
 
-def should_use_hierarchical(text: str, direct_limit: int = 10000) -> str:
+def should_use_hierarchical(text: str, direct_limit: int = 20000) -> str:
     """判断应该使用哪种摘要策略
 
     Args:
         text: 待处理的文本
-        direct_limit: 直接摘要的字符数上限（默认 1 万字）
+        direct_limit: 直接摘要的字符数上限（默认 2 万字）
 
     Returns:
         策略名称: "direct", "map_reduce", "hierarchical"
@@ -431,10 +429,10 @@ def should_use_hierarchical(text: str, direct_limit: int = 10000) -> str:
 
     if char_count <= direct_limit:
         return "direct"
-    elif char_count <= direct_limit * 3:  # 3 万字以下
+    elif char_count <= direct_limit * 3:  # 6 万字以下
         return "map_reduce"
-    elif char_count <= direct_limit * 10:  # 10 万字以下
+    elif char_count <= direct_limit * 10:  # 20 万字以下
         return "hierarchical"
     else:
-        # 超大文档（>10万字）使用 map_reduce + 大块，避免 API 调用爆炸
+        # 超大文档（>20万字）使用 map_reduce + 大块，避免 API 调用爆炸
         return "map_reduce"

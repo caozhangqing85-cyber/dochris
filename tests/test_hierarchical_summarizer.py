@@ -115,7 +115,7 @@ class TestGenerateHierarchicalSummary:
     async def test_hierarchical_truncates_oversized_text(self, hierarchical_summarizer):
         """测试超长文本截断"""
         # 超过 MAX_HIERARCHICAL_CHARS 的文本
-        oversized_text = "a" * 150000
+        oversized_text = "a" * 250000
 
         with patch("dochris.core.text_chunker.structure_aware_split") as mock_split:
             mock_split.return_value = [MagicMock(title="块1", content="内容1")]
