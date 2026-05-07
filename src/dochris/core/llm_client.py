@@ -137,7 +137,7 @@ class LLMClient:
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
-            timeout=120,
+            timeout=300,  # 5 分钟超时（合并多个摘要需要更长处理时间）
         )
 
         # 向后兼容：对于 openai_compat，暴露底层的 AsyncOpenAI 客户端

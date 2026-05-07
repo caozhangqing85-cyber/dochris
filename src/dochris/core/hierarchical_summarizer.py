@@ -245,6 +245,10 @@ class HierarchicalSummarizer:
     ) -> dict[str, Any] | None:
         """合并多个摘要为一个全局摘要
 
+        当摘要数量较多（> 5）时，采用树形合并策略：
+        两两合并递归，避免单次 prompt 过大导致 API 超时。
+        例如 18 个 → 6 个 → 2 个 → 1 个。
+
         Args:
             summaries: 摘要列表
             title: 文档标题
@@ -257,6 +261,70 @@ class HierarchicalSummarizer:
             return None
 
         # 如果只有一个摘要，直接返回
+        if len(summaries) == 1:
+            return summaries[0]
+
+        # 树形合并：当摘要数量 > 5 时，分批两两合并，避免 prompt 过大
+        MERGE_BATCH_SIZE = 5
+        if len(summaries) > MERGE_BATCH_SIZE:
+            logger.info(
+                f"树形合并: {len(summaries)} 个摘要 > {MERGE_BATCH_SIZE}，"
+                f"分批合并为 ~{max(1, len(summaries) // MERGE_BATCH_SIZE)} 组"
+            )
+            return await self._tree_merge(summaries, title, max_retries, MERGE_BATCH_SIZE)
+
+        # 摘要数量 <= 5，直接一次性合并
+        return await self._merge_batch(summaries, title, max_retries)
+
+    async def _tree_merge(
+        self,
+        summaries: list[dict[str, Any]],
+        title: str,
+        max_retries: int,
+        batch_size: int = 5,
+    ) -> dict[str, Any] | None:
+        """树形合并：将多个摘要分批递归合并
+
+        分批策略：每 batch_size 个摘要合并为一组，递归直到只剩 1 个。
+        """
+        # 分批
+        batches: list[list[dict[str, Any]]] = []
+        for i in range(0, len(summaries), batch_size):
+            batches.append(summaries[i : i + batch_size])
+
+        logger.info(f"树形合并: {len(summaries)} → {len(batches)} 组")
+
+        # 并行合并各组（使用信号量限制并发）
+        sem = asyncio.Semaphore(3)
+        results: list[dict[str, Any] | None] = [None] * len(batches)
+
+        async def merge_batch(idx: int, batch: list[dict[str, Any]]) -> None:
+            async with sem:
+                results[idx] = await self._merge_batch(batch, title, max_retries)
+
+        await asyncio.gather(
+            *[merge_batch(i, batch) for i, batch in enumerate(batches)]
+        )
+
+        # 过滤失败的结果
+        merged = [r for r in results if r is not None]
+        if not merged:
+            logger.error("树形合并: 所有分组合并失败")
+            return None
+
+        # 递归合并直到只剩 1 个
+        if len(merged) == 1:
+            return merged[0]
+
+        logger.info(f"树形合并: 继续合并 {len(merged)} 个中间结果")
+        return await self._tree_merge(merged, title, max_retries, batch_size)
+
+    async def _merge_batch(
+        self, summaries: list[dict[str, Any]], title: str, max_retries: int
+    ) -> dict[str, Any] | None:
+        """合并一批摘要（单次 API 调用）"""
+        if not summaries:
+            return None
         if len(summaries) == 1:
             return summaries[0]
 
