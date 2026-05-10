@@ -29,7 +29,11 @@ class TestGetDefaultWorkspace:
 
     def test_contains_knowledge_base(self):
         """测试路径包含 knowledge-base"""
-        result = get_default_workspace()
+        from unittest.mock import patch
+
+        with patch("dochris.settings.paths.get_settings") as mock_settings:
+            mock_settings.return_value.workspace = Path.home() / ".openclaw/knowledge-base"
+            result = get_default_workspace()
         assert "knowledge-base" in str(result)
 
 

@@ -64,7 +64,7 @@ class TestGetFailedAudioManifests:
 
 
 class TestFasterWhisperTranscriber:
-    @patch("dochris.admin.transcribe_failed_audio.WhisperModel")
+    @patch("faster_whisper.WhisperModel")
     def test_transcriber_init(self, mock_model):
         from dochris.admin.transcribe_failed_audio import FasterWhisperTranscriber
 
