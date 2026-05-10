@@ -210,8 +210,10 @@ def _score_concepts(concepts: list) -> DimensionScore:
     - list[str]: 直接计数有效字符串
     - list[dict]: 统计包含 'name' 键的有效字典
     """
-    valid = [c for c in concepts if isinstance(c, str) and c.strip()]
-    if not valid:
+    valid_strs = [c for c in concepts if isinstance(c, str) and c.strip()]
+    if valid_strs:
+        valid = valid_strs
+    else:
         # LLM 可能返回 list[dict] 格式，如 [{"name": "概念", "description": "..."}]
         valid = [
             c

@@ -37,8 +37,8 @@ class Settings:
     # 路径配置
     # ============================================================
 
-    workspace: Path = field(default_factory=lambda: Path.home() / ".knowledge-base")
-    """工作区路径，默认 ~/.knowledge-base"""
+    workspace: Path = field(default_factory=lambda: Path.home() / ".openclaw/knowledge-base")
+    """工作区路径，默认 ~/.openclaw/knowledge-base"""
 
     source_path: Path | None = None
     """源文件扫描路径，可选"""
@@ -218,7 +218,6 @@ class Settings:
         # 1. 先尝试从可能的 workspace 位置加载 .env
         env_paths = [
             Path.cwd() / ".env",
-            Path.home() / ".knowledge-base" / ".env",
             Path.home() / ".openclaw" / "knowledge-base" / ".env",
         ]
         if env_file:
@@ -237,12 +236,12 @@ class Settings:
         else:
             # 尝试检测当前是否在知识库目录中
             cwd = Path.cwd()
-            if (cwd / "scripts" / "config.py").exists():
+            if (cwd / "manifests" / "sources").exists():
                 workspace = cwd
-            elif (cwd.parent / "scripts" / "config.py").exists():
+            elif (cwd.parent / "manifests" / "sources").exists():
                 workspace = cwd.parent
             else:
-                workspace = Path.home() / ".knowledge-base"
+                workspace = Path.home() / ".openclaw/knowledge-base"
 
         # 解析 source_path
         source_path_str = os.environ.get("SOURCE_PATH")
@@ -252,7 +251,7 @@ class Settings:
         obsidian_vaults_str = os.environ.get("OBSIDIAN_VAULTS", "")
         obsidian_vaults: list[Path] = []
         if obsidian_vaults_str:
-            obsidian_vaults = [Path(p).expanduser() for p in obsidian_vaults_str.split(":")]
+            obsidian_vaults = [Path(p).expanduser() for p in obsidian_vaults_str.split(os.pathsep)]
         elif os.environ.get("OBSIDIAN_VAULT"):
             obsidian_vaults = [Path(os.environ["OBSIDIAN_VAULT"]).expanduser()]
 
@@ -264,7 +263,9 @@ class Settings:
         # 解析插件配置
         plugin_dirs_str = os.environ.get("PLUGIN_DIRS", "")
         plugin_dirs = (
-            [Path(p).expanduser() for p in plugin_dirs_str.split(":")] if plugin_dirs_str else []
+            [Path(p).expanduser() for p in plugin_dirs_str.split(os.pathsep)]
+            if plugin_dirs_str
+            else []
         )
 
         plugins_enabled_str = os.environ.get("PLUGINS_ENABLED", "")

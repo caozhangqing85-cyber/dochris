@@ -4,12 +4,9 @@
 
 import os
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dochris.compensate.compensate_utils import (
     EBOOK_CONVERT_CMD,

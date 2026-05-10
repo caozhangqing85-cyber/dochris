@@ -16,7 +16,6 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 # 导入配置
-sys.path.insert(0, str(Path(__file__).parent))
 from dochris.settings import (
     get_data_dir,
     get_settings,

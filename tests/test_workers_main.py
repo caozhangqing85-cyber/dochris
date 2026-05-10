@@ -124,7 +124,7 @@ class TestWorkersMainModuleStructure:
 
     def test_workers_package_has_init(self):
         """测试 workers 包有 __init__.py"""
-        import workers
+        from dochris import workers
 
         assert hasattr(workers, "__file__")
 
@@ -156,7 +156,7 @@ class TestWorkersMainExecution:
 
         # 这会执行 __main__.py 的内容
         try:
-            importlib.import_module("workers.__main__")
+            importlib.import_module("dochris.workers.__main__")
         except SystemExit:
             pass  # 可能会退出，这是正常的
 

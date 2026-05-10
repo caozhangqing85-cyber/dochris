@@ -134,7 +134,7 @@ class TestPhase1ProgressFile(unittest.TestCase):
 
         try:
             # 临时覆盖 PROGRESS_FILE 为测试目录
-            import phase1_ingestion
+            from dochris.phases import phase1_ingestion
 
             original_progress_file = phase1_ingestion.PROGRESS_FILE
             phase1_ingestion.PROGRESS_FILE = self.temp_path / "progress.json"

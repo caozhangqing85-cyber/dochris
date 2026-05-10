@@ -4,6 +4,7 @@
 包含所有默认常量定义
 """
 
+import os
 from pathlib import Path
 
 # ============================================================
@@ -228,4 +229,6 @@ EBOOK_EXTENSIONS: set[str] = {".epub", ".mobi", ".azw3", ".fb2"}
 # ============================================================
 
 # 旧代码中 OPENCLAW_CONFIG_PATH 的别名
-OPENCLAW_CONFIG_PATH: str = str(Path.home() / ".openclaw/openclaw.json")
+OPENCLAW_CONFIG_PATH: str = os.environ.get(
+    "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw/openclaw.json")
+)

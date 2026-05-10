@@ -7,7 +7,6 @@ import logging
 import re
 
 # 导入统一配置
-import sys
 import threading
 from collections.abc import Callable
 from datetime import datetime
@@ -16,7 +15,6 @@ from typing import Any, cast
 
 import openai
 
-sys.path.insert(0, str(Path(__file__).parent))
 from dochris.settings import (
     LOG_DATE_FORMAT,
     LOG_FORMAT_SIMPLE,

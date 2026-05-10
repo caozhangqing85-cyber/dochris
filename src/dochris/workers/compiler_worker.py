@@ -8,16 +8,10 @@
 """
 
 import logging
-import sys
 from pathlib import Path
 from typing import Any, cast
 
 # 导入核心模块
-scripts_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(scripts_dir))
-
-# 导入插件系统
-# 导入 manifest 管理
 from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
 from dochris.core.quality_scorer import get_quality_threshold, score_summary_quality_v4

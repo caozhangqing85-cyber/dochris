@@ -3,12 +3,8 @@
 Workers 模块导入测试
 """
 
-import sys
-from pathlib import Path
 
 # 确保 scripts 目录在 sys.path
-scripts_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(scripts_dir))
 
 print("✓ Testing workers imports...")
 

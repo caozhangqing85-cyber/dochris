@@ -20,7 +20,6 @@ from typing import Any
 
 # 添加路径
 scripts_dir = Path(__file__).parent
-sys.path.insert(0, str(scripts_dir))
 
 from dochris.manifest import get_all_manifests
 from dochris.settings import get_settings

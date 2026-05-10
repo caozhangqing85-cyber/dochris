@@ -166,6 +166,12 @@ def main() -> int:
         description="初始化知识库工作区，创建目录结构和配置文件",
     )
     parser_init.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="工作区路径（可选，默认 ~/.openclaw/knowledge-base）",
+    )
+    parser_init.add_argument(
         "--non-interactive",
         "-n",
         action="store_true",

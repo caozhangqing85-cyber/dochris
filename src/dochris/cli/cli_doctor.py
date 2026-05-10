@@ -164,6 +164,19 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         except ImportError:
             print(f"   {dim('○')} {module_name} ({description}) - 未安装（可选）")
 
+    # 6.5 外部工具检查
+    print(f"\n{info('6.5 外部工具检查')}")
+    external_tools = [
+        ("ffprobe", "音频/视频时长检测", "brew install ffmpeg"),
+    ]
+    for tool_name, description, install_hint in external_tools:
+        tool_path = shutil.which(tool_name)
+        if tool_path:
+            print(f"   {success('✓')} {tool_name} ({description})")
+        else:
+            print(f"   {warning('⚠')} {tool_name} ({description}) - 未安装")
+            print(f"   {dim(f'提示: {install_hint}')}")
+
     # 7. 环境变量检查
     print(f"\n{info('7. 环境变量检查')}")
     env_vars = [

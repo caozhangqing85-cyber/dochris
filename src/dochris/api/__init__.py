@@ -13,5 +13,5 @@ __all__ = ["create_app"]
 
 try:
     from dochris.api.app import app  # noqa: F401
-except Exception:
+except ImportError:
     app = None  # type: ignore[assignment]

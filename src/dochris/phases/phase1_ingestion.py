@@ -20,7 +20,6 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
 # 导入统一配置
-sys.path.insert(0, str(Path(__file__).parent))
 from dochris.log import append_log
 from dochris.manifest import (
     append_to_index,

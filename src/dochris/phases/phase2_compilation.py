@@ -18,7 +18,6 @@ import asyncio
 import logging
 import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from rich.console import Console
@@ -32,8 +31,6 @@ from rich.progress import (
 )
 
 # 导入核心模块
-sys.path.insert(0, str(Path(__file__).parent))
-
 from dochris.core.cache import cache_dir, clear_cache
 from dochris.manifest import get_all_manifests
 from dochris.settings import (

@@ -30,8 +30,6 @@ from pathlib import Path
 from typing import Any
 
 # 确保 scripts 包可导入
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from dochris.log import append_log
 from dochris.manifest import (
     get_all_manifests,

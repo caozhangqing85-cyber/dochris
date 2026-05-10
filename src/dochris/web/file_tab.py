@@ -58,6 +58,8 @@ def handle_refresh_files() -> tuple[list[list[str]], str]:
 
 def handle_upload(files: list[Any]) -> str:
     """处理文件上传"""
+    from dochris.core.utils import sanitize_filename
+
     if not files:
         return "*未选择文件*"
     settings = get_settings()
@@ -67,7 +69,8 @@ def handle_upload(files: list[Any]) -> str:
     for f in files:
         try:
             src = Path(f.name)
-            dst = raw_dir / src.name
+            safe_name = sanitize_filename(src.name)
+            dst = raw_dir / safe_name
             if not dst.exists():
                 shutil.copy2(src, dst)
                 count += 1

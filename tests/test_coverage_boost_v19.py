@@ -36,10 +36,9 @@ class TestConfigFromEnv:
         assert s.api_key == "test-key-xyz"
 
     def test_from_env_workspace_from_cwd_scripts(self, tmp_path, monkeypatch):
-        """from_env detects workspace via cwd/scripts/config.py (line 244)"""
-        scripts = tmp_path / "scripts"
-        scripts.mkdir()
-        (scripts / "config.py").write_text("# test\n", encoding="utf-8")
+        """from_env detects workspace via cwd/manifests/sources"""
+        manifests = tmp_path / "manifests" / "sources"
+        manifests.mkdir(parents=True)
 
         for k in [
             "WORKSPACE",
@@ -53,20 +52,19 @@ class TestConfigFromEnv:
         ]:
             monkeypatch.delenv(k, raising=False)
 
-        with patch("pathlib.Path.cwd", return_value=tmp_path):
-            from dochris.settings.config import Settings
+        monkeypatch.chdir(tmp_path)
+        from dochris.settings.config import Settings
 
-            s = Settings.from_env()
-            assert s.workspace == tmp_path
+        s = Settings.from_env()
+        assert s.workspace == tmp_path
 
     def test_from_env_workspace_from_parent_scripts(self, tmp_path, monkeypatch):
-        """from_env detects workspace via cwd.parent/scripts/config.py (line 246)"""
+        """from_env detects workspace via cwd.parent/manifests/sources"""
         parent = tmp_path / "parent"
         child = parent / "subdir"
         child.mkdir(parents=True)
-        scripts = parent / "scripts"
-        scripts.mkdir()
-        (scripts / "config.py").write_text("# t\n", encoding="utf-8")
+        manifests = parent / "manifests" / "sources"
+        manifests.mkdir(parents=True)
 
         for k in [
             "WORKSPACE",
@@ -80,11 +78,11 @@ class TestConfigFromEnv:
         ]:
             monkeypatch.delenv(k, raising=False)
 
-        with patch("pathlib.Path.cwd", return_value=child):
-            from dochris.settings.config import Settings
+        monkeypatch.chdir(child)
+        from dochris.settings.config import Settings
 
-            s = Settings.from_env()
-            assert s.workspace == parent
+        s = Settings.from_env()
+        assert s.workspace == parent
 
 
 class TestConfigValidateEdge:

@@ -40,7 +40,9 @@ append_log = append_log_to_file
 
 def get_default_workspace() -> Path:
     """获取默认工作区路径"""
-    return Path.home() / ".openclaw/knowledge-base"
+    from dochris.settings.paths import get_default_workspace as _get_ws
+
+    return _get_ws()
 
 
 def _ensure_dirs(workspace_path: Path) -> None:

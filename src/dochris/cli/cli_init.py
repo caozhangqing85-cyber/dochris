@@ -28,6 +28,12 @@ def cmd_init(args: Any) -> int:
     """
     non_interactive = getattr(args, "non_interactive", False)
     api_key_arg = getattr(args, "api_key", None)
+    path_arg = getattr(args, "path", None)
+
+    # 如果指定了路径，设置 WORKSPACE 环境变量
+    if path_arg:
+        workspace = Path(path_arg).expanduser().resolve()
+        os.environ["WORKSPACE"] = str(workspace)
 
     print("\n" + "=" * 60)
     print("📚 Dochris 知识库初始化向导")
@@ -71,6 +77,7 @@ def cmd_init(args: Any) -> int:
         directories = [
             "raw/pdfs",
             "raw/articles",
+            "raw/markdown",
             "raw/audio",
             "raw/videos",
             "raw/ebooks",

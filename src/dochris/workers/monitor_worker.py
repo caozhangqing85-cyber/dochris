@@ -5,15 +5,11 @@
 
 import json
 import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 # 导入 manifest 管理
-scripts_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(scripts_dir))
-
 from dochris.manifest import get_all_manifests, get_default_workspace
 
 logger = logging.getLogger(__name__)

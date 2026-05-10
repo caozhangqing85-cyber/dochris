@@ -18,14 +18,10 @@ import sys
 import time
 
 # 确保 scripts 包可导入
-from pathlib import Path
 from typing import Any, cast
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-
 # --- 路径常量（向后兼容） ---
-import query_utils
+from dochris.phases import query_utils
 
 # --- 工具函数 ---
 from dochris.phases.query_utils import (
@@ -72,7 +68,7 @@ def _get_manifest_id(file_path: str) -> str | None:
 
 
 # --- 搜索引擎（使用 module 引用，保证缓存共享） ---
-import query_engine
+from dochris.phases import query_engine
 
 # 向后兼容：直接暴露所有公开符号
 search_concepts = query_engine.search_concepts

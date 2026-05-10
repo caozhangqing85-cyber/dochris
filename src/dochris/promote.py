@@ -17,8 +17,6 @@ import sys
 from pathlib import Path
 
 # 确保 scripts 包可导入
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from dochris.core.utils import sanitize_filename
 from dochris.log import append_log
 from dochris.manifest import get_manifest, update_manifest_status

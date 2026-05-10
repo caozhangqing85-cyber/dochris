@@ -6,8 +6,8 @@ Knowledge Base Quality Monitor
 
 import json
 import logging
-import os
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -132,17 +132,22 @@ def check_latest_summary_quality() -> dict:
 def check_process_status() -> dict:
     """检查进程状态"""
     try:
-        result = os.popen(
-            'ps aux | grep -E "phase2_compilation|pdf_compilation" | grep -v grep'
-        ).read()
-        processes = result.strip().split("\n")
-        processes = [p for p in processes if p.strip()]
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        lines = result.stdout.splitlines()
+        processes = [
+            line for line in lines if re.search(r"phase2_compilation|pdf_compilation", line)
+        ]
         return {
             "running": len(processes) > 0,
             "process_count": len(processes),
             "processes": processes,
         }
-    except (OSError, RuntimeError) as e:
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as e:
         logger.error(f"检查进程状态失败: {e}")
         return {"running": False, "process_count": 0, "processes": []}
 

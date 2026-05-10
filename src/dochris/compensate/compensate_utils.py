@@ -6,9 +6,6 @@ import datetime
 import logging
 import sys
 from enum import Enum
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dochris.settings import get_default_workspace
 

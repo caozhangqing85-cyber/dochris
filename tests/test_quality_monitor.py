@@ -222,12 +222,10 @@ class TestCheckLatestSummaryQuality(unittest.TestCase):
 class TestCheckProcessStatus(unittest.TestCase):
     """测试检查进程状态"""
 
-    @patch("os.popen")
-    def test_process_running(self, mock_popen):
+    @patch("subprocess.run")
+    def test_process_running(self, mock_run):
         """测试进程运行中"""
-        mock_result = MagicMock()
-        mock_result.read.return_value = "user 1234 0.0 phase2_compilation.py\n"
-        mock_popen.return_value = mock_result
+        mock_run.return_value = MagicMock(stdout="user 1234 0.0 phase2_compilation.py\n")
 
         from dochris.quality.quality_monitor import check_process_status
 
@@ -236,12 +234,10 @@ class TestCheckProcessStatus(unittest.TestCase):
         self.assertTrue(result["running"])
         self.assertEqual(result["process_count"], 1)
 
-    @patch("os.popen")
-    def test_process_not_running(self, mock_popen):
+    @patch("subprocess.run")
+    def test_process_not_running(self, mock_run):
         """测试进程未运行"""
-        mock_result = MagicMock()
-        mock_result.read.return_value = "\n"
-        mock_popen.return_value = mock_result
+        mock_run.return_value = MagicMock(stdout="\n")
 
         from dochris.quality.quality_monitor import check_process_status
 

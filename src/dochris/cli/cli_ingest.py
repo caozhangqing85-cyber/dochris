@@ -19,10 +19,17 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         if not source_path.exists():
             print(f"\n{error('✗ 路径不存在')}: {source_path}")
             return 1
-        if not source_path.is_dir():
-            print(f"\n{error('✗ 不是目录')}: {source_path}")
-            return 1
-        print(info(f"Phase 1: 开始摄入文件... (源: {source_path})"))
+        if source_path.is_file():
+            # 单文件：创建临时目录，将文件复制进去
+            import shutil
+            import tempfile
+
+            tmp_dir = Path(tempfile.mkdtemp(prefix="kb_ingest_"))
+            shutil.copy2(source_path, tmp_dir / source_path.name)
+            source_path = tmp_dir
+            print(info(f"Phase 1: 开始摄入文件... (源文件: {args.path})"))
+        else:
+            print(info(f"Phase 1: 开始摄入文件... (源目录: {source_path})"))
     else:
         print(info("Phase 1: 开始摄入文件..."))
 
