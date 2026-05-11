@@ -39,7 +39,7 @@ class TestCliServe:
         sys.modules["uvicorn"] = mock_uvicorn
         importlib.reload(serve_mod)
 
-        args = MagicMock(host="0.0.0.0", port=8000, reload=True, web=False)
+        args = MagicMock(host="127.0.0.1", port=8000, reload=True, web=False)
         result = serve_mod.cmd_serve(args)
         assert result == 0
         assert mock_uvicorn.run.call_args[1]["reload"] is True
@@ -79,7 +79,7 @@ class TestCliServe:
         result = serve_mod.cmd_serve(args)
         assert result == 0
         call_kwargs = mock_uvicorn.run.call_args[1]
-        assert call_kwargs["host"] == "0.0.0.0"
+        assert call_kwargs["host"] == "127.0.0.1"
         assert call_kwargs["port"] == 8000
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks
 
 from dochris.api.schemas import CompileRequest, CompileResponse, ErrorResponse
 from dochris.manifest import get_all_manifests
@@ -20,7 +20,9 @@ router = APIRouter(tags=["compile"])
     response_model=CompileResponse,
     responses={500: {"model": ErrorResponse}},
 )
-async def compile_documents(req: CompileRequest) -> CompileResponse:
+async def compile_documents(
+    req: CompileRequest, background_tasks: BackgroundTasks
+) -> CompileResponse:
     """触发文档编译
 
     后台异步执行编译任务，立即返回任务状态。
@@ -46,18 +48,26 @@ async def compile_documents(req: CompileRequest) -> CompileResponse:
             total=total_to_compile,
         )
 
-    try:
-        await do_compile_all(
-            max_concurrent=req.concurrency,
-            limit=req.limit,
-            dry_run=False,
-        )
-    except Exception as exc:
-        logger.exception("编译失败")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    background_tasks.add_task(
+        _run_compile_task,
+        req.concurrency,
+        req.limit,
+    )
 
     return CompileResponse(
-        status="completed",
-        message=f"编译完成: {total_to_compile} 个文档",
+        status="accepted",
+        message=f"已提交后台编译任务: {total_to_compile} 个文档",
         total=total_to_compile,
     )
+
+
+async def _run_compile_task(concurrency: int, limit: int | None) -> None:
+    """后台执行编译任务，避免长时间占用 HTTP 请求"""
+    try:
+        await do_compile_all(
+            max_concurrent=concurrency,
+            limit=limit,
+            dry_run=False,
+        )
+    except Exception:
+        logger.exception("后台编译失败")

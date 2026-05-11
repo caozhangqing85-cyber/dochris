@@ -61,11 +61,11 @@ class TestCompileEndpoint:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "completed"
+        assert data["status"] == "accepted"
         mock_compile.assert_called_once_with(max_concurrent=2, limit=5, dry_run=False)
 
-    def test_compile_internal_error(self, client) -> None:
-        """编译失败返回 500"""
+    def test_compile_background_error_is_logged(self, client) -> None:
+        """后台编译失败不阻塞 HTTP 响应"""
         manifests = [{"id": "SRC-0001", "status": "ingested"}]
 
         with (
@@ -79,7 +79,8 @@ class TestCompileEndpoint:
         ):
             resp = client.post("/api/v1/compile", json={"concurrency": 1})
 
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
 
     def test_compile_default_concurrency(self, client) -> None:
         """默认并发数为 1"""

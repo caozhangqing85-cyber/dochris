@@ -22,7 +22,6 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 # 导入统一配置
 from dochris.log import append_log
 from dochris.manifest import (
-    append_to_index,
     create_manifest,
     get_next_src_id,
 )
@@ -369,10 +368,10 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     phase1["hash_index"][hash_val] = entry["name"]
     phase1["stats"]["linked"] += 1
 
-    # 创建 manifest 并追加到 source_index.csv
+    # 创建 manifest；create_manifest 内部会同步追加 source_index.csv
     try:
         src_id = get_next_src_id(KB_PATH)
-        manifest = create_manifest(
+        create_manifest(
             workspace_path=KB_PATH,
             src_id=src_id,
             title=entry["name"],
@@ -382,7 +381,6 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
             content_hash=hash_val or "",
             size_bytes=entry.get("size", 0),
         )
-        append_to_index(KB_PATH, manifest)
         logger.info(f"  [{category}] {entry['name']} -> {rel_dst} [{src_id}]")
     except (OSError, ValueError, KeyError) as e:
         logger.warning(f"  manifest 创建失败: {entry['name']}: {e}")

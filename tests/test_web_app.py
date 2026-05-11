@@ -324,6 +324,7 @@ class TestFileTable:
         assert rows[0][0] == "SRC-0001"
         assert rows[0][2] == "pdf"
         assert rows[0][3] == "compiled"
+        assert len(rows[0]) == 6
 
     @patch("dochris.web.file_tab.get_manifest_data")
     @patch("dochris.web.file_tab.get_settings")
@@ -437,8 +438,9 @@ class TestEventHandlers:
 
     def test_handle_upload_no_files(self) -> None:
         """无文件上传"""
-        result = handle_upload([])
-        assert "未选择文件" in result
+        rows, status = handle_upload([])
+        assert rows == []
+        assert "未选择文件" in status
 
 
 # ============================================================

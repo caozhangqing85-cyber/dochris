@@ -105,7 +105,6 @@ def sanitize_filename(filename: str, replacement: str = "_", max_length: int = 2
         >>> sanitize_filename("a" * 300, max_length=80)[:85]
         'aaaaaaaa...'
     """
-    import string
     import unicodedata
 
     if not filename:
@@ -119,9 +118,14 @@ def sanitize_filename(filename: str, replacement: str = "_", max_length: int = 2
     cleaned = cleaned.replace("/", replacement)
     cleaned = cleaned.replace("\\", replacement)
 
-    # 移除其他不安全字符，保留字母、数字、常见符号
-    safe_chars = string.ascii_letters + string.digits + "._- "
-    cleaned = "".join(c if c in safe_chars else replacement for c in cleaned)
+    # 保留 Unicode 文件名中的字母、数字和常见安全符号，避免中文标题被替换成 "_"。
+    safe_chars = "._- ()[]{}"
+    cleaned = "".join(
+        c
+        if c in safe_chars or unicodedata.category(c)[0] in {"L", "N", "M"}
+        else replacement
+        for c in cleaned
+    )
 
     # 移除连续的替换字符和首尾空格/点
     while replacement + replacement in cleaned:

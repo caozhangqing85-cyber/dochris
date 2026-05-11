@@ -95,22 +95,15 @@ def _build_manifest(file_entries: list[tuple[str, Path]], workspace: Path) -> li
     尝试从 manifests/ 目录读取对应文件的状态和质量分。
     """
     rows = []
-    manifests_dir = workspace / "manifests" / "sources"
+    manifests = _load_manifest_lookup(workspace)
 
     for arcname, file_path in file_entries:
-        # 尝试匹配 manifest（按文件名）
         status = "unknown"
         quality = ""
-        if manifests_dir.exists():
-            for mf in manifests_dir.glob("*.json"):
-                try:
-                    data = _read_json_simple(mf)
-                    if data and data.get("filename", "") == file_path.name:
-                        status = data.get("status", "unknown")
-                        quality = str(data.get("quality_score", ""))
-                        break
-                except (OSError, ValueError):
-                    continue
+        data = _match_manifest(file_path, manifests)
+        if data:
+            status = data.get("status", "unknown")
+            quality = str(data.get("quality_score", ""))
 
         rows.append(
             {
@@ -122,6 +115,41 @@ def _build_manifest(file_entries: list[tuple[str, Path]], workspace: Path) -> li
         )
 
     return rows
+
+
+def _load_manifest_lookup(workspace: Path) -> list[dict]:
+    """读取所有 manifest，供导出时匹配产物状态"""
+    manifests_dir = workspace / "manifests" / "sources"
+    if not manifests_dir.exists():
+        return []
+
+    manifests = []
+    for mf in manifests_dir.glob("*.json"):
+        data = _read_json_simple(mf)
+        if data:
+            manifests.append(data)
+    return manifests
+
+
+def _match_manifest(file_path: Path, manifests: list[dict]) -> dict | None:
+    """按 src_id、file_path 和 title 兼容匹配导出文件对应的 manifest"""
+    stem = file_path.stem
+    parts = set(file_path.parts)
+
+    for data in manifests:
+        src_id = data.get("id", "")
+        if src_id and (stem == src_id or src_id in parts):
+            return data
+
+        manifest_file = Path(str(data.get("file_path", ""))).name
+        if manifest_file and manifest_file == file_path.name:
+            return data
+
+        title = str(data.get("title", ""))
+        if title and Path(title).stem == stem:
+            return data
+
+    return None
 
 
 def _read_json_simple(path: Path) -> dict | None:

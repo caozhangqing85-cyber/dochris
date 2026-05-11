@@ -23,12 +23,21 @@ QUERY_MODE_LABELS: dict[str, str] = {
 }
 
 # ── 状态常量 ──────────────────────────────────────────────────
-STATUS_FILTERS = ["全部", "compiled", "ingested", "failed", "promoted_to_wiki", "promoted"]
+STATUS_FILTERS = [
+    "全部",
+    "ingested",
+    "compiled",
+    "failed",
+    "compile_failed",
+    "promoted_to_wiki",
+    "promoted",
+]
 
 STATUS_LABELS: dict[str, str] = {
+    "ingested": "📥 待编译",
     "compiled": "✅ 已编译",
-    "ingested": "📥 已摄入",
     "failed": "❌ 失败",
+    "compile_failed": "❌ 编译失败",
     "promoted_to_wiki": "🌟 已推广(Wiki)",
     "promoted": "🔒 已推广(Curated)",
     "unknown": "❓ 未知",

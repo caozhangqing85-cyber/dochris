@@ -28,6 +28,10 @@ class TestSanitizeFilename:
         """正常文件名不变"""
         assert sanitize_filename("test.pdf") == "test.pdf"
 
+    def test_unicode_filename_preserved(self):
+        """中文文件名不应被替换成下划线"""
+        assert sanitize_filename("我的测试文件.md") == "我的测试文件.md"
+
     def test_path_traversal_removed(self):
         """路径遍历字符被移除"""
         result = sanitize_filename("../etc/passwd")

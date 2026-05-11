@@ -15,6 +15,7 @@ from typing import Any, cast
 from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
 from dochris.core.quality_scorer import get_quality_threshold, score_summary_quality_v4
+from dochris.core.utils import sanitize_filename
 from dochris.exceptions import CompilationError
 from dochris.manifest import get_default_workspace, get_manifest, update_manifest_status
 
@@ -178,7 +179,7 @@ class CompilerWorker:
             cached = load_cached(self.cache_dir, fh)
             if cached:
                 logger.info(f"✓ Cache hit: {src_id}")
-                await self._save_result(src_id, cached)
+                await self._save_result(src_id, cached, int(cached.get("quality_score", 0) or 0))
                 return cached
 
         # 3. 根据文件类型选择处理方式
@@ -344,6 +345,13 @@ class CompilerWorker:
             encoding="utf-8",
         )
 
+        manifest = get_manifest(self.workspace, src_id) or {}
+        title = str(manifest.get("title", "")).strip()
+        if title:
+            title_file = summaries_path / f"{sanitize_filename(title, max_length=80)}.md"
+            if title_file != summary_file:
+                title_file.write_text(summary_file.read_text(encoding="utf-8"), encoding="utf-8")
+
         # 保存概念 (保持现有格式)
         if quality_score >= get_quality_threshold():
             concepts_path = self.workspace / "outputs/concepts" / src_id
@@ -353,7 +361,9 @@ class CompilerWorker:
                 # 处理概念（支持字符串和字典格式）
                 if isinstance(concept, dict):
                     concept_name = str(concept.get("name", ""))
-                    concept_desc = str(concept.get("description", ""))
+                    concept_desc = str(
+                        concept.get("description") or concept.get("explanation") or ""
+                    )
                 else:
                     concept_name = str(concept) if concept else ""
                     concept_desc = ""
@@ -376,6 +386,7 @@ class CompilerWorker:
             "compiled",
             quality_score=quality_score,
             summary=result,
+            compiled_summary=result,
             promoted_to=None,
         )
 

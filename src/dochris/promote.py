@@ -69,7 +69,29 @@ def _find_output_file(base_dir: Path, src_id: str, ext: str) -> Path | None:
     if direct.exists():
         return direct
 
-    # 策略2：读取 manifest 获取 title，用 title 匹配
+    return None
+
+
+def _find_concept_file(base_dir: Path, src_id: str, concept_name: str) -> Path | None:
+    """查找指定 src_id 下的概念文件，兼容新旧输出结构"""
+    compiler_safe = concept_name.strip().replace("/", "_").replace("\\", "_")
+    sanitized = sanitize_filename(concept_name, max_length=50)
+    candidate_names = [name for name in [compiler_safe, sanitized] if name]
+    candidates = []
+    for name in candidate_names:
+        candidates.append(base_dir / src_id / f"{name}.md")
+        candidates.append(base_dir / f"{name}.md")
+    for path in candidates:
+        if path.exists():
+            return path
+
+    src_dir = base_dir / src_id
+    if src_dir.exists():
+        for name in candidate_names:
+            for path in sorted(src_dir.glob(f"*_{name}.md")):
+                if path.is_file():
+                    return path
+
     return None
 
 
@@ -106,7 +128,9 @@ def promote_to_wiki(workspace_path: Path, src_id: str) -> bool:
 
     # 晋升摘要文件
     safe_title = sanitize_filename(title, max_length=80)
-    summary_src = outputs_summaries / f"{safe_title}.md"
+    summary_src = _find_output_file(outputs_summaries, src_id, ".md")
+    if summary_src is None:
+        summary_src = outputs_summaries / f"{safe_title}.md"
 
     if not summary_src.exists():
         # 尝试使用更宽松的匹配（允许更多特殊字符）
@@ -135,9 +159,8 @@ def promote_to_wiki(workspace_path: Path, src_id: str) -> bool:
                     continue
                 if not concept_name:
                     continue
-                safe_concept = sanitize_filename(concept_name, max_length=50)
-                concept_src = outputs_concepts / f"{safe_concept}.md"
-                if concept_src.exists():
+                concept_src = _find_concept_file(outputs_concepts, src_id, concept_name)
+                if concept_src is not None:
                     dst = _copy_file(concept_src, wiki_concepts)
                     promoted_files.append(f"  wiki/concepts/{dst.name}")
 

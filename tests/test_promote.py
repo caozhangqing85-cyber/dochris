@@ -67,14 +67,16 @@ def sample_manifest(temp_workspace):
 def sample_output_files(temp_workspace, sample_manifest):
     """创建示例输出文件"""
     # 摘要文件
-    summary_path = temp_workspace / "outputs" / "summaries" / "测试文档.md"
+    summary_path = temp_workspace / "outputs" / "summaries" / "SRC-0001.md"
     summary_path.write_text("# 测试文档\n\n摘要内容", encoding="utf-8")
 
     # 概念文件
-    concept1_path = temp_workspace / "outputs" / "concepts" / "概念1.md"
+    concept_dir = temp_workspace / "outputs" / "concepts" / "SRC-0001"
+    concept_dir.mkdir(parents=True, exist_ok=True)
+    concept1_path = concept_dir / "01_概念1.md"
     concept1_path.write_text("# 概念1\n\n解释1", encoding="utf-8")
 
-    concept2_path = temp_workspace / "outputs" / "concepts" / "概念2.md"
+    concept2_path = concept_dir / "02_概念2.md"
     concept2_path.write_text("# 概念2\n\n解释2", encoding="utf-8")
 
     return {
@@ -206,7 +208,8 @@ class TestPromoteToWiki:
 
         assert result is True
         # 检查文件被复制
-        assert (temp_workspace / "wiki" / "summaries" / "测试文档.md").exists()
+        assert (temp_workspace / "wiki" / "summaries" / "SRC-0001.md").exists()
+        assert (temp_workspace / "wiki" / "concepts" / "01_概念1.md").exists()
 
     def test_promote_to_wiki_manifest_not_found(self, temp_workspace, monkeypatch):
         """测试 manifest 不存在"""

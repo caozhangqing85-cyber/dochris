@@ -327,8 +327,9 @@ class TestWebAppHandlers:
         """无文件上传"""
         from dochris.web.app import handle_upload
 
-        result = handle_upload([])
-        assert "未选择文件" in result
+        rows, status = handle_upload([])
+        assert rows == []
+        assert "未选择文件" in status
 
     def test_format_query_results_empty(self):
         """空结果格式化"""
@@ -377,22 +378,46 @@ class TestWebAppHandlers:
         assert "AI 回答" in result
         assert "这是AI回答" in result
 
-    def test_handle_upload_with_files(self):
+    def test_handle_upload_with_files(self, tmp_path):
         """有文件上传"""
         from dochris.web.app import handle_upload
 
         mock_settings = MagicMock()
-        mock_settings.raw_dir = Path("/tmp/test_raw")
+        mock_settings.workspace = tmp_path
+        mock_settings.raw_dir = tmp_path / "raw"
 
-        mock_file = MagicMock()
-        mock_file.name = "/tmp/source/test.pdf"
+        source_file = tmp_path / "source" / "测试文件.md"
+        source_file.parent.mkdir()
+        source_file.write_text("hello", encoding="utf-8")
+        mock_file = MagicMock(name=str(source_file))
+        mock_file.name = str(source_file)
+        mock_file.orig_name = "测试文件.md"
 
-        with patch("dochris.web.utils.get_settings", return_value=mock_settings):
-            with patch("pathlib.Path.mkdir"):
-                with patch("pathlib.Path.exists", return_value=False):
-                    with patch("shutil.copy2"):
-                        result = handle_upload([mock_file])
-        assert "已上传" in result
+        with patch("dochris.web.file_tab.get_settings", return_value=mock_settings):
+            rows, status = handle_upload([mock_file])
+
+        assert "新增待编译 1 个" in status
+        assert rows[0][1] == "测试文件.md"
+
+    def test_handle_upload_with_filedata_dict(self, tmp_path):
+        """兼容 Gradio API 传入的 FileData dict"""
+        from dochris.web.app import handle_upload
+
+        mock_settings = MagicMock()
+        mock_settings.workspace = tmp_path
+        mock_settings.raw_dir = tmp_path / "raw"
+
+        source_file = tmp_path / "source" / "api-temp-name.md"
+        source_file.parent.mkdir()
+        source_file.write_text("hello", encoding="utf-8")
+        file_data = {"path": str(source_file), "orig_name": "接口上传文件.md"}
+
+        with patch("dochris.web.file_tab.get_settings", return_value=mock_settings):
+            rows, status = handle_upload([file_data])
+
+        assert "新增待编译 1 个" in status
+        assert rows[0][1] == "接口上传文件.md"
+        assert rows[0][5] == "raw/articles/接口上传文件.md"
 
     def test_handle_compile_exception(self):
         """编译异常"""
