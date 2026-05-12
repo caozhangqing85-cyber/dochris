@@ -85,7 +85,12 @@ def _history_to_table(history: list[dict[str, str]]) -> list[list[str]]:
 
 def _export_markdown(content: str, prefix: str = "export") -> str | None:
     """将 Markdown 内容导出到临时文件"""
-    if not content or content.startswith("*"):
+    content = (content or "").strip()
+    placeholder_values = {
+        "*输入查询内容后点击查询*",
+        "*请输入查询内容*",
+    }
+    if not content or content in placeholder_values:
         return None
     try:
         tmp = tempfile.NamedTemporaryFile(

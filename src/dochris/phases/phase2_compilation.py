@@ -36,16 +36,15 @@ from dochris.manifest import get_all_manifests
 from dochris.settings import (
     BATCH_SIZE,
     CACHE_RETENTION_DAYS,
-    DEFAULT_API_BASE,
     DEFAULT_API_KEY,
     DEFAULT_CONCURRENCY,
-    DEFAULT_MODEL,
     LOG_DATE_FORMAT,
     LOG_FORMAT,
     OPENROUTER_API_BASE,
     OPENROUTER_MODEL,
     get_default_workspace,
     get_logs_dir,
+    get_settings,
 )
 from dochris.workers.compiler_worker import CompilerWorker
 from dochris.workers.monitor_worker import MonitorWorker
@@ -88,6 +87,8 @@ async def compile_all(
     limit: int | None = None,
     use_openrouter: bool = False,
     dry_run: bool = False,
+    api_base: str | None = None,
+    model: str | None = None,
 ) -> None:
     """编译所有待编译的文档
 
@@ -97,18 +98,19 @@ async def compile_all(
         use_openrouter: 是否使用 OpenRouter API
         dry_run: 模拟运行，只显示将要执行的操作
     """
+    settings = get_settings()
     workspace = get_default_workspace()
     logger = logging.getLogger(__name__)
 
     # 检测是否使用 OpenRouter
     if use_openrouter:
-        api_base = OPENROUTER_API_BASE
-        model = OPENROUTER_MODEL
-        logger.info(f"✓ 使用 OpenRouter (免费模型: {model})")
+        selected_api_base = api_base or OPENROUTER_API_BASE
+        selected_model = model or OPENROUTER_MODEL
+        logger.info(f"✓ 使用 OpenRouter (免费模型: {selected_model})")
     else:
-        api_base = DEFAULT_API_BASE
-        model = DEFAULT_MODEL
-        logger.info(f"✓ 使用默认 API ({model})")
+        selected_api_base = api_base or settings.api_base
+        selected_model = model or settings.model
+        logger.info(f"✓ 使用默认 API ({selected_model})")
 
     # 获取待编译的 manifest
     all_manifests = get_all_manifests(workspace, status="ingested")
@@ -155,7 +157,10 @@ async def compile_all(
 
     # 创建 worker（显式传入 workspace，避免全局 Settings 缓存导致路径不一致）
     worker = CompilerWorker(
-        api_key=DEFAULT_API_KEY, base_url=api_base, model=model, workspace=workspace
+        api_key=settings.api_key or DEFAULT_API_KEY or "",
+        base_url=selected_api_base,
+        model=selected_model,
+        workspace=workspace,
     )
 
     # 创建监控（显式传入 workspace）
@@ -231,7 +236,7 @@ async def compile_all(
                     fail_count += 1
 
             # 打印进度
-            completed = i + batch_size
+            completed = min(i + len(batch), len(all_manifests))
             percentage = (completed / len(all_manifests)) * 100
             logger.info(f"📈 进度: {completed}/{len(all_manifests)} ({percentage:.1f}%)")
 
@@ -299,14 +304,15 @@ def main() -> None:
 
     parser.add_argument("--clear-all-cache", action="store_true", help="清理所有缓存")
 
-    parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="指定模型名称")
+    parser.add_argument("--model", type=str, default=None, help="指定模型名称")
 
-    parser.add_argument("--api-base", type=str, default=DEFAULT_API_BASE, help="指定 API 基础 URL")
+    parser.add_argument("--api-base", type=str, default=None, help="指定 API 基础 URL")
 
     args = parser.parse_args()
 
     # 验证 API 密钥（编译命令需要）
-    if not args.clear_cache and not args.clear_all_cache and not DEFAULT_API_KEY:
+    settings = get_settings()
+    if not args.clear_cache and not args.clear_all_cache and not (settings.api_key or DEFAULT_API_KEY):
         logger.error("❌ 错误: OPENAI_API_KEY 环境变量未设置")
         logger.error("请设置: export OPENAI_API_KEY='your-api-key'")
         sys.exit(1)
@@ -331,7 +337,11 @@ def main() -> None:
 
     asyncio.run(
         compile_all(
-            max_concurrent=args.concurrency, limit=args.limit, use_openrouter=args.openrouter
+            max_concurrent=args.concurrency,
+            limit=args.limit,
+            use_openrouter=args.openrouter,
+            api_base=args.api_base,
+            model=args.model,
         )
     )
 

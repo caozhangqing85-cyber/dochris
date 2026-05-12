@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import gradio as gr  # type: ignore[import-untyped]
 import pytest
@@ -22,6 +22,8 @@ from dochris.web.app import (
     handle_refresh_status,
     handle_upload,
 )
+from dochris.web.compile_tab import _handle_compile_v2
+from dochris.web.query_tab import _export_markdown
 
 # ============================================================
 # Fixtures
@@ -382,6 +384,54 @@ class TestEventHandlers:
         mock_query.side_effect = RuntimeError("API 错误")
         result = handle_query("测试", 5)
         assert "查询出错" in result
+
+    def test_export_markdown_allows_bold_query_result(self) -> None:
+        """查询结果以 Markdown 粗体开头时仍可导出"""
+        path = _export_markdown("**查询耗时:** 0.01s\n\n## 摘要匹配\n\n1. 测试")
+
+        assert path is not None
+        assert Path(path).exists()
+
+    def test_export_markdown_skips_placeholder(self) -> None:
+        """占位提示不生成导出文件"""
+        assert _export_markdown("*请输入查询内容*") is None
+
+    def test_handle_compile_v2_reports_failed_items(self) -> None:
+        """编译按钮需要展示本次失败数量，避免误导为全部成功"""
+        with (
+            patch(
+                "dochris.phases.phase2_compilation.compile_all",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "dochris.web.compile_tab.get_manifest_data",
+                side_effect=[
+                    (
+                        [
+                            {"id": "SRC-0001", "status": "ingested"},
+                            {"id": "SRC-0002", "status": "ingested"},
+                        ],
+                        {},
+                        {},
+                    ),
+                    (
+                        [
+                            {"id": "SRC-0001", "status": "compiled"},
+                            {"id": "SRC-0002", "status": "failed"},
+                        ],
+                        {},
+                        {},
+                    ),
+                ],
+            ),
+            patch("dochris.web.compile_tab.get_compile_info", return_value="preview"),
+        ):
+            result, preview = _handle_compile_v2(10, 1, False)
+
+        assert "有失败" in result
+        assert "成功 1 个" in result
+        assert "失败 1 个" in result
+        assert preview == "preview"
 
     @patch("dochris.web.file_tab.get_manifest_data")
     @patch("dochris.web.file_tab.get_settings")

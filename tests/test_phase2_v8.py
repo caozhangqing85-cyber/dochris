@@ -1,5 +1,6 @@
 """补充测试 phase2_compilation.py — 覆盖 dry_run 估算和非 TTY 分支"""
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -101,6 +102,41 @@ class TestPhase2ProgressBranch:
         # 验证 worker 被调用编译文档
         assert mock_worker.compile_document.call_count == 2
         mock_monitor.print_report.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_compile_all_uses_dynamic_settings_model(
+        self, mock_workspace, monkeypatch, caplog
+    ):
+        """编译使用 Settings 中的动态模型配置，并正确打印批次进度"""
+        monkeypatch.setenv("WORKSPACE", str(mock_workspace))
+        caplog.set_level(logging.INFO)
+
+        mock_worker = MagicMock()
+        mock_worker.compile_document = AsyncMock(return_value={"status": "compiled"})
+        mock_monitor = MagicMock()
+
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests", return_value=_make_manifests(1)
+        ):
+            with patch("dochris.phases.phase2_compilation.setup_logging"):
+                with patch(
+                    "dochris.phases.phase2_compilation.CompilerWorker", return_value=mock_worker
+                ) as mock_worker_class:
+                    with patch(
+                        "dochris.phases.phase2_compilation.MonitorWorker", return_value=mock_monitor
+                    ):
+                        with patch("dochris.phases.phase2_compilation.clear_cache", return_value=0):
+                            with patch("sys.stdout.isatty", return_value=False):
+                                from dochris.phases.phase2_compilation import compile_all
+                                from dochris.settings import reset_settings
+
+                                reset_settings()
+                                monkeypatch.setenv("MODEL", "glm-4-flash")
+                                monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+                                await compile_all(limit=None, max_concurrent=1, dry_run=False)
+
+        assert mock_worker_class.call_args.kwargs["model"] == "glm-4-flash"
+        assert "📈 进度: 1/1 (100.0%)" in caplog.text
 
 
 class TestPhase2TTYProgress:

@@ -4,6 +4,7 @@
 12+ 测试用例
 """
 
+import asyncio
 import sys
 import tempfile
 import unittest
@@ -89,6 +90,20 @@ class TestCompilerWorker(unittest.TestCase):
 
         manifest = worker.workspace / "manifests" / "sources" / "SRC-0001.json"
         self.assertFalse(manifest.exists())
+
+    @patch("dochris.workers.compiler_worker.update_manifest_status")
+    @patch("dochris.workers.compiler_worker.get_manifest")
+    def test_mark_failed_does_not_override_compiled(self, mock_get_manifest, mock_update):
+        """迟到的失败结果不应覆盖已编译成功的 manifest"""
+        from dochris.workers.compiler_worker import CompilerWorker
+
+        mock_get_manifest.return_value = {"id": "SRC-0001", "status": "compiled"}
+        worker = CompilerWorker(api_key="test_key", base_url="https://api.test.com")
+        worker.workspace = self.temp_path
+
+        asyncio.run(worker._mark_failed("SRC-0001", "late failure"))
+
+        mock_update.assert_not_called()
 
 
 class TestCompilerWorkerPDF(unittest.TestCase):

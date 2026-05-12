@@ -255,6 +255,24 @@ class TestKeywordSearch(unittest.TestCase):
         # 文件名精确匹配应该有较高分数
         self.assertGreater(result[0]["score"], 0)
 
+    def test_keyword_search_matches_chinese_phrase_fragments(self):
+        """中文整句查询应能命中摘要中的关键词片段"""
+        from dochris.phases.query_utils import _keyword_search
+
+        test_file = self.search_dir / "SRC-0001.md"
+        test_file.write_text("上传文件后需要编译，然后可以在知识查询页面查询知识库。", encoding="utf-8")
+
+        result = _keyword_search(
+            "上传后怎么查询知识库",
+            self.search_dir,
+            5,
+            lambda p, t: {"title": p.stem},
+            "outputs",
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertGreater(result[0]["score"], 0)
+
 
 class TestExtractConcept(unittest.TestCase):
     """测试提取概念"""
@@ -337,6 +355,29 @@ class TestExtractSummary(unittest.TestCase):
         self.assertEqual(result["title"], "test_summary")
         self.assertEqual(result["one_line"], "")
         self.assertEqual(result["key_points"], [])
+
+    def test_extract_summary_supports_english_headings(self):
+        """兼容编译模型输出的英文摘要标题"""
+        from dochris.phases.query_utils import _extract_summary
+
+        test_file = Path("/tmp/SRC-0001.md")
+        content = """# 上传和查询流程
+
+## Key Points
+
+- 上传文件后进入待编译状态
+- 编译成功后可以查询知识库
+- 查询结果可以导出
+
+## Detailed Summary
+
+用户上传文件后需要先编译，然后才能查询。
+"""
+        result = _extract_summary(test_file, content)
+
+        self.assertEqual(result["title"], "SRC-0001")
+        self.assertEqual(result["one_line"], "上传和查询流程")
+        self.assertEqual(result["key_points"], ["上传文件后进入待编译状态", "编译成功后可以查询知识库", "查询结果可以导出"])
 
 
 class TestPathConstants(unittest.TestCase):

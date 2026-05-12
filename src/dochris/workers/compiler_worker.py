@@ -392,4 +392,13 @@ class CompilerWorker:
 
     async def _mark_failed(self, src_id: str, error_message: str) -> None:
         """标记编译失败"""
+        manifest = get_manifest(self.workspace, src_id) or {}
+        current_status = manifest.get("status")
+        if current_status in {"compiled", "promoted_to_wiki", "promoted"}:
+            logger.warning(
+                "跳过失败状态回写: %s 当前已是 %s，保留已有成功结果",
+                src_id,
+                current_status,
+            )
+            return
         update_manifest_status(self.workspace, src_id, "failed", error_message=error_message)

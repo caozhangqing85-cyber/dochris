@@ -183,7 +183,7 @@ def _keyword_search(
 
     results = []
     query_lower = query.lower()
-    query_terms = set(re.findall(r"[\w]+", query_lower))
+    query_terms = _split_query_terms(query_lower)
 
     for md_file in search_dir.glob("*.md"):
         try:
@@ -218,6 +218,17 @@ def _keyword_search(
     return results[:top_k]
 
 
+def _split_query_terms(query: str) -> set[str]:
+    """拆分查询词，兼容英文空格词和中文连续短语。"""
+    terms: set[str] = set()
+    for token in re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]+", query.lower()):
+        terms.add(token)
+        if re.fullmatch(r"[\u4e00-\u9fff]+", token):
+            terms.update(token[i : i + 2] for i in range(len(token) - 1))
+            terms.update(token[i : i + 3] for i in range(len(token) - 2))
+    return {term for term in terms if term}
+
+
 def _extract_concept(file_path: Path, text: str) -> dict:
     """从概念文件提取定义"""
     definition = ""
@@ -240,21 +251,38 @@ def _extract_summary(file_path: Path, text: str) -> dict:
     one_line = ""
     key_points = []
     section = ""
+    heading = ""
+    has_structured_section = False
 
     for line in text.split("\n"):
-        if line.startswith("## 一句话摘要"):
+        stripped = line.strip()
+        lower = stripped.lower()
+
+        if stripped.startswith("# ") and not heading:
+            heading = stripped[2:].strip()
+
+        if stripped.startswith("## 一句话摘要") or lower.startswith("## one-line"):
             section = "one_line"
+            has_structured_section = True
             continue
-        elif line.startswith("## 要点"):
+        elif stripped.startswith("## 要点") or lower.startswith("## key points"):
             section = "key_points"
+            has_structured_section = True
             continue
-        elif line.startswith("## "):
+        elif lower.startswith("## detailed summary"):
+            has_structured_section = True
+            section = ""
+            continue
+        elif stripped.startswith("## "):
             section = ""
 
-        if section == "one_line" and line.strip():
-            one_line = line.strip()
-        elif section == "key_points" and line.strip().startswith("- "):
-            key_points.append(line.strip()[2:])
+        if section == "one_line" and stripped:
+            one_line = stripped
+        elif section == "key_points" and stripped.startswith("- "):
+            key_points.append(stripped[2:])
+
+    if not one_line and heading and has_structured_section:
+        one_line = heading
 
     return {
         "title": file_path.stem,

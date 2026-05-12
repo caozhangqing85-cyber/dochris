@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
 import gradio as gr  # type: ignore[import-untyped]
 import pandas as pd  # type: ignore[import-untyped]
@@ -17,6 +18,15 @@ from .utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _manifest_display_name(manifest: dict) -> str:
+    """按优先级提取质量页面展示文件名"""
+    for key in ("original_filename", "title", "source_file", "file_path", "source_path"):
+        value = manifest.get(key)
+        if value:
+            return Path(str(value)).name
+    return "unknown"
 
 
 def _get_quality_dashboard() -> str:
@@ -34,7 +44,7 @@ def _get_quality_dashboard() -> str:
             score_int = int(qs)
             scores.append(score_int)
             if score_int < threshold:
-                name = m.get("original_filename", m.get("source_file", "unknown"))
+                name = _manifest_display_name(m)
                 low_quality.append(f"- `{name}` — 分数: {score_int}")
 
     if not scores:
@@ -133,7 +143,7 @@ def _get_low_quality_table() -> list[list[str]]:
     for m in manifests:
         qs = m.get("quality_score")
         if qs is not None and isinstance(qs, (int, float)) and int(qs) < threshold:
-            name = m.get("original_filename", m.get("source_file", "unknown"))
+            name = _manifest_display_name(m)
             status = m.get("status", "unknown")
             rows.append([m.get("id", ""), name, str(int(qs)), STATUS_LABELS.get(status, status)])
             if len(rows) >= 100:

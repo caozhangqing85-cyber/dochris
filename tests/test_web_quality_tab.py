@@ -10,6 +10,7 @@ from dochris.web.quality_tab import (
     _get_low_quality_table,
     _get_quality_dashboard,
     _get_quality_distribution_df,
+    _manifest_display_name,
     handle_refresh_quality,
 )
 
@@ -108,6 +109,18 @@ class TestGetQualityDashboard:
         result = _get_quality_dashboard()
         assert "未达标文件" in result
         assert "较差.pdf" in result
+
+    def test_manifest_display_name_falls_back_to_title(self):
+        """没有 original_filename 时使用 title 展示文件名"""
+        result = _manifest_display_name(
+            {
+                "id": "SRC-0001",
+                "title": "QA测试文档.md",
+                "file_path": "raw/articles/other.md",
+            }
+        )
+
+        assert result == "QA测试文档.md"
 
     @patch("dochris.web.quality_tab.get_manifest_data")
     @patch("dochris.web.quality_tab.get_settings")
@@ -223,6 +236,28 @@ class TestGetLowQualityTable:
         assert "SRC-0001" not in manifest_ids  # 95 >= 85
         assert "SRC-0006" not in manifest_ids  # 100 >= 85
         assert "SRC-0002" in manifest_ids  # 75 < 85
+
+    @patch("dochris.web.quality_tab.get_manifest_data")
+    @patch("dochris.web.quality_tab.get_settings")
+    def test_uses_title_when_original_filename_missing(self, mock_settings, mock_data):
+        """低质量表格没有 original_filename 时不应显示 unknown"""
+        mock_data.return_value = (
+            [
+                {
+                    "id": "SRC-0001",
+                    "title": "QA测试文档.md",
+                    "status": "compiled",
+                    "quality_score": 44,
+                }
+            ],
+            {},
+            {},
+        )
+        mock_settings.return_value = MagicMock(min_quality_score=85)
+
+        rows = _get_low_quality_table()
+
+        assert rows[0][1] == "QA测试文档.md"
 
     @patch("dochris.web.quality_tab.get_manifest_data")
     @patch("dochris.web.quality_tab.get_settings")
