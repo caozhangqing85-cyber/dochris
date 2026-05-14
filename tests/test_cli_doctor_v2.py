@@ -92,6 +92,7 @@ class TestCmdDoctorConfigError:
         from dochris.exceptions import ConfigurationError
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         monkeypatch.delenv("WORKSPACE", raising=False)
 
         with patch(

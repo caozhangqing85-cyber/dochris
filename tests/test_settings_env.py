@@ -63,6 +63,7 @@ class TestSettingsFromEnv:
     def test_from_env_empty_api_key(self, tmp_path: Path, monkeypatch) -> None:
         """空 API Key 处理"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         env_file = tmp_path / ".env"
         env_file.write_text("OPENAI_API_KEY=")
