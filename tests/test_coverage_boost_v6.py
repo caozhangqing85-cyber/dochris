@@ -139,7 +139,9 @@ class TestPhase2CompilationCLI:
         with (
             patch("sys.argv", ["phase2_compilation.py"]),
             patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", ""),
+            patch("dochris.phases.phase2_compilation.get_settings") as mock_settings,
         ):
+            mock_settings.return_value.api_key = ""
             with pytest.raises(SystemExit):
                 p2.main()
 
