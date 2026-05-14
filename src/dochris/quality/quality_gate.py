@@ -85,7 +85,8 @@ def check_pollution(workspace_path: Path) -> dict:
     for m in manifests:
         if m["status"] in ("promoted_to_wiki", "promoted"):
             title = m.get("title", "")
-            safe_title = re.sub(r'[<>:"/\\|?*]', "", title)[:80]
+            # 使用 sanitize_filename 确保跨平台兼容（包括 Unicode 文件名）
+            safe_title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", title)[:80]
             promoted_summaries.add(f"{safe_title}.md")
             # 也添加 _N 变体
             for n in range(1, 10):
@@ -275,7 +276,7 @@ def auto_downgrade(
 
     # 移除 wiki/ 中的文件（从 promoted_to_wiki 降级时）
     if current_status in ("promoted", "promoted_to_wiki"):
-        safe_title = re.sub(r'[<>:"/\\|?*]', "", title)[:80]
+        safe_title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", title)[:80]
 
         for target_dir in ["wiki/summaries", "wiki/concepts", "curated/promoted"]:
             target_path = workspace_path / target_dir

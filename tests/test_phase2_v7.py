@@ -278,8 +278,9 @@ class TestPhase2V7Main:
     @patch("sys.argv", ["phase2_compilation.py"])
     @patch("dochris.phases.phase2_compilation.setup_logging")
     @patch("dochris.phases.phase2_compilation.compile_all")
+    @patch("dochris.phases.phase2_compilation.get_settings")
     @patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", None)
-    def test_main_without_api_key(self, mock_compile, mock_logging):
+    def test_main_without_api_key(self, mock_get_settings, mock_compile, mock_logging):
         """测试没有 API 密钥时的情况"""
         import sys
 
@@ -287,6 +288,9 @@ class TestPhase2V7Main:
 
         mock_logger = MagicMock()
         mock_logging.return_value = mock_logger
+        mock_settings = MagicMock()
+        mock_settings.api_key = ""
+        mock_get_settings.return_value = mock_settings
 
         with patch.object(sys, "exit") as mock_exit:
             main()

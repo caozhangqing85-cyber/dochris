@@ -23,7 +23,7 @@ def _success(data: Any) -> dict[str, Any]:
 def _error(msg: str, status_code: int = 404) -> None:
     """抛出统一错误响应"""
     raise HTTPException(
-        status_code=status_code, detail={"success": False, "error": msg, "version": __version__}
+        status_code=status_code, detail={"success": False, "error": msg}
     )
 
 

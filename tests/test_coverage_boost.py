@@ -1261,6 +1261,7 @@ class TestSettingsConfigValidateApiKey:
         from dochris.settings.config import Settings
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         s = Settings(api_key=None)
         with pytest.raises(ValueError, match="OPENAI_API_KEY"):
             s.validate_api_key()

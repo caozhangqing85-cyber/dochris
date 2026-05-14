@@ -76,6 +76,22 @@ def handle_upload(files: list[Any]) -> tuple[list[list[str]], str]:
     if not files:
         return _get_file_table(), "*未选择文件*"
 
+    # 上传限制
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    MAX_FILES_PER_BATCH = 50
+    ALLOWED_EXTENSIONS: frozenset[str] = frozenset({
+        ".pdf", ".md", ".txt", ".docx", ".doc", ".pptx", ".xlsx",
+        ".epub", ".mobi", ".azw3",
+        ".mp3", ".wav", ".m4a", ".flac", ".ogg",
+        ".mp4", ".mkv", ".avi", ".mov",
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp",
+        ".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp", ".h",
+        ".json", ".yaml", ".yml", ".toml", ".csv",
+    })
+
+    if len(files) > MAX_FILES_PER_BATCH:
+        return _get_file_table(), f"*单次最多上传 {MAX_FILES_PER_BATCH} 个文件*"
+
     settings = get_settings()
     workspace = settings.workspace
     inbox_dir = workspace / "uploads" / "inbox"
@@ -100,6 +116,23 @@ def handle_upload(files: list[Any]) -> tuple[list[list[str]], str]:
             original_name = sanitize_filename(_uploaded_original_name(f, src.name))
             if not src.exists():
                 failed.append(f"{original_name}: 上传临时文件不存在")
+                continue
+
+            # 文件大小检查
+            file_size = src.stat().st_size
+            if file_size > MAX_FILE_SIZE:
+                failed.append(f"{original_name}: 文件过大 ({file_size // 1024 // 1024}MB，上限 100MB)")
+                continue
+
+            # 文件类型检查
+            ext = Path(original_name).suffix.lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                failed.append(f"{original_name}: 不支持的文件类型 ({ext})")
+                continue
+
+            # 空文件检查
+            if file_size == 0:
+                failed.append(f"{original_name}: 空文件，跳过")
                 continue
 
             inbox_dst = resolve_path_conflict(inbox_dir, original_name, logger)
@@ -156,9 +189,13 @@ def handle_upload(files: list[Any]) -> tuple[list[list[str]], str]:
     if stored_paths:
         status_lines.append("保存位置:")
         status_lines.extend(f"- `{p}`" for p in stored_paths[:5])
+        if len(stored_paths) > 5:
+            status_lines.append(f"- ...共 {len(stored_paths)} 个文件")
     if failed:
         status_lines.append("失败:")
         status_lines.extend(f"- {msg}" for msg in failed[:5])
+        if len(failed) > 5:
+            status_lines.append(f"- ...共 {len(failed)} 个失败")
     status_lines.append("下一步: 打开「编译控制」，点击「刷新预览」，然后点击「开始编译」。")
     return rows, "\n".join(status_lines)
 
@@ -215,18 +252,31 @@ def _uploaded_original_name(uploaded_file: Any, fallback: str) -> str:
 
 
 def _relative_to_workspace(path: Path, workspace: Path) -> str:
-    """返回相对工作区路径；不在工作区内时返回绝对路径"""
+    """返回相对工作区路径；不在工作区内时记录警告并返回文件名"""
     try:
-        return str(path.relative_to(workspace))
+        resolved = path.resolve()
+        ws_resolved = workspace.resolve()
+        rel = resolved.relative_to(ws_resolved)
+        # 二次校验：确保 resolve 后仍在工作区内
+        if not str(resolved).startswith(str(ws_resolved)):
+            logger.warning(f"路径遍历检测: {path} 不在工作区 {workspace} 内")
+            return path.name
+        return str(rel)
     except ValueError:
-        return str(path)
+        logger.warning(f"路径 {path} 不在工作区 {workspace} 内")
+        return path.name
 
 
 def _link_or_copy(src: Path, dst: Path) -> None:
-    """优先创建符号链接，失败时复制文件"""
+    """优先创建符号链接，失败时复制文件
+
+    Windows 上 os.symlink 可能因权限不足失败（需要管理员权限或开发者模式），
+    自动降级为 shutil.copy2。
+    """
     try:
         os.symlink(str(src.resolve()), str(dst))
-    except OSError:
+    except (OSError, NotImplementedError):
+        # NotImplementedError: Windows 不支持 symlink（罕见）
         shutil.copy2(src, dst)
 
 

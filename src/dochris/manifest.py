@@ -27,12 +27,16 @@ Manifest 格式：
 import csv
 import json
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from dochris.log_utils import append_log_to_file
 
 logger = logging.getLogger(__name__)
+
+# Manifest 写入锁（防止并发写入同一个 JSON 文件导致数据损坏）
+_manifest_lock = threading.Lock()
 
 # 保留向后兼容的别名
 append_log = append_log_to_file
@@ -124,8 +128,9 @@ def create_manifest(
 
     # 写入 manifest 文件
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    with _manifest_lock:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     # 同步到索引
     append_to_index(workspace_path, manifest)
@@ -232,8 +237,9 @@ def update_manifest_status(
 
     # 写回文件
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    with _manifest_lock:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     # 同步更新 source_index.csv
     update_index_entry(workspace_path, src_id, status, quality_score)

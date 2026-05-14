@@ -127,6 +127,21 @@ def _cmd_config_set(args: argparse.Namespace) -> int:
         print(f"\n{error('✗ 用法: kb config set <KEY> <VALUE>')}")
         return 1
 
+    # 验证配置键是否为已知的配置项
+    _VALID_KEYS: frozenset[str] = frozenset({
+        "OPENAI_API_KEY", "OPENAI_API_BASE", "MODEL", "WORKSPACE",
+        "SOURCE_PATH", "MAX_CONCURRENCY", "MIN_QUALITY_SCORE",
+        "MAX_CONTENT_CHARS", "QUERY_MODEL", "EMBEDDING_MODEL",
+        "LOG_LEVEL", "LLM_PROVIDER", "VECTOR_STORE",
+    })
+    if key not in _VALID_KEYS:
+        from dochris.cli.cli_utils import warning
+
+        print(f"\n{warning(f'⚠ 未知配置键: {key}')}")
+        print(f"  已知配置键: {', '.join(sorted(_VALID_KEYS))}")
+        print(f"  如果确认要设置，请手动编辑 .env 文件")
+        return 1
+
     env_path = _find_env_file()
     if env_path is None:
         # 创建默认位置
@@ -137,7 +152,11 @@ def _cmd_config_set(args: argparse.Namespace) -> int:
 
     env_vars = _read_env_file(env_path)
     env_vars[key] = value
-    _write_env_file(env_path, env_vars)
+    try:
+        _write_env_file(env_path, env_vars)
+    except OSError as e:
+        print(f"{error(f'✗ 写入配置文件失败: {e}')}")
+        return 1
 
     print(f"{success(f'✓ 已设置 {key}={value}')}")
     print(f"  配置文件: {env_path}")

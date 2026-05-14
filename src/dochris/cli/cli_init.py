@@ -63,6 +63,9 @@ def cmd_init(args: Any) -> int:
             if non_interactive:
                 print("   非交互模式，跳过确认，将覆盖现有 .env 文件")
             else:
+                if not sys.stdin.isatty() and not os.environ.get("DOCHRIS_ALLOW_PROMPT"):
+                    print("   非交互环境，跳过重新初始化")
+                    return 0
                 response = input("   是否要重新初始化？这会覆盖现有 .env 文件。[y/N]: ")
                 if response.lower() != "y":
                     print("   已取消初始化")
@@ -132,7 +135,7 @@ def cmd_init(args: Any) -> int:
             print(f"   使用 API Key: {api_key[:10]}...")
     elif existing_key:
         print(f"   检测到现有 API Key: {existing_key[:10]}...")
-        use_existing = input("   是否使用现有 API Key？[Y/n]: ")
+        use_existing = input("   是否使用现有 API Key？[Y/n]: ") if sys.stdin.isatty() else "y"
         api_key = existing_key if use_existing.lower() != "n" else _prompt_api_key()
     else:
         api_key = _prompt_api_key()
@@ -141,9 +144,15 @@ def cmd_init(args: Any) -> int:
         print("❌ API Key 是必需的")
         return 1
 
+    # 4.5 选择 API 端点（仅智谱 key）
+    chosen_base_url = None
+    is_openrouter = api_key.startswith("sk-or-v1")
+    if not is_openrouter and not non_interactive:
+        chosen_base_url = _prompt_api_plan()
+
     # 5. 写入 .env 文件
     try:
-        _create_env_file(env_file, api_key)
+        _create_env_file(env_file, api_key, base_url=chosen_base_url)
         print(f"✅ 配置已保存: {env_file}")
     except OSError as e:
         print(f"❌ 写入配置文件失败: {e}")
@@ -189,10 +198,20 @@ def cmd_init(args: Any) -> int:
 
 
 def _prompt_api_key() -> str | None:
-    """提示用户输入 API Key"""
+    """提示用户输入 API Key（非 TTY 环境下安全降级）"""
+    # 非交互环境检查（可通过 DOCHRIS_ALLOW_PROMPT=1 覆盖，方便测试）
+    if not sys.stdin.isatty() and not os.environ.get("DOCHRIS_ALLOW_PROMPT"):
+        print("   ⚠️  非交互环境，无法提示输入 API Key")
+        print("   请使用 --non-interactive --api-key <KEY> 或设置 OPENAI_API_KEY 环境变量")
+        return None
+
     print("\n请输入 API Key（获取地址: https://open.bigmodel.cn/）")
     print("或留空使用 OpenRouter 免费模型")
-    api_key = input("API Key: ").strip()
+    try:
+        api_key = input("API Key: ").strip()
+    except EOFError:
+        print("\n   ⚠️  输入被中断")
+        return None
 
     if not api_key:
         # 使用 OpenRouter
@@ -202,7 +221,26 @@ def _prompt_api_key() -> str | None:
     return api_key
 
 
-def _create_env_file(env_file: Path, api_key: str) -> None:
+def _prompt_api_plan() -> str:
+    """询问 API 套餐类型，返回对应的 base_url"""
+    if not sys.stdin.isatty() and not os.environ.get("DOCHRIS_ALLOW_PROMPT"):
+        return "https://open.bigmodel.cn/api/paas/v4"
+
+    print("\n请选择 API 套餐类型:")
+    print("  1. 通用 API（默认）")
+    print("  2. Coding Plan（专属端点，避免 429 限流）")
+    try:
+        choice = input("选择 [1]: ").strip()
+    except EOFError:
+        return "https://open.bigmodel.cn/api/paas/v4"
+
+    if choice == "2":
+        print("   ✓ 已选择 Coding Plan 端点")
+        return "https://open.bigmodel.cn/api/coding/paas/v4"
+    return "https://open.bigmodel.cn/api/paas/v4"
+
+
+def _create_env_file(env_file: Path, api_key: str, base_url: str | None = None) -> None:
     """创建 .env 文件"""
     # 检测是否使用 OpenRouter
     is_openrouter = api_key.startswith("sk-or-v1")
@@ -210,6 +248,8 @@ def _create_env_file(env_file: Path, api_key: str) -> None:
     if is_openrouter:
         base_url = "https://openrouter.ai/api/v1"
         model = "qwen/qwen-2.5-72b-instruct:free"
+    elif base_url:
+        model = "glm-5.1"
     else:
         base_url = "https://open.bigmodel.cn/api/paas/v4"
         model = "glm-5.1"

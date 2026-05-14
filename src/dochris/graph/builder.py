@@ -188,17 +188,32 @@ def build_graph(workspace_path: Path | str) -> KnowledgeGraph:
 
     # 清理无效边（指向不存在节点的边）
     valid_node_ids = set(graph.nodes.keys())
+    invalid_edges = [
+        e for e in graph.edges if e.source not in valid_node_ids or e.target not in valid_node_ids
+    ]
+    if invalid_edges:
+        logger.debug(f"清理 {len(invalid_edges)} 条无效边（指向不存在节点）")
     graph.edges = [
         e for e in graph.edges if e.source in valid_node_ids and e.target in valid_node_ids
     ]
 
-    logger.info(f"知识图谱构建完成: {len(graph.nodes)} 节点, {len(graph.edges)} 边")
+    if not graph.nodes:
+        logger.info("知识图谱构建完成: 空图谱（工作区无数据）")
+    else:
+        logger.info(f"知识图谱构建完成: {len(graph.nodes)} 节点, {len(graph.edges)} 边")
     return graph
 
 
 def _title_to_slug(title: str) -> str:
-    """将标题转换为文件名 slug（简单匹配）"""
-    # 尝试匹配常见的命名模式
+    """将标题转换为文件名 slug
+
+    去除文件系统不安全字符，保留 Unicode 字母数字和连字符。
+    """
     slug = title.strip()
+    # 移除文件系统不安全字符
+    slug = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", slug)
+    # 空格替换为连字符
     slug = slug.replace(" ", "-")
-    return slug
+    # 合并连续连字符
+    slug = re.sub(r"-{2,}", "-", slug)
+    return slug.strip("-") or title.strip()

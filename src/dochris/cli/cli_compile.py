@@ -21,6 +21,11 @@ def cmd_compile(args: argparse.Namespace) -> int:
     limit = args.named_limit if args.named_limit is not None else args.limit
     concurrency = args.concurrency
 
+    # 并发数验证
+    if concurrency is not None and concurrency < 1:
+        print(error("✗ 并发数必须 >= 1"))
+        return 1
+
     # 显示待编译数量
     workspace = get_default_workspace()
     pending = get_all_manifests(workspace, status="ingested")
@@ -56,10 +61,11 @@ def cmd_compile(args: argparse.Namespace) -> int:
         compiled = get_all_manifests(workspace, status="compiled")
         failed = get_all_manifests(workspace, status="compile_failed")
 
-        # 计算本次编译数量（compiled + failed 中时间在 start_time 之后的）
-        # 简化处理：直接用总数
+        # 本次编译统计：比较编译前后的 manifest 数量差异
         total_compiled = len(compiled)
         total_failed = len(failed)
+        this_compiled = max(0, total_compiled - len([m for m in compiled if _was_before(m, start_time)]))
+        this_failed = max(0, total_failed - len([m for m in failed if _was_before(m, start_time)]))
 
         # 计算平均质量分
         score_total = 0
@@ -72,11 +78,11 @@ def cmd_compile(args: argparse.Namespace) -> int:
         avg_score = round(score_total / score_count, 1) if score_count > 0 else 0
 
         print(f"\n{success('✓ 编译完成!')}")
-        print(f"  成功: {bold(str(total_compiled))} 个")
-        if total_failed > 0:
+        print(f"  本次成功: {bold(str(this_compiled))} 个 (累计 {total_compiled})")
+        if this_failed > 0:
             failed_ids = [m["id"] for m in failed[:5]]
             print(
-                f"  失败: {error(str(total_failed))} 个 ({', '.join(failed_ids)}{'...' if total_failed > 5 else ''})"
+                f"  本次失败: {error(str(this_failed))} 个 ({', '.join(failed_ids)}{'...' if total_failed > 5 else ''})"
             )
         if score_count > 0:
             print(f"  平均质量分: {info(str(avg_score))}")
@@ -99,3 +105,17 @@ def _format_duration(seconds: float) -> str:
     hours = int(minutes // 60)
     mins = minutes % 60
     return f"{hours}h {mins}m"
+
+
+def _was_before(manifest: dict, timestamp: float) -> bool:
+    """检查 manifest 的编译时间是否早于给定时间戳"""
+    ts = manifest.get("compiled_at") or manifest.get("updated_at") or ""
+    if not ts:
+        return True  # 无时间信息的视为编译前已有
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(ts)
+        return dt.timestamp() < timestamp
+    except (ValueError, TypeError):
+        return True

@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 SUCCESS_STATUSES = {"compiled", "promoted_to_wiki", "promoted"}
 FAILED_STATUSES = {"failed", "compile_failed"}
 
+# 编译锁，防止并发编译
+_compile_lock = False
+
 
 def get_compile_info() -> str:
     """获取编译预览信息"""
@@ -54,7 +57,13 @@ def _handle_compile_v2(limit: int, concurrency: int, dry_run: bool) -> tuple[str
     Returns:
         (编译结果, 编译预览信息)
     """
+    global _compile_lock
+
+    if _compile_lock:
+        return "**编译正在进行中，请等待完成后再试**", get_compile_info()
+
     try:
+        _compile_lock = True
         if dry_run:
             manifests, status_counter, _ = get_manifest_data()
             pending = status_counter.get("ingested", 0)
@@ -84,6 +93,8 @@ def _handle_compile_v2(limit: int, concurrency: int, dry_run: bool) -> tuple[str
         # UI 事件处理器顶层守卫
         logger.error(f"编译失败: {e}")
         return f"**编译出错:** {e}", get_compile_info()
+    finally:
+        _compile_lock = False
 
 
 def _get_pending_ids(limit: int | None) -> list[str]:

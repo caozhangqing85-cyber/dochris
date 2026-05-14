@@ -56,7 +56,9 @@ async def promote_artifact(
             success = promote_to_curated(workspace, src_id)
     except Exception as exc:
         logger.exception("晋升失败")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=500, detail="晋升操作失败，请查看服务端日志获取详情"
+        ) from exc
 
     if not success:
         return PromoteResponse(

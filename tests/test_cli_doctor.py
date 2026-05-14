@@ -76,8 +76,9 @@ class TestCmdDoctor:
         """测试 API Key 未配置的诊断"""
         from dochris.cli.cli_doctor import cmd_doctor
 
-        # 移除 API key
+        # 移除 API key（同时移除两个可能的环境变量名）
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         args = argparse.Namespace()
 

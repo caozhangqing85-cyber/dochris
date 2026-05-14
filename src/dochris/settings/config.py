@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dochris.settings.constants import DEFAULT_LLM_API_BASE
+from dochris.settings.constants import CODING_LLM_API_BASE, DEFAULT_LLM_API_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +56,16 @@ class Settings:
     # ============================================================
 
     api_key: str | None = None
-    """LLM API 密钥"""
+    """LLM API 密钥（支持 OPENAI_API_KEY 或 BIGMODEL_API_KEY 环境变量）"""
 
     api_base: str = field(
-        default_factory=lambda: os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
+        default_factory=lambda: (
+            CODING_LLM_API_BASE
+            if (os.environ.get("BIGMODEL_API_KEY") or "").strip() and not os.environ.get("OPENAI_API_BASE")
+            else os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
+        )
     )
-    """LLM API 基础 URL"""
+    """LLM API 基础 URL（自动检测智谱 Coding Plan 端点）"""
 
     model: str = field(default_factory=lambda: os.environ.get("MODEL", "glm-5.1"))
     """默认 LLM 模型"""
@@ -256,8 +260,14 @@ class Settings:
             obsidian_vaults = [Path(os.environ["OBSIDIAN_VAULT"]).expanduser()]
 
         # 解析 API 配置
-        api_key = os.environ.get("OPENAI_API_KEY")
-        api_base = os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
+        # 支持 BIGMODEL_API_KEY 作为 OPENAI_API_KEY 的别名（智谱官方 key 名）
+        bigmodel_key = (os.environ.get("BIGMODEL_API_KEY") or "").strip()
+        api_key = os.environ.get("OPENAI_API_KEY") or bigmodel_key or None
+        # 如果设置了 BIGMODEL_API_KEY 但未设置 OPENAI_API_BASE，自动使用 Coding 端点
+        if bigmodel_key and not os.environ.get("OPENAI_API_BASE"):
+            api_base = CODING_LLM_API_BASE
+        else:
+            api_base = os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
         model = os.environ.get("MODEL", "glm-5.1")
 
         # 解析插件配置
@@ -377,7 +387,7 @@ class Settings:
         Raises:
             ValueError: 当 API 密钥未设置时
         """
-        api_key = self.api_key or os.environ.get("OPENAI_API_KEY")
+        api_key = self.api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("BIGMODEL_API_KEY")
         if not api_key:
             raise ValueError(
                 "OPENAI_API_KEY 环境变量未设置\n"

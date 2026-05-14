@@ -32,7 +32,7 @@ def _to_search_result(item: dict[str, Any]) -> SearchResult:
     responses={500: {"model": ErrorResponse}},
 )
 async def query_knowledge_base(
-    q: str = Query(..., min_length=1, description="查询关键词"),
+    q: str = Query(..., min_length=1, max_length=500, description="查询关键词"),
     mode: str = Query(default="combined", description="查询模式"),
     top_k: int = Query(default=5, ge=1, le=50, description="返回结果数量"),
 ) -> QueryResponse:

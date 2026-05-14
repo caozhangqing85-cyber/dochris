@@ -32,6 +32,14 @@ _chromadb_client_cache: Any | None = None
 _vector_store_cache: Any | None = None
 
 
+def clear_caches() -> None:
+    """清理全局缓存，释放资源"""
+    global _llm_client_cache, _chromadb_client_cache, _vector_store_cache
+    _llm_client_cache = None
+    _chromadb_client_cache = None
+    _vector_store_cache = None
+
+
 # ============================================================
 # 向量存储工厂（新增，支持抽象层）
 # ============================================================

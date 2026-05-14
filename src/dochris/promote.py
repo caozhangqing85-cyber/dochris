@@ -12,8 +12,10 @@ Promote 脚本 — 将编译产物从 outputs/ 晋升到 wiki/ 或 curated/
   python scripts/promote_artifact.py <workspace> status <src-id>
 """
 
+import os
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 # 确保 scripts 包可导入
@@ -32,7 +34,9 @@ def _ensure_dirs(*paths: Path) -> None:
 
 
 def _copy_file(src: Path, dst_dir: Path) -> Path:
-    """复制文件到目标目录，处理重名冲突
+    """原子复制文件到目标目录，处理重名冲突
+
+    使用临时文件 + rename 实现原子操作，避免中断导致文件损坏。
 
     Args:
         src: 源文件路径
@@ -53,7 +57,19 @@ def _copy_file(src: Path, dst_dir: Path) -> Path:
         suffix = src.suffix
         dst = dst_dir / f"{stem}_{counter}{suffix}"
         counter += 1
-    shutil.copy2(src, dst)
+    # 原子操作：先写临时文件，再 rename
+    fd, tmp_path = tempfile.mkstemp(suffix=src.suffix, dir=dst_dir)
+    try:
+        os.close(fd)
+        shutil.copy2(src, tmp_path)
+        os.rename(tmp_path, dst)
+    except Exception:
+        # 清理临时文件
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
     return dst
 
 
@@ -85,12 +101,25 @@ def _find_concept_file(base_dir: Path, src_id: str, concept_name: str) -> Path |
         if path.exists():
             return path
 
+    # 模糊匹配：在 base_dir 和 src 子目录中搜索包含 concept_name 的文件
     src_dir = base_dir / src_id
-    if src_dir.exists():
+    for search_dir in [src_dir, base_dir]:
+        if not search_dir.exists():
+            continue
         for name in candidate_names:
-            for path in sorted(src_dir.glob(f"*_{name}.md")):
+            # 尝试 glob 模式匹配（如 01_AI.md）
+            for path in sorted(search_dir.glob(f"*_{name}.md")):
                 if path.is_file():
                     return path
+            # 尝试在所有 .md 文件中搜索标题包含概念名的
+            for path in sorted(search_dir.glob("*.md")):
+                if path.is_file():
+                    try:
+                        first_line = path.read_text(encoding="utf-8", errors="ignore").split("\n", 1)[0]
+                        if concept_name.strip() in first_line:
+                            return path
+                    except OSError:
+                        continue
 
     return None
 
