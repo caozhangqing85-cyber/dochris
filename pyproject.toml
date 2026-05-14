@@ -56,7 +56,7 @@ ocr = [
     "Pillow>=10.0.0",
 ]
 web = [
-    "gradio>=5.7.1,<6",
+    "gradio>=5.7.1,<7",
     "huggingface-hub>=1.5.0,<2",
 ]
 dev = [
