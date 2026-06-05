@@ -64,7 +64,7 @@ def _copy_file(src: Path, dst_dir: Path) -> Path:
         shutil.copy2(src, tmp_path)
         os.rename(tmp_path, dst)
     except Exception:
-        # 清理临时文件
+        # 清理临时文件（rename 失败时 tmp_path 仍存在）
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -90,9 +90,13 @@ def _find_output_file(base_dir: Path, src_id: str, ext: str) -> Path | None:
 
 def _find_concept_file(base_dir: Path, src_id: str, concept_name: str) -> Path | None:
     """查找指定 src_id 下的概念文件，兼容新旧输出结构"""
+    # 新格式：re.sub 清理非法字符，空格替换为下划线，截断 60 字符
+    import re
+
+    new_safe = re.sub(r'[<>:"/\\|?*]', "", concept_name.strip()).replace(" ", "_")[:60]
     compiler_safe = concept_name.strip().replace("/", "_").replace("\\", "_")
     sanitized = sanitize_filename(concept_name, max_length=50)
-    candidate_names = [name for name in [compiler_safe, sanitized] if name]
+    candidate_names = [name for name in [new_safe, compiler_safe, sanitized] if name]
     candidates = []
     for name in candidate_names:
         candidates.append(base_dir / src_id / f"{name}.md")
@@ -115,7 +119,9 @@ def _find_concept_file(base_dir: Path, src_id: str, concept_name: str) -> Path |
             for path in sorted(search_dir.glob("*.md")):
                 if path.is_file():
                     try:
-                        first_line = path.read_text(encoding="utf-8", errors="ignore").split("\n", 1)[0]
+                        first_line = path.read_text(encoding="utf-8", errors="ignore").split(
+                            "\n", 1
+                        )[0]
                         if concept_name.strip() in first_line:
                             return path
                     except OSError:

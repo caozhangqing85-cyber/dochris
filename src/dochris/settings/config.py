@@ -26,6 +26,30 @@ except ImportError:
         return False
 
 
+def _detect_api_base() -> str:
+    """从环境变量自动检测 API 端点
+
+    逻辑：
+    - 如果设置了 BIGMODEL_API_KEY 或 ANTHROPIC_AUTH_TOKEN 且未设置 OPENAI_API_BASE → 使用 Coding 端点
+    - 否则使用 OPENAI_API_BASE 或默认通用端点
+    """
+    bigmodel_key = (os.environ.get("BIGMODEL_API_KEY") or "").strip()
+    anthropic_key = (os.environ.get("ANTHROPIC_AUTH_TOKEN") or "").strip()
+    if (bigmodel_key or anthropic_key) and not os.environ.get("OPENAI_API_BASE"):
+        return CODING_LLM_API_BASE
+    return os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
+
+
+def _detect_api_key() -> str | None:
+    """从环境变量获取 API key（支持 OPENAI_API_KEY、BIGMODEL_API_KEY 和 ANTHROPIC_AUTH_TOKEN）"""
+    return (
+        os.environ.get("OPENAI_API_KEY")
+        or (os.environ.get("BIGMODEL_API_KEY") or "").strip()
+        or (os.environ.get("ANTHROPIC_AUTH_TOKEN") or "").strip()
+        or None
+    )
+
+
 @dataclass
 class Settings:
     """知识库系统配置
@@ -37,8 +61,8 @@ class Settings:
     # 路径配置
     # ============================================================
 
-    workspace: Path = field(default_factory=lambda: Path.home() / ".openclaw/knowledge-base")
-    """工作区路径，默认 ~/.openclaw/knowledge-base"""
+    workspace: Path = field(default_factory=lambda: Path.home() / ".dochris/knowledge-base")
+    """工作区路径，默认 ~/.dochris/knowledge-base"""
 
     source_path: Path | None = None
     """源文件扫描路径，可选"""
@@ -46,9 +70,7 @@ class Settings:
     obsidian_vaults: list[Path] = field(default_factory=list)
     """Obsidian vault 路径列表"""
 
-    openclaw_config_path: Path = field(
-        default_factory=lambda: Path.home() / ".openclaw/openclaw.json"
-    )
+    openclaw_config_path: Path = field(default_factory=lambda: Path.home() / ".dochris/config.json")
     """OpenClaw 配置文件路径"""
 
     # ============================================================
@@ -58,13 +80,7 @@ class Settings:
     api_key: str | None = None
     """LLM API 密钥（支持 OPENAI_API_KEY 或 BIGMODEL_API_KEY 环境变量）"""
 
-    api_base: str = field(
-        default_factory=lambda: (
-            CODING_LLM_API_BASE
-            if (os.environ.get("BIGMODEL_API_KEY") or "").strip() and not os.environ.get("OPENAI_API_BASE")
-            else os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
-        )
-    )
+    api_base: str = field(default_factory=_detect_api_base)
     """LLM API 基础 URL（自动检测智谱 Coding Plan 端点）"""
 
     model: str = field(default_factory=lambda: os.environ.get("MODEL", "glm-5.1"))
@@ -137,7 +153,7 @@ class Settings:
     # ============================================================
 
     min_quality_score: int = field(
-        default_factory=lambda: int(os.environ.get("MIN_QUALITY_SCORE", "85"))
+        default_factory=lambda: int(os.environ.get("MIN_QUALITY_SCORE", "70"))
     )
     """最低质量分数（通过门槛）"""
 
@@ -222,6 +238,7 @@ class Settings:
         # 1. 先尝试从可能的 workspace 位置加载 .env
         env_paths = [
             Path.cwd() / ".env",
+            Path.home() / ".dochris" / "knowledge-base" / ".env",
             Path.home() / ".openclaw" / "knowledge-base" / ".env",
         ]
         if env_file:
@@ -244,8 +261,10 @@ class Settings:
                 workspace = cwd
             elif (cwd.parent / "manifests" / "sources").exists():
                 workspace = cwd.parent
-            else:
+            elif (Path.home() / ".openclaw" / "knowledge-base" / "manifests" / "sources").exists():
                 workspace = Path.home() / ".openclaw/knowledge-base"
+            else:
+                workspace = Path.home() / ".dochris/knowledge-base"
 
         # 解析 source_path
         source_path_str = os.environ.get("SOURCE_PATH")
@@ -260,14 +279,8 @@ class Settings:
             obsidian_vaults = [Path(os.environ["OBSIDIAN_VAULT"]).expanduser()]
 
         # 解析 API 配置
-        # 支持 BIGMODEL_API_KEY 作为 OPENAI_API_KEY 的别名（智谱官方 key 名）
-        bigmodel_key = (os.environ.get("BIGMODEL_API_KEY") or "").strip()
-        api_key = os.environ.get("OPENAI_API_KEY") or bigmodel_key or None
-        # 如果设置了 BIGMODEL_API_KEY 但未设置 OPENAI_API_BASE，自动使用 Coding 端点
-        if bigmodel_key and not os.environ.get("OPENAI_API_BASE"):
-            api_base = CODING_LLM_API_BASE
-        else:
-            api_base = os.environ.get("OPENAI_API_BASE", DEFAULT_LLM_API_BASE)
+        api_key = _detect_api_key()
+        api_base = _detect_api_base()
         model = os.environ.get("MODEL", "glm-5.1")
 
         # 解析插件配置
@@ -297,7 +310,7 @@ class Settings:
             embedding_model=os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"),
             vector_store=os.environ.get("VECTOR_STORE", "chromadb"),
             max_concurrency=int(os.environ.get("MAX_CONCURRENCY", "3")),
-            min_quality_score=int(os.environ.get("MIN_QUALITY_SCORE", "85")),
+            min_quality_score=int(os.environ.get("MIN_QUALITY_SCORE", "70")),
             max_content_chars=int(os.environ.get("MAX_CONTENT_CHARS", "20000")),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             plugin_dirs=[str(p) for p in plugin_dirs],
@@ -387,7 +400,7 @@ class Settings:
         Raises:
             ValueError: 当 API 密钥未设置时
         """
-        api_key = self.api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("BIGMODEL_API_KEY")
+        api_key = self.api_key or _detect_api_key()
         if not api_key:
             raise ValueError(
                 "OPENAI_API_KEY 环境变量未设置\n"
@@ -434,10 +447,9 @@ class Settings:
         # 验证 api_key（警告级别）
         api_key = self.api_key or os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            # 检查 OpenClaw 配置文件
             if self.openclaw_config_path.exists():
                 warnings.append(
-                    f"OPENAI_API_KEY 未设置，可能从 OpenClaw 配置获取: {self.openclaw_config_path}"
+                    f"OPENAI_API_KEY 未设置，可能从配置文件获取: {self.openclaw_config_path}"
                 )
             else:
                 warnings.append("OPENAI_API_KEY 未设置，请在运行前设置环境变量或 .env 文件")

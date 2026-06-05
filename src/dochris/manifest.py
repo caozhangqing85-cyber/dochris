@@ -192,6 +192,7 @@ def update_manifest_status(
     summary: dict | None = None,
     compiled_summary: dict | None = None,
     promoted_to: str | None = None,
+    trust_level: str | None = None,
 ) -> dict | None:
     """更新 manifest 状态
 
@@ -208,36 +209,39 @@ def update_manifest_status(
     Returns:
         更新后的 manifest 字典，不存在则返回 None
     """
-    manifest = get_manifest(workspace_path, src_id)
-    if manifest is None:
-        return None
-
-    manifest["status"] = status
-
-    if quality_score > 0:
-        manifest["quality_score"] = quality_score
-
-    if error_message is not None:
-        manifest["error_message"] = error_message
-
-    if summary is not None:
-        manifest["summary"] = summary
-
-    if compiled_summary is not None:
-        manifest["compiled_summary"] = compiled_summary
-
-    if promoted_to is not None:
-        manifest["promoted_to"] = promoted_to
-
-    # 设置时间戳
-    if status == "compiled":
-        manifest["date_compiled"] = datetime.now().isoformat()
-    elif status == "failed":
-        manifest["date_failed"] = datetime.now().isoformat()
-
-    # 写回文件
-    manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
     with _manifest_lock:
+        manifest = get_manifest(workspace_path, src_id)
+        if manifest is None:
+            return None
+
+        manifest["status"] = status
+
+        if quality_score > 0:
+            manifest["quality_score"] = quality_score
+
+        if error_message is not None:
+            manifest["error_message"] = error_message
+
+        if summary is not None:
+            manifest["summary"] = summary
+
+        if compiled_summary is not None:
+            manifest["compiled_summary"] = compiled_summary
+
+        if promoted_to is not None:
+            manifest["promoted_to"] = promoted_to
+
+        if trust_level is not None:
+            manifest["trust_level"] = trust_level
+
+        # 设置时间戳
+        if status == "compiled":
+            manifest["date_compiled"] = datetime.now().isoformat()
+        elif status == "failed":
+            manifest["date_failed"] = datetime.now().isoformat()
+
+        # 写回文件
+        manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
 
