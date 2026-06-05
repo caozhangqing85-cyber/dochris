@@ -122,8 +122,12 @@ class TestAPIConfig:
         assert "qwen" in OPENROUTER_MODEL.lower()
 
     def test_query_model(self):
-        """测试查询模型名"""
-        assert QUERY_MODEL == "glm-4-flash"
+        """测试查询模型名（运行时可能被 .env 覆盖）"""
+        from dochris.constants import DEFAULT_QUERY_MODEL
+        # QUERY_MODEL 来自 settings，可能被环境变量覆盖
+        # 只验证它是非空字符串
+        assert QUERY_MODEL and isinstance(QUERY_MODEL, str)
+        assert DEFAULT_QUERY_MODEL == "glm-4-flash"
 
 
 class TestCompilationConfig:

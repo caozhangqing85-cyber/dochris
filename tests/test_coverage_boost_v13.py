@@ -334,6 +334,7 @@ class TestSettingsFromEnv:
             "WORKSPACE",
             "OPENAI_API_KEY",
             "OPENAI_API_BASE",
+            "BIGMODEL_API_KEY",
             "MODEL",
             "SOURCE_PATH",
             "OBSIDIAN_VAULTS",

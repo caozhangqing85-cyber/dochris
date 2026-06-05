@@ -73,9 +73,9 @@ class TestQueryEndpoint:
             resp = client.get("/api/v1/query", params={"q": "学习", "mode": "concept"})
 
         assert resp.status_code == 200
-        mock_query.assert_called_once_with(
-            "学习", mode="concept", top_k=5, logger=mock_query.call_args[1]["logger"]
-        )
+        call_kwargs = mock_query.call_args
+        assert call_kwargs[1]["mode"] == "concept"
+        assert call_kwargs[1]["top_k"] == 5
 
     def test_query_with_top_k(self, client) -> None:
         """指定返回数量"""

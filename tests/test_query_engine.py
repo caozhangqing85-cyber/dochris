@@ -300,14 +300,17 @@ class TestGenerateAnswer:
 
         concepts = [{"name": "测试概念", "definition": "概念定义"}]
 
-        result = generate_answer(
-            "测试问题",
-            concepts=concepts,
-            summaries=[],
-            vector_results=[],
-            client=mock_client,
-            logger=logger,
-        )
+        # Mock 缓存未命中，确保 LLM 被调用
+        with patch("dochris.core.cache.load_query_cache", return_value=None):
+            with patch("dochris.core.cache.save_query_cache", return_value=True):
+                result = generate_answer(
+                    "测试问题",
+                    concepts=concepts,
+                    summaries=[],
+                    vector_results=[],
+                    client=mock_client,
+                    logger=logger,
+                )
 
         assert result == "测试回答"
         mock_client.chat.completions.create.assert_called_once()

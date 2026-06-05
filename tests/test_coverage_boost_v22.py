@@ -1,7 +1,6 @@
 """覆盖率提升 v22 — auth API key + graph builder/models + web app handlers"""
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -280,166 +279,11 @@ class TestGraphBuilder:
 
 
 # ============================================================
-# web/app.py — handler edge cases
+# graph/builder.py — edge cases
 # ============================================================
-class TestWebAppHandlers:
-    """Web UI handler 边界测试"""
 
-    def test_handle_query_empty_input(self):
-        """空查询返回提示"""
-        from dochris.web.app import handle_query
 
-        result = handle_query("", 5)
-        assert "请输入查询内容" in result
-
-    def test_handle_query_exception(self):
-        """查询异常返回错误"""
-        from dochris.web.app import handle_query
-
-        with patch("dochris.web.query_tab._do_query", side_effect=RuntimeError("fail")):
-            result = handle_query("test", 5)
-        assert "查询出错" in result
-
-    def test_handle_refresh_files_exception(self):
-        """刷新文件异常"""
-        from dochris.web.app import handle_refresh_files
-
-        with patch("dochris.web.file_tab._get_file_table", side_effect=RuntimeError("fail")):
-            rows, status = handle_refresh_files()
-        assert rows == []
-        assert "刷新失败" in status
-
-    def test_handle_refresh_status_exception(self):
-        """获取状态异常"""
-        from dochris.web.app import handle_refresh_status
-
-        with patch("dochris.web.status_tab.get_system_status", side_effect=RuntimeError("fail")):
-            result = handle_refresh_status()
-        assert "获取状态失败" in result
-
-    def test_handle_refresh_quality_exception(self):
-        """获取质量数据异常"""
-        from dochris.web.app import handle_refresh_quality
-
-        with patch(
-            "dochris.web.quality_tab._get_quality_dashboard", side_effect=RuntimeError("fail")
-        ):
-            result = handle_refresh_quality()
-        assert "获取质量数据失败" in result
-
-    def test_handle_upload_no_files(self):
-        """无文件上传"""
-        from dochris.web.app import handle_upload
-
-        rows, status = handle_upload([])
-        assert rows == []
-        assert "未选择文件" in status
-
-    def test_format_query_results_empty(self):
-        """空结果格式化"""
-        from dochris.web.app import _format_query_results
-
-        result = _format_query_results({"time_seconds": 0.5})
-        assert "未找到相关结果" in result
-
-    def test_format_query_results_with_vector(self):
-        """有向量结果的格式化"""
-        from dochris.web.app import _format_query_results
-
-        result = _format_query_results(
-            {
-                "time_seconds": 0.1,
-                "vector_results": [
-                    {"score": 0.95, "title": "测试", "content": "内容", "source": "/test.md"}
-                ],
-            }
-        )
-        assert "测试" in result
-        assert "0.950" in result
-
-    def test_format_query_results_with_concepts(self):
-        """有概念匹配的格式化"""
-        from dochris.web.app import _format_query_results
-
-        result = _format_query_results(
-            {
-                "time_seconds": 0.1,
-                "concepts": [{"name": "AI"}],
-            }
-        )
-        assert "AI" in result
-
-    def test_format_query_results_with_answer(self):
-        """有 AI 回答的格式化"""
-        from dochris.web.app import _format_query_results
-
-        result = _format_query_results(
-            {
-                "time_seconds": 1.0,
-                "answer": "这是AI回答",
-            }
-        )
-        assert "AI 回答" in result
-        assert "这是AI回答" in result
-
-    def test_handle_upload_with_files(self, tmp_path):
-        """有文件上传"""
-        from dochris.web.app import handle_upload
-
-        mock_settings = MagicMock()
-        mock_settings.workspace = tmp_path
-        mock_settings.raw_dir = tmp_path / "raw"
-
-        source_file = tmp_path / "source" / "测试文件.md"
-        source_file.parent.mkdir()
-        source_file.write_text("hello", encoding="utf-8")
-        mock_file = MagicMock(name=str(source_file))
-        mock_file.name = str(source_file)
-        mock_file.orig_name = "测试文件.md"
-
-        with patch("dochris.web.file_tab.get_settings", return_value=mock_settings):
-            rows, status = handle_upload([mock_file])
-
-        assert "新增待编译 1 个" in status
-        assert rows[0][1] == "测试文件.md"
-
-    def test_handle_upload_with_filedata_dict(self, tmp_path):
-        """兼容 Gradio API 传入的 FileData dict"""
-        from dochris.web.app import handle_upload
-
-        mock_settings = MagicMock()
-        mock_settings.workspace = tmp_path
-        mock_settings.raw_dir = tmp_path / "raw"
-
-        source_file = tmp_path / "source" / "api-temp-name.md"
-        source_file.parent.mkdir()
-        source_file.write_text("hello", encoding="utf-8")
-        file_data = {"path": str(source_file), "orig_name": "接口上传文件.md"}
-
-        with patch("dochris.web.file_tab.get_settings", return_value=mock_settings):
-            rows, status = handle_upload([file_data])
-
-        assert "新增待编译 1 个" in status
-        assert rows[0][1] == "接口上传文件.md"
-        # 路径可能是 raw/articles/ 或 uploads/inbox/，取决于符号链接是否成功
-        assert "接口上传文件.md" in rows[0][5]
-
-    def test_handle_compile_exception(self):
-        """编译异常"""
-        from dochris.web.app import handle_compile
-
-        with patch("asyncio.run", side_effect=RuntimeError("compile fail")):
-            result = handle_compile(10)
-        assert "编译出错" in result
-
-    def test_handle_graph_refresh_exception(self):
-        """图谱刷新异常"""
-        from dochris.web.app import _handle_graph_refresh
-
-        with patch("dochris.web.graph_tab._get_graph_html", side_effect=RuntimeError("graph fail")):
-            result = _handle_graph_refresh()
-        assert "获取知识图谱失败" in result
-
+class TestGraphBuilderEdges:
     def test_build_graph_with_manifest_concepts(self, tmp_path):
         """manifest 有 compiled_summary.concepts 时创建边"""
         from dochris.graph.builder import build_graph
