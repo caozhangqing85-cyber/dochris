@@ -218,7 +218,10 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
 
         # 检查是否已经存在（通过内容哈希）
         existing = get_all_manifests(workspace_path)
-        already_exists = any(m.get("content_hash") == content_hash for m in existing)
+        already_exists = any(
+            m.get("content_hash") is not None and m.get("content_hash") == content_hash
+            for m in existing
+        )
         if already_exists:
             logger.info(f"  跳过（已存在）: {title}")
             continue

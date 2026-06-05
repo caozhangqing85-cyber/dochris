@@ -357,8 +357,8 @@ MIN_TEXT_LENGTH = 100  # 文本最小长度（判断是否有意义）
 # 路径常量
 # ============================================================
 
-DEFAULT_WORKSPACE = Path.home() / ".knowledge-base"
-OPENCLAW_CONFIG_PATH = Path.home() / ".openclaw/openclaw.json"
+DEFAULT_WORKSPACE = Path.home() / ".dochris/knowledge-base"
+OPENCLAW_CONFIG_PATH = Path.home() / ".dochris/config.json"
 
 # ============================================================
 # OpenRouter 备用配置

@@ -260,7 +260,9 @@ class TestKeywordSearch(unittest.TestCase):
         from dochris.phases.query_utils import _keyword_search
 
         test_file = self.search_dir / "SRC-0001.md"
-        test_file.write_text("上传文件后需要编译，然后可以在知识查询页面查询知识库。", encoding="utf-8")
+        test_file.write_text(
+            "上传文件后需要编译，然后可以在知识查询页面查询知识库。", encoding="utf-8"
+        )
 
         result = _keyword_search(
             "上传后怎么查询知识库",
@@ -377,7 +379,10 @@ class TestExtractSummary(unittest.TestCase):
 
         self.assertEqual(result["title"], "SRC-0001")
         self.assertEqual(result["one_line"], "上传和查询流程")
-        self.assertEqual(result["key_points"], ["上传文件后进入待编译状态", "编译成功后可以查询知识库", "查询结果可以导出"])
+        self.assertEqual(
+            result["key_points"],
+            ["上传文件后进入待编译状态", "编译成功后可以查询知识库", "查询结果可以导出"],
+        )
 
 
 class TestPathConstants(unittest.TestCase):

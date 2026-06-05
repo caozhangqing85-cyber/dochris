@@ -9,6 +9,24 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# 延迟加载 httpx 异常类型（httpx 为可选依赖）
+_httpx_exc_types: tuple[type[Exception], ...] = ()
+_httpx_loaded = False
+
+
+def _get_httpx_exceptions() -> tuple[type[Exception], ...]:
+    """获取 httpx 异常类型（延迟加载，只执行一次）"""
+    global _httpx_exc_types, _httpx_loaded
+    if not _httpx_loaded:
+        try:
+            import httpx
+
+            _httpx_exc_types = (httpx.HTTPStatusError, httpx.TimeoutException)
+        except ImportError:
+            pass
+        _httpx_loaded = True
+    return _httpx_exc_types
+
 
 class RetryManager:
     """重试管理器"""
@@ -22,12 +40,34 @@ class RetryManager:
 
     @classmethod
     def get_error_type(cls, error: Exception) -> str:
-        """识别错误类型"""
+        """识别错误类型
+
+        优先通过异常类型判断（更可靠），再通过错误消息文本匹配。
+        """
+        # 优先通过异常类型判断
+        httpx_excs = _get_httpx_exceptions()
+        if httpx_excs:
+            import httpx
+
+            if isinstance(error, httpx.HTTPStatusError):
+                if error.response.status_code == 429:
+                    return "rate_limit_429"
+                if error.response.status_code >= 500:
+                    return "timeout"
+            if isinstance(error, httpx.TimeoutException):
+                return "timeout"
+
+        if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
+            return "timeout"
+        if isinstance(error, (ConnectionError, ConnectionResetError, ConnectionRefusedError)):
+            return "timeout"
+
+        # 回退到文本匹配
         error_str = str(error).lower()
 
         if "429" in error_str or "rate" in error_str:
             return "rate_limit_429"
-        elif "timeout" in error_str:
+        elif "timeout" in error_str or "timed out" in error_str:
             return "timeout"
         else:
             return "other"

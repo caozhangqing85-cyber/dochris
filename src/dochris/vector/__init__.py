@@ -3,6 +3,7 @@
 提供统一的向量存储接口，支持多种后端：
 - ChromaDB: 默认，持久化到本地文件
 - FAISS: 轻量级，无需服务进程
+- LEANN: 超低存储占用，适合个人设备
 """
 
 from dochris.vector.base import BaseVectorStore
@@ -27,7 +28,19 @@ def _try_register_faiss() -> None:
         pass
 
 
+def _try_register_leann() -> None:
+    """尝试注册 LEANN store（可选依赖）"""
+    try:
+        from dochris.vector.leann_store import LeannStore
+
+        STORES["leann"] = LeannStore
+        __all__.append("LeannStore")
+    except ImportError:
+        pass
+
+
 _try_register_faiss()
+_try_register_leann()
 
 
 def get_store(name: str) -> type[BaseVectorStore]:

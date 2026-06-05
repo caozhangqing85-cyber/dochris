@@ -452,6 +452,7 @@ class TestRunCompensate:
 
         logger = MagicMock()
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         mock_settings = MagicMock()
         mock_settings.api_key = None
 

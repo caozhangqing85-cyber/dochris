@@ -31,7 +31,7 @@ FASTER_WHISPER_AVAILABLE: bool = False
 def _init_paths() -> None:
     """延迟初始化路径常量"""
     global WORKSPACE, TRANSCRIPTS_DIR, LOGS_PATH
-    WORKSPACE = Path.home() / ".openclaw/knowledge-base"
+    WORKSPACE = Path.home() / ".dochris/knowledge-base"
     TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
     LOGS_PATH = WORKSPACE / "logs"
 

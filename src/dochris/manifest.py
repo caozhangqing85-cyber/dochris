@@ -27,12 +27,16 @@ Manifest 格式：
 import csv
 import json
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 
 from dochris.log_utils import append_log_to_file
 
 logger = logging.getLogger(__name__)
+
+# Manifest 写入锁（防止并发写入同一个 JSON 文件导致数据损坏）
+_manifest_lock = threading.Lock()
 
 # 保留向后兼容的别名
 append_log = append_log_to_file
@@ -124,8 +128,9 @@ def create_manifest(
 
     # 写入 manifest 文件
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    with _manifest_lock:
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     # 同步到索引
     append_to_index(workspace_path, manifest)
@@ -187,6 +192,7 @@ def update_manifest_status(
     summary: dict | None = None,
     compiled_summary: dict | None = None,
     promoted_to: str | None = None,
+    trust_level: str | None = None,
 ) -> dict | None:
     """更新 manifest 状态
 
@@ -203,37 +209,41 @@ def update_manifest_status(
     Returns:
         更新后的 manifest 字典，不存在则返回 None
     """
-    manifest = get_manifest(workspace_path, src_id)
-    if manifest is None:
-        return None
+    with _manifest_lock:
+        manifest = get_manifest(workspace_path, src_id)
+        if manifest is None:
+            return None
 
-    manifest["status"] = status
+        manifest["status"] = status
 
-    if quality_score > 0:
-        manifest["quality_score"] = quality_score
+        if quality_score > 0:
+            manifest["quality_score"] = quality_score
 
-    if error_message is not None:
-        manifest["error_message"] = error_message
+        if error_message is not None:
+            manifest["error_message"] = error_message
 
-    if summary is not None:
-        manifest["summary"] = summary
+        if summary is not None:
+            manifest["summary"] = summary
 
-    if compiled_summary is not None:
-        manifest["compiled_summary"] = compiled_summary
+        if compiled_summary is not None:
+            manifest["compiled_summary"] = compiled_summary
 
-    if promoted_to is not None:
-        manifest["promoted_to"] = promoted_to
+        if promoted_to is not None:
+            manifest["promoted_to"] = promoted_to
 
-    # 设置时间戳
-    if status == "compiled":
-        manifest["date_compiled"] = datetime.now().isoformat()
-    elif status == "failed":
-        manifest["date_failed"] = datetime.now().isoformat()
+        if trust_level is not None:
+            manifest["trust_level"] = trust_level
 
-    # 写回文件
-    manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        # 设置时间戳
+        if status == "compiled":
+            manifest["date_compiled"] = datetime.now().isoformat()
+        elif status == "failed":
+            manifest["date_failed"] = datetime.now().isoformat()
+
+        # 写回文件
+        manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
 
     # 同步更新 source_index.csv
     update_index_entry(workspace_path, src_id, status, quality_score)

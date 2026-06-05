@@ -334,6 +334,7 @@ class TestSettingsFromEnv:
             "WORKSPACE",
             "OPENAI_API_KEY",
             "OPENAI_API_BASE",
+            "BIGMODEL_API_KEY",
             "MODEL",
             "SOURCE_PATH",
             "OBSIDIAN_VAULTS",
@@ -355,6 +356,7 @@ class TestSettingsFromEnv:
         monkeypatch.delenv("OBSIDIAN_VAULTS", raising=False)
         monkeypatch.delenv("OBSIDIAN_VAULT", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         monkeypatch.delenv("PLUGIN_DIRS", raising=False)
         monkeypatch.delenv("PLUGINS_ENABLED", raising=False)
         monkeypatch.delenv("PLUGINS_DISABLED", raising=False)
@@ -370,6 +372,7 @@ class TestSettingsFromEnv:
         monkeypatch.delenv("SOURCE_PATH", raising=False)
         monkeypatch.delenv("OBSIDIAN_VAULT", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         monkeypatch.delenv("PLUGIN_DIRS", raising=False)
         monkeypatch.delenv("PLUGINS_ENABLED", raising=False)
         monkeypatch.delenv("PLUGINS_DISABLED", raising=False)
@@ -385,6 +388,7 @@ class TestSettingsFromEnv:
         monkeypatch.delenv("WORKSPACE", raising=False)
         monkeypatch.delenv("SOURCE_PATH", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         monkeypatch.delenv("PLUGIN_DIRS", raising=False)
         monkeypatch.delenv("PLUGINS_ENABLED", raising=False)
         monkeypatch.delenv("PLUGINS_DISABLED", raising=False)
@@ -400,6 +404,7 @@ class TestSettingsFromEnv:
         monkeypatch.delenv("OBSIDIAN_VAULTS", raising=False)
         monkeypatch.delenv("OBSIDIAN_VAULT", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         monkeypatch.delenv("PLUGIN_DIRS", raising=False)
         monkeypatch.delenv("PLUGINS_ENABLED", raising=False)
         monkeypatch.delenv("PLUGINS_DISABLED", raising=False)
@@ -418,6 +423,7 @@ class TestSettingsFromEnv:
         monkeypatch.delenv("OBSIDIAN_VAULTS", raising=False)
         monkeypatch.delenv("OBSIDIAN_VAULT", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         s = Settings.from_env(env_file=tmp_path / "nonexistent.env")
         assert len(s.plugin_dirs) == 2
@@ -453,6 +459,7 @@ class TestSettingsValidate:
         config_path.write_text("{}", encoding="utf-8")
         s = Settings(workspace=tmp_path, api_key=None, openclaw_config_path=config_path)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         warnings = s.validate()
         assert any("OpenClaw" in w for w in warnings)
@@ -464,6 +471,7 @@ class TestSettingsValidate:
             workspace=tmp_path, api_key=None, openclaw_config_path=tmp_path / "nonexistent.json"
         )
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         warnings = s.validate()
         assert any("OPENAI_API_KEY" in w for w in warnings)
@@ -506,6 +514,7 @@ class TestSettingsValidate:
 
         s = Settings(workspace=tmp_path, api_key=None)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         with pytest.raises(ValueError, match="OPENAI_API_KEY"):
             s.validate_api_key()
@@ -516,6 +525,7 @@ class TestGetResetSettings:
         from dochris.settings.config import get_settings, reset_settings
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         try:
             s = get_settings(reload=True)
             assert s is not None
@@ -527,5 +537,6 @@ class TestGetResetSettings:
         from dochris.settings import config as cfg_module
 
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         cfg_module.reset_settings()
         assert cfg_module._global_settings is None

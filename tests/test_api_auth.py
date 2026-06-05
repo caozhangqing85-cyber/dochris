@@ -17,6 +17,11 @@ def _make_request(headers: dict | None = None, query_params: dict | None = None)
     req.headers = headers or {}
     req.query_params = MagicMock()
     req.query_params.get = (query_params or {}).get
+    # 模拟本地客户端地址（与 auth.py 的 allowed_hosts 匹配）
+    req.client = MagicMock()
+    req.client.host = "127.0.0.1"
+    req.url = MagicMock()
+    req.url.path = "/api/v1/test"
     return req
 
 

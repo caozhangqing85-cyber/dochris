@@ -85,7 +85,7 @@ def get_default_workspace() -> Path:
     Returns:
         默认工作区路径
     """
-    return Path.home() / ".openclaw/knowledge-base"
+    return Path.home() / ".dochris/knowledge-base"
 
 
 def append_log_to_file(workspace: Path | None, message: str, log_type: str = "system") -> None:

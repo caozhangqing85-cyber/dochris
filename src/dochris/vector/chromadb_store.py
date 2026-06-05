@@ -14,29 +14,51 @@ from .base import BaseVectorStore
 logger = logging.getLogger(__name__)
 
 
+def _build_embedding_function(model_name: str) -> Any:
+    """构建嵌入函数，使用本地缓存的 SentenceTransformer 模型
+
+    设置 local_files_only=True 避免向 HuggingFace Hub 发起网络请求，
+    防止因 SSL/网络问题导致模型加载超时（sentence_transformers v5+
+    即使模型已缓存也会尝试检查 adapter_config.json）。
+    """
+    from chromadb.utils import embedding_functions
+
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name=model_name,
+        local_files_only=True,
+    )
+
+
 class ChromaDBStore(BaseVectorStore):
     """ChromaDB 向量存储（持久化到本地文件）
 
     使用 PersistentClient 将数据存储到本地目录，
     支持自动嵌入和向量检索。
-
-    Examples:
-        >>> store = ChromaDBStore(persist_directory="./data")
-        >>> store.add_documents("my_collection", ["doc1", "doc2"], ["id1", "id2"])
-        >>> results = store.query("my_collection", "search query", n_results=5)
     """
 
     name = "chromadb"
 
-    def __init__(self, persist_directory: str | Path | None = None, **kwargs: Any) -> None:
-        """初始化 ChromaDB 存储
-
-        Args:
-            persist_directory: 持久化目录路径，默认为 None（内存模式）
-            **kwargs: 其他参数（当前未使用，保留用于扩展）
-        """
+    def __init__(
+        self,
+        persist_directory: str | Path | None = None,
+        embedding_model: str = "BAAI/bge-small-zh-v1.5",
+        **kwargs: Any,
+    ) -> None:
         self._persist_directory = Path(persist_directory) if persist_directory else None
+        self._embedding_model = embedding_model
+        self._ef: Any | None = None
         self._client: Any | None = None
+
+    @property
+    def embedding_function(self) -> Any:
+        if self._ef is None:
+            try:
+                self._ef = _build_embedding_function(self._embedding_model)
+                logger.info(f"ChromaDB embedding: {self._embedding_model}")
+            except Exception as e:
+                logger.warning(f"Failed to load embedding model {self._embedding_model}: {e}")
+                return None
+        return self._ef
 
     def _get_client(self) -> Any:
         """获取或创建 ChromaDB 客户端
@@ -85,7 +107,12 @@ class ChromaDBStore(BaseVectorStore):
             raise ValueError(f"documents ({len(documents)}) and ids ({len(ids)}) length mismatch")
 
         client = self._get_client()
-        col = client.get_or_create_collection(name=collection)
+        ef = self.embedding_function
+        col = client.get_or_create_collection(
+            name=collection,
+            embedding_function=ef,
+            metadata={"hnsw:space": "cosine"},
+        )
 
         # 确保元数据列表长度正确
         if metadatas is None:
@@ -120,9 +147,10 @@ class ChromaDBStore(BaseVectorStore):
         """
         client = self._get_client()
 
-        # 尝试获取集合
+        # 尝试获取集合（传入 embedding function 以确保一致）
         try:
-            col = client.get_collection(name=collection)
+            ef = self.embedding_function
+            col = client.get_collection(name=collection, embedding_function=ef)
         except Exception as e:
             logger.debug(f"Collection '{collection}' not found: {e}")
             return []

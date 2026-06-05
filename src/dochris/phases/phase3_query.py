@@ -16,6 +16,7 @@ Phase 3: 查询系统（v2 — wiki 优先 + manifest 来源追踪）
 import logging
 import sys
 import time
+from pathlib import Path
 
 # 确保 scripts 包可导入
 from typing import Any, cast
@@ -125,7 +126,12 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
 
 
 def query(
-    query_str: str, mode: str = "combined", top_k: int = 5, logger: logging.Logger | None = None
+    query_str: str,
+    mode: str = "combined",
+    top_k: int = 5,
+    logger: logging.Logger | None = None,
+    contribute: bool = False,
+    workspace_path: str | Path | None = None,
 ) -> dict[str, Any]:
     """
     执行查询
@@ -136,6 +142,9 @@ def query(
       "vector"   — 向量检索
       "combined" — 综合查询
       "all"      — 搜索全部，返回 search_sources 标注
+
+    contribute: 启用 Query-as-Contribution，将回答写回候选区
+    workspace_path: contribute=True 时需要提供工作区路径
     """
     if logger is None:
         logger = logging.getLogger("phase3")
@@ -198,6 +207,26 @@ def query(
             logger.warning("LLM client creation failed, showing retrieval results only")
 
     result["time_seconds"] = round(time.time() - start, 2)
+
+    # Query-as-Contribution：将高质量回答写回候选区
+    if contribute and result.get("answer") and workspace_path:
+        try:
+            from dochris.quality.query_contribution import auto_contribute_from_query
+
+            contribution = auto_contribute_from_query(
+                workspace_path=Path(workspace_path),
+                query_result=result,
+            )
+            if contribution:
+                result["contribution"] = {
+                    "id": contribution["id"],
+                    "quality_score": contribution["quality_score"],
+                    "needs_review": contribution.get("needs_review", True),
+                    "auto_promoted": contribution.get("auto_promoted", False),
+                }
+        except Exception as e:
+            logger.warning(f"Query-as-Contribution 失败: {e}")
+
     return result
 
 

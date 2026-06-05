@@ -216,7 +216,7 @@ class HierarchicalSummarizer:
             )
 
         # 使用信号量控制并发，避免同时发出过多请求触发 API 限流
-        max_parallel = 3
+        max_parallel = 1
         sem = asyncio.Semaphore(max_parallel)
 
         async def limited_summarize(

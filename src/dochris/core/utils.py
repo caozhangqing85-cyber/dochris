@@ -121,9 +121,7 @@ def sanitize_filename(filename: str, replacement: str = "_", max_length: int = 2
     # 保留 Unicode 文件名中的字母、数字和常见安全符号，避免中文标题被替换成 "_"。
     safe_chars = "._- ()[]{}"
     cleaned = "".join(
-        c
-        if c in safe_chars or unicodedata.category(c)[0] in {"L", "N", "M"}
-        else replacement
+        c if c in safe_chars or unicodedata.category(c)[0] in {"L", "N", "M"} else replacement
         for c in cleaned
     )
 

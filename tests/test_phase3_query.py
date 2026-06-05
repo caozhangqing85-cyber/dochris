@@ -375,9 +375,11 @@ class TestPhase3LLMAnswer:
         summaries = [{"title": "摘要1", "one_line": "一句话", "key_points": ["要点1"]}]
         vector_results = []
 
-        answer = generate_answer(
-            "测试问题", concepts, summaries, vector_results, mock_client, logger
-        )
+        with patch("dochris.core.cache.load_query_cache", return_value=None):
+            with patch("dochris.core.cache.save_query_cache", return_value=True):
+                answer = generate_answer(
+                    "测试问题", concepts, summaries, vector_results, mock_client, logger
+                )
 
         assert answer == "这是生成的回答"
         mock_client.chat.completions.create.assert_called_once()

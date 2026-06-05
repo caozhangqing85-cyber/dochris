@@ -312,7 +312,11 @@ def main() -> None:
 
     # 验证 API 密钥（编译命令需要）
     settings = get_settings()
-    if not args.clear_cache and not args.clear_all_cache and not (settings.api_key or DEFAULT_API_KEY):
+    if (
+        not args.clear_cache
+        and not args.clear_all_cache
+        and not (settings.api_key or DEFAULT_API_KEY)
+    ):
         logger.error("❌ 错误: OPENAI_API_KEY 环境变量未设置")
         logger.error("请设置: export OPENAI_API_KEY='your-api-key'")
         sys.exit(1)

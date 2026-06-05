@@ -126,7 +126,22 @@ class SummaryGenerator:
         if self.llm_client.no_think:
             return self._build_messages_qwen3(text, title)
 
-        system_prompt = """你是知识库编译器。整理文本并生成结构化 JSON。
+        # 根据文本长度动态调整输出约束
+        text_len = len(text)
+        if text_len > 50000:
+            summary_range = "3000-6000 字（长文档，必须充分展开）"
+            points_range = "8-15 个"
+            concepts_range = "8-15 个"
+        elif text_len > 10000:
+            summary_range = "1500-3000 字"
+            points_range = "5-10 个"
+            concepts_range = "5-10 个"
+        else:
+            summary_range = "800-1500 字"
+            points_range = "4-5 个"
+            concepts_range = "3-5 个"
+
+        system_prompt = f"""你是知识库编译器。整理文本并生成结构化 JSON。
 
 【核心任务】
 提取文本中的**关键知识点**和**学习价值**，生成高质量的知识摘要。
@@ -135,13 +150,17 @@ class SummaryGenerator:
 1. 必须输出合法的 JSON 对象，前后不要任何文字或代码块标记
 2. JSON 对象必须包含以下 4 个字段：
    - one_line: 一句话摘要（10-50 字）
-   - key_points: 字符串数组，必须包含 4-5 个独立要点
-   - detailed_summary: 详细摘要（800-1500 字）
-   - concepts: 对象数组，必须包含 3-5 个概念
+   - key_points: 字符串数组，必须包含 {points_range} 独立要点
+   - detailed_summary: 详细摘要（{summary_range}）
+   - concepts: 对象数组，必须包含 {concepts_range} 概念
 
 3. key_points 数组中的每个要点必须是：
-   - 15-30 字的完整句子
-   - 独立的信息点
+   - 15-40 字的完整句子
+   - 独立的信息点，覆盖不同主题
+
+4. concepts 数组中的每个概念必须是对象格式（禁止纯字符串）：
+   {{"name": "概念名称", "explanation": "50-100字的详细解释，包含定义、作用和上下文关系"}}
+   explanation 不能为空，必须提供有实质内容的解释。
 """
 
         user_prompt = f"""请为以下内容生成结构化摘要：
@@ -167,7 +186,22 @@ class SummaryGenerator:
         - 需要更明确的 JSON 格式约束
         - 适合深度分析，不受内容过滤限制
         """
-        system_prompt = """你是一位资深知识工程师，擅长从复杂文本中提取结构化知识。
+        # 根据文本长度动态调整输出约束
+        text_len = len(text)
+        if text_len > 50000:
+            summary_min = "3000"
+            points_count = "8-15"
+            concepts_count = "8-15"
+        elif text_len > 10000:
+            summary_min = "1500"
+            points_count = "5-10"
+            concepts_count = "5-10"
+        else:
+            summary_min = "1000"  # noqa: F841
+            points_count = "至少5"  # noqa: F841
+            concepts_count = "至少3"  # noqa: F841
+
+        system_prompt = f"""你是一位资深知识工程师，擅长从复杂文本中提取结构化知识。
 
 ## 你的工作流程
 1. 通读全文，理解核心论点和知识结构
@@ -182,7 +216,7 @@ class SummaryGenerator:
 
 JSON 结构如下：
 {
-  "one_line": "用一句话精准概括全文核心内容（20-50字）",
+            "one_line": "用一句话精准概括全文核心内容（20-50字）",
   "key_points": [
     "要点1：独立完整的句子，20-40字",
     "要点2：另一个独立的信息点",
@@ -190,7 +224,7 @@ JSON 结构如下：
     "要点4",
     "要点5"
   ],
-  "detailed_summary": "1000-2000字的详细摘要。要求：\\n- 字数不少于1000字，充分展开论述\\n- 按逻辑顺序组织，每个论点都要有充分的分析和解释\\n- 包含核心论点、支撑证据、关键结论\\n- 保留原文的论证逻辑和因果关系\\n- 使用"方法""策略""技巧""原理""规律""核心""本质""提升""学习""掌握""改善""优化"等学习导向的措辞\\n- 用自己的话重新表述，不要照搬原文句子\\n- 结尾总结核心学习收获和实践启示",
+  "detailed_summary": "''' + summary_min + '''字以上的详细摘要。要求：\\n- 字数不少于''' + summary_min + '''字，充分展开论述\\n- 按逻辑顺序组织，每个论点都要有充分的分析和解释\\n- 包含核心论点、支撑证据、关键结论\\n- 保留原文的论证逻辑和因果关系\\n- 结尾总结核心学习收获和实践启示",
   "concepts": [
     {"name": "概念名称", "explanation": "50-100字的详细解释，包含定义、作用和上下文关系"},
     {"name": "概念2", "explanation": "..."},
@@ -202,9 +236,9 @@ JSON 结构如下：
 
 ## 质量标准（严格）
 - one_line：20-50字，信息密度高，不能是泛泛而谈
-- key_points：至少5个独立要点，每个20-40字
-- detailed_summary：不少于1000字，这是硬性要求。要充分展开分析，不要惜字如金
-- concepts：至少3个概念，每个explanation要详细实用
+- key_points：''' + points_count + '''个独立要点，每个20-40字
+- detailed_summary：不少于''' + summary_min + '''字，这是硬性要求。要充分展开分析，不要惜字如金
+- concepts：''' + concepts_count + '''个概念，每个explanation要详细实用
 - 禁止使用"作为AI""作为语言模型"等套话，直接以知识工程师身份输出"""
 
         user_prompt = f"""请为以下文档生成高质量的结构化知识摘要。
@@ -250,8 +284,15 @@ JSON 结构如下：
         if strategy == "direct":
             return await self.generate_summary(text, title, max_retries)
         elif strategy == "map_reduce":
-            # 超大文档（>10万字）使用更大的块以减少 API 调用
-            chunk_size = min(16000, max(4000, char_count // 20))
+            # 根据文本长度动态调整分块大小，减少 API 调用次数
+            # 目标：控制在 5-10 个分块，避免触发 API 限速
+            if char_count > 100000:
+                chunk_size = max(20000, char_count // 8)
+            elif char_count > 50000:
+                chunk_size = max(12000, char_count // 8)
+            else:
+                chunk_size = min(16000, max(4000, char_count // 8))
+
             from dochris.core.hierarchical_summarizer import HierarchicalSummarizer
 
             summarizer = HierarchicalSummarizer(self.llm_client)

@@ -167,6 +167,7 @@ class TestValidateApiKey:
     def test_raises_when_missing(self, monkeypatch):
         """api_key 未设置时抛出 ValueError"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         s = Settings(api_key=None)
         with pytest.raises(ValueError, match="OPENAI_API_KEY"):
             s.validate_api_key()
@@ -187,6 +188,7 @@ class TestValidate:
     def test_empty_api_base_raises(self, tmp_path, monkeypatch):
         """空 api_base 抛出 ValueError"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         s = Settings(api_base="", workspace=tmp_path)
         with pytest.raises(ValueError, match="api_base"):
             s.validate()
@@ -194,6 +196,7 @@ class TestValidate:
     def test_empty_model_raises(self, tmp_path, monkeypatch):
         """空 model 抛出 ValueError"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         s = Settings(model="", workspace=tmp_path, api_base="https://api.example.com/v1")
         with pytest.raises(ValueError, match="model"):
             s.validate()
@@ -201,6 +204,7 @@ class TestValidate:
     def test_no_api_key_warns(self, tmp_path, monkeypatch):
         """无 API key 时返回警告"""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
         s = Settings(
             workspace=tmp_path,
             api_base="https://api.example.com/v1",

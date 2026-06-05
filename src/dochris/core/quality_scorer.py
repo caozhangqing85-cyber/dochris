@@ -111,12 +111,12 @@ def _score_detail_length(ds: str) -> DimensionScore:
     ds_len = len(ds)
     tiers = [
         (1500, 25),
-        (1200, 22),
-        (1000, 19),
-        (800, 16),
-        (600, 12),
-        (400, 8),
-        (200, 4),
+        (1200, 23),
+        (1000, 21),
+        (800, 18),
+        (600, 14),
+        (400, 10),
+        (200, 5),
     ]
     points = _tiered_score(ds_len, tiers)
     return DimensionScore(

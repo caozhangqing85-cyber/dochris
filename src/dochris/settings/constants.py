@@ -12,7 +12,10 @@ from pathlib import Path
 # ============================================================
 
 DEFAULT_LLM_API_BASE = "https://open.bigmodel.cn/api/paas/v4"
-"""默认 LLM API Base URL"""
+"""默认 LLM API Base URL（智谱通用 API）"""
+
+CODING_LLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
+"""智谱 GLM Coding Plan 专属 API 端点"""
 
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 """OpenRouter 备用 API Base URL"""
@@ -230,5 +233,5 @@ EBOOK_EXTENSIONS: set[str] = {".epub", ".mobi", ".azw3", ".fb2"}
 
 # 旧代码中 OPENCLAW_CONFIG_PATH 的别名
 OPENCLAW_CONFIG_PATH: str = os.environ.get(
-    "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw/openclaw.json")
+    "OPENCLAW_CONFIG_PATH", str(Path.home() / ".dochris/config.json")
 )

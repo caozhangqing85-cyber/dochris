@@ -8,13 +8,14 @@
 """
 
 import logging
+import re
 from pathlib import Path
 from typing import Any, cast
 
 # 导入核心模块
 from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
-from dochris.core.quality_scorer import get_quality_threshold, score_summary_quality_v4
+from dochris.core.quality_scorer import score_summary_quality_v4
 from dochris.core.utils import sanitize_filename
 from dochris.exceptions import CompilationError
 from dochris.manifest import get_default_workspace, get_manifest, update_manifest_status
@@ -24,6 +25,10 @@ from dochris.parsers.code_parser import detect_code_file, extract_from_code
 from dochris.parsers.doc_parser import detect_document_file, parse_document
 from dochris.parsers.pdf_parser import parse_pdf
 from dochris.plugin import get_plugin_manager
+
+# Layer 0 + Layer 1 质量系统
+from dochris.quality.lint import lint_compile_result, lint_result_to_dict
+from dochris.quality.provenance import compute_provenance, provenance_to_dict
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -33,7 +38,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 
-from dochris.settings import DEFAULT_LLM_API_BASE as DEFAULT_LLM_BASE_URL
+from dochris.settings.constants import CODING_LLM_API_BASE, DEFAULT_LLM_API_BASE
 
 DEFAULT_LLM_MODEL = "glm-5.1"
 
@@ -44,7 +49,7 @@ class CompilerWorker:
     def __init__(
         self,
         api_key: str = "",
-        base_url: str = DEFAULT_LLM_BASE_URL,
+        base_url: str = "",
         model: str = DEFAULT_LLM_MODEL,
         # 本地兜底配置（从 settings 读取默认值）
         fallback_base_url: str = "",
@@ -70,15 +75,28 @@ class CompilerWorker:
         if not fallback_api_key:
             fallback_api_key = settings.local_llm_api_key
 
-        # 从环境变量补充 API key
+        # 从环境变量补充 API key（优先 Coding Plan 专用变量）
         import os
 
         if not api_key:
-            api_key = os.environ.get("OPENAI_API_KEY", "")
+            api_key = (
+                os.environ.get("BIGMODEL_API_KEY", "").strip()
+                or os.environ.get("OPENAI_API_KEY", "")
+                or os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
+            )
+
+        # 自动检测 base_url：优先 Coding Plan 端点
+        if not base_url:
+            bigmodel_key = os.environ.get("BIGMODEL_API_KEY", "").strip()
+            anthropic_key = os.environ.get("ANTHROPIC_AUTH_TOKEN", "").strip()
+            if bigmodel_key or anthropic_key:
+                base_url = CODING_LLM_API_BASE
+            else:
+                base_url = settings.api_base or DEFAULT_LLM_API_BASE
 
         # 主通道 LLM（智谱）
         if api_key and base_url:
-            self.llm = LLMClient(api_key, base_url, model)
+            self.llm = LLMClient(api_key, base_url, model, request_delay=10.0)
             logger.info(f"主通道: {model} @ {base_url}")
         else:
             self.llm = None
@@ -86,7 +104,9 @@ class CompilerWorker:
 
         # 兜底通道 LLM（本地 Ollama）
         if enable_fallback:
-            self.fallback_llm = LLMClient(fallback_api_key, fallback_base_url, fallback_model)
+            self.fallback_llm = LLMClient(
+                fallback_api_key, fallback_base_url, fallback_model, request_delay=5.0
+            )
             logger.info(f"兜底通道: {fallback_model} @ {fallback_base_url}")
         else:
             self.fallback_llm = None
@@ -204,7 +224,7 @@ class CompilerWorker:
                 await self._mark_failed(src_id, "LLM compilation failed")
                 return None
 
-            # 5. 质量评分（支持插件自定义）
+            # 5. 质量评分（支持插件自定义，Phase A 保留旧打分兜底）
             plugin_score = self.plugin_manager.call_hook_firstresult(
                 "quality_score",
                 compile_result.get("detailed_summary", ""),
@@ -216,6 +236,30 @@ class CompilerWorker:
             else:
                 quality_score = score_summary_quality_v4(compile_result)
             compile_result["quality_score"] = quality_score
+
+            # 5.5 Layer 0 溯源标签 + Layer 1 结构化 Lint（Phase A 新增）
+            try:
+                provenance_result = compute_provenance(compile_result, text)
+                compile_result["provenance"] = provenance_to_dict(provenance_result)
+                logger.debug(
+                    f"溯源标签: {provenance_result.overall_label} "
+                    f"(置信度={provenance_result.confidence:.1f})"
+                )
+            except Exception as e:
+                logger.warning(f"溯源分析异常（不影响编译）: {e}")
+                compile_result["provenance"] = None
+
+            try:
+                lint_result = lint_compile_result(compile_result, text)
+                compile_result["lint"] = lint_result_to_dict(lint_result)
+                if not lint_result.passed:
+                    logger.warning(
+                        f"Lint 未通过: {lint_result.error_count} errors, "
+                        f"{lint_result.warning_count} warnings"
+                    )
+            except Exception as e:
+                logger.warning(f"Lint 校验异常（不影响编译）: {e}")
+                compile_result["lint"] = None
 
             # 6. 保存到缓存
             if fh:
@@ -329,57 +373,76 @@ class CompilerWorker:
         self, src_id: str, result: dict[str, Any], quality_score: int = 0
     ) -> None:
         """保存编译结果"""
-        # 保存摘要 (保持现有格式)
+        # 标准化 concepts：将字符串格式转为 {name, explanation} 格式
+        raw_concepts = result.get("concepts", [])
+        normalized_concepts = self._normalize_concepts(raw_concepts, result)
+        result["concepts"] = normalized_concepts
+
+        # 保存摘要（只写一份，按 src_id 命名）
         summaries_path = self.workspace / "outputs/summaries"
         summaries_path.mkdir(parents=True, exist_ok=True)
 
-        summary_file = summaries_path / f"{src_id}.md"
-        summary_file.write_text(
+        # 构建 concepts 列表文本
+        concept_lines = []
+        for c in raw_concepts:
+            name = c.get("name", "") if isinstance(c, dict) else str(c) if c else ""
+            if name:
+                concept_lines.append(f"- [[{name}]]")
+
+        summary_content = (
             f"# {result.get('one_line', '')}\n\n"
             f"## Key Points\n\n"
             f"{chr(10).join(f'- {p}' for p in result.get('key_points', []))}\n\n"
             f"## Detailed Summary\n\n"
             f"{result.get('detailed_summary', '')}\n\n"
             f"## Concepts\n\n"
-            f"{chr(10).join(f'- {c}' for c in result.get('concepts', []))}\n",
-            encoding="utf-8",
+            f"{chr(10).join(concept_lines)}\n"
         )
 
+        summary_file = summaries_path / f"{src_id}.md"
+        summary_file.write_text(summary_content, encoding="utf-8")
+
+        # 按标题创建符号链接（避免重复文件）
         manifest = get_manifest(self.workspace, src_id) or {}
         title = str(manifest.get("title", "")).strip()
         if title:
-            title_file = summaries_path / f"{sanitize_filename(title, max_length=80)}.md"
-            if title_file != summary_file:
-                title_file.write_text(summary_file.read_text(encoding="utf-8"), encoding="utf-8")
+            safe_title = sanitize_filename(title, max_length=80)
+            # 去掉标题自带的 .md 后缀，避免 ".md.md" 双重扩展名
+            if safe_title.lower().endswith(".md"):
+                safe_title = safe_title[:-3]
+            title_file = summaries_path / f"{safe_title}.md"
+            if title_file != summary_file and not title_file.exists():
+                try:
+                    title_file.symlink_to(summary_file)
+                except OSError:
+                    pass
 
-        # 保存概念 (保持现有格式)
-        if quality_score >= get_quality_threshold():
-            concepts_path = self.workspace / "outputs/concepts" / src_id
-            concepts_path.mkdir(parents=True, exist_ok=True)
+        # 保存概念文件（始终写入，不受质量门槛限制）
+        concepts_dir = self.workspace / "outputs/concepts"
+        concepts_dir.mkdir(parents=True, exist_ok=True)
 
-            for idx, concept in enumerate(result.get("concepts", []), 1):
-                # 处理概念（支持字符串和字典格式）
-                if isinstance(concept, dict):
-                    concept_name = str(concept.get("name", ""))
-                    concept_desc = str(
-                        concept.get("description") or concept.get("explanation") or ""
-                    )
-                else:
-                    concept_name = str(concept) if concept else ""
-                    concept_desc = ""
+        for idx, concept in enumerate(normalized_concepts, 1):
+            concept_name = concept["name"]
+            concept_desc = concept.get("explanation", "")
 
-                # 过滤空概念
-                if not concept_name or not concept_name.strip():
-                    continue
+            # 清理概念名中的非法路径字符
+            safe_name = re.sub(r'[<>:"/\\|?*]', "", concept_name.strip()).replace(" ", "_")[:60]
+            if not safe_name:
+                safe_name = f"concept_{idx}"
+            concept_file = concepts_dir / f"{safe_name}.md"
+            # 避免同名覆盖：追加序号
+            if concept_file.exists():
+                concept_file = concepts_dir / f"{safe_name}_{src_id}.md"
+            concept_content = f"# {concept_name}\n\n{concept_desc}\n"
+            concept_file.write_text(concept_content, encoding="utf-8")
 
-                # 清理概念名中的路径分隔符，防止生成嵌套目录
-                safe_name = concept_name.strip().replace("/", "_").replace("\\", "_")
-                concept_file = concepts_path / f"{idx:02d}_{safe_name}.md"
-                concept_content = f"# {concept_name}\n\n{concept_desc}\n"
-                concept_file.parent.mkdir(parents=True, exist_ok=True)
-                concept_file.write_text(concept_content, encoding="utf-8")
+        # 向量嵌入：将摘要和概念嵌入到向量数据库
+        self._embed_to_vector_store(src_id, result, manifest)
 
-        # 更新 manifest
+        # 计算 trust_level（基于 provenance + lint 的真实质量信号）
+        trust_level = self._compute_trust_level(result)
+
+        # 更新 manifest（一次性写入，包含 provenance/lint 元数据）
         update_manifest_status(
             self.workspace,
             src_id,
@@ -388,7 +451,131 @@ class CompilerWorker:
             summary=result,
             compiled_summary=result,
             promoted_to=None,
+            trust_level=trust_level,
         )
+
+    @staticmethod
+    def _compute_trust_level(result: dict[str, Any]) -> str:
+        """基于 provenance + lint 计算信任等级
+
+        Returns:
+            "high"    — extracted/merged + lint passed
+            "medium"  — inferred 或 lint 有 warning
+            "low"     — ambiguous 或 lint 有 error
+        """
+        prov = result.get("provenance")
+        lint_data = result.get("lint")
+
+        prov_label = ""
+        if prov and isinstance(prov, dict):
+            prov_label = prov.get("overall_label", "")
+
+        lint_passed = True
+        has_errors = False
+        if lint_data and isinstance(lint_data, dict):
+            lint_passed = lint_data.get("passed", True)
+            has_errors = any(i.get("severity") == "error" for i in lint_data.get("issues", []))
+
+        if has_errors or prov_label == "ambiguous":
+            return "low"
+        if lint_passed and prov_label in ("extracted", "merged"):
+            return "high"
+        return "medium"
+
+    def _embed_to_vector_store(
+        self, src_id: str, result: dict[str, Any], manifest: dict[str, Any]
+    ) -> None:
+        """将编译结果嵌入向量数据库
+
+        将摘要和概念文本分别存入向量库的不同 collection，
+        支持后续的语义相似度检索。
+
+        Args:
+            src_id: manifest ID
+            result: 编译结果
+            manifest: manifest 数据
+        """
+        try:
+            settings = get_settings()
+            data_dir = self.workspace / "data"
+
+            from dochris.vector import get_store
+
+            store_cls = get_store(settings.vector_store)
+            store = store_cls(persist_directory=str(data_dir))
+
+            title = manifest.get("title", src_id)
+
+            # 1. 嵌入摘要
+            summary_parts: list[str] = []
+            if result.get("one_line"):
+                summary_parts.append(result["one_line"])
+            if result.get("key_points"):
+                summary_parts.extend(result["key_points"])
+            if result.get("detailed_summary"):
+                summary_parts.append(result["detailed_summary"][:2000])
+
+            if summary_parts:
+                summary_text = "\n".join(summary_parts)
+                store.add_documents(
+                    collection="summaries",
+                    documents=[summary_text],
+                    ids=[f"{src_id}_summary"],
+                    metadatas=[
+                        {
+                            "source": src_id,
+                            "title": title,
+                            "type": manifest.get("type", "unknown"),
+                            "file": f"outputs/summaries/{src_id}.md",
+                        }
+                    ],
+                )
+                logger.debug(f"向量嵌入摘要: {src_id}")
+
+            # 2. 嵌入概念
+            concepts = result.get("concepts", [])
+            if concepts:
+                concept_docs = []
+                concept_ids = []
+                concept_metas = []
+                for idx, concept in enumerate(concepts):
+                    if isinstance(concept, dict):
+                        name = concept.get("name", "")
+                        explanation = concept.get("explanation", "")
+                    elif isinstance(concept, str):
+                        name = concept
+                        explanation = ""
+                    else:
+                        continue
+
+                    if not name:
+                        continue
+
+                    doc_text = f"{name}: {explanation}" if explanation else name
+                    concept_docs.append(doc_text)
+                    concept_ids.append(f"{src_id}_concept_{idx}")
+                    concept_metas.append(
+                        {
+                            "source": src_id,
+                            "title": title,
+                            "concept_name": name,
+                            "type": "concept",
+                        }
+                    )
+
+                if concept_docs:
+                    store.add_documents(
+                        collection="concepts",
+                        documents=concept_docs,
+                        ids=concept_ids,
+                        metadatas=concept_metas,
+                    )
+                    logger.debug(f"向量嵌入 {len(concept_docs)} 个概念: {src_id}")
+
+        except ImportError:
+            logger.debug("向量存储依赖未安装，跳过向量嵌入")
+        except Exception as e:
+            logger.warning(f"向量嵌入失败（不影响编译结果）: {e}")
 
     async def _mark_failed(self, src_id: str, error_message: str) -> None:
         """标记编译失败"""
@@ -402,3 +589,98 @@ class CompilerWorker:
             )
             return
         update_manifest_status(self.workspace, src_id, "failed", error_message=error_message)
+
+    @staticmethod
+    def _normalize_concepts(
+        raw_concepts: list[Any], result: dict[str, Any]
+    ) -> list[dict[str, str]]:
+        """将 concepts 标准化为 {name, explanation} 格式
+
+        LLM 有时返回纯字符串列表而非对象列表，此方法将字符串格式
+        转为 {name, explanation} 格式，explanation 从详细摘要中提取。
+
+        Args:
+            raw_concepts: 原始概念列表（可能是字符串或字典）
+            result: 完整编译结果（用于提取 explanation）
+
+        Returns:
+            标准化的概念列表 [{"name": str, "explanation": str}]
+        """
+        detailed_summary = result.get("detailed_summary", "")
+        normalized: list[dict[str, str]] = []
+
+        for concept in raw_concepts:
+            if isinstance(concept, dict):
+                name = str(concept.get("name", "")).strip()
+                explanation = str(
+                    concept.get("explanation") or concept.get("description") or ""
+                ).strip()
+                if not name:
+                    continue
+                # 如果有 explanation，直接使用
+                if explanation:
+                    normalized.append({"name": name, "explanation": explanation})
+                else:
+                    # 从详细摘要中提取包含该概念名的句子
+                    explanation = _extract_concept_context(name, detailed_summary)
+                    normalized.append({"name": name, "explanation": explanation})
+            elif isinstance(concept, str) and concept.strip():
+                name = concept.strip()
+                explanation = _extract_concept_context(name, detailed_summary)
+                normalized.append({"name": name, "explanation": explanation})
+
+        return normalized
+
+
+def _extract_concept_context(concept_name: str, text: str, max_chars: int = 200) -> str:
+    """从文本中提取包含概念名的上下文句子
+
+    三级匹配策略：
+    1. 精确匹配完整概念名
+    2. 提取核心关键词（冒号/破折号前的部分）匹配
+    3. 关键词片段匹配
+
+    Args:
+        concept_name: 概念名称
+        text: 源文本（通常是详细摘要）
+        max_chars: 最大提取字符数
+
+    Returns:
+        提取的上下文文本
+    """
+    import re
+
+    sentences = re.split(r"[。！？\n]", text)
+
+    def _search(patterns: list[str]) -> list[str]:
+        hits = []
+        for sent in sentences:
+            sent = sent.strip()
+            if len(sent) <= 5:
+                continue
+            if any(p in sent for p in patterns):
+                hits.append(sent)
+                if len(hits) >= 2:
+                    break
+        return hits
+
+    # 1. 精确匹配完整概念名
+    relevant = _search([concept_name])
+    if relevant:
+        return "。".join(relevant)[:max_chars]
+
+    # 2. 提取核心关键词（冒号、破折号、括号前的部分）
+    core_name = re.split(r"[:：\-—–(（]", concept_name)[0].strip()
+    if core_name and len(core_name) >= 2 and core_name != concept_name:
+        relevant = _search([core_name])
+        if relevant:
+            return "。".join(relevant)[:max_chars]
+
+    # 3. 关键词片段匹配（去空格后）
+    keywords = concept_name.replace(" ", "")
+    relevant = _search([keywords])
+    if relevant:
+        return "。".join(relevant)[:max_chars]
+
+    # 全部失败 — 使用默认模板
+    return f"{concept_name}（详细解释请参阅原文）"

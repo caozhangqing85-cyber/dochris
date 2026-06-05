@@ -221,12 +221,18 @@ class TestWorkersMain:
         """Verify workers __main__ imports compiler_worker and monitor_worker"""
         import subprocess
         import sys
+        from pathlib import Path
+
+        src_dir = str(Path(__file__).parent.parent / "src")
+        env = __import__("os").environ.copy()
+        env["PYTHONPATH"] = src_dir
 
         result = subprocess.run(
             [sys.executable, "-c", "from dochris.workers import __main__"],
             capture_output=True,
             text=True,
             timeout=10,
+            env=env,
         )
         # The module runs print statements at import time
         assert "Workers import test completed" in result.stdout or result.returncode == 0

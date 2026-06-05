@@ -24,10 +24,13 @@ class TestStatusEndpoint:
             {
                 "workspace": tmp_workspace,
                 "model": "test-model",
+                "query_model": "test-query-model",
                 "api_base": "https://test.api",
                 "max_concurrency": 3,
                 "min_quality_score": 85,
                 "api_key": "test-key",
+                "llm_provider": "openai",
+                "llm_temperature": 0.3,
             },
         )()
 
@@ -59,10 +62,13 @@ class TestStatusEndpoint:
             {
                 "workspace": tmp_workspace,
                 "model": "test",
+                "query_model": "test",
                 "api_base": "https://test",
                 "max_concurrency": 1,
                 "min_quality_score": 85,
                 "api_key": None,
+                "llm_provider": "openai",
+                "llm_temperature": 0.3,
             },
         )()
 
