@@ -231,12 +231,6 @@ cat ~/test-kb/outputs/summaries/SRC-0001.md
 | 电子书知识提取 | EPUB/MOBI → 概念 + 摘要 |
 | 团队知识共享 | API 服务 + Web UI + Docker 部署 |
 
-## 常见问题
-
-📖 **遇到问题？** 查看 [快速上手指南的常见问题部分](docs/QUICKSTART.md#常见问题) 和下方的常见问题。
-
-### Q: 编译时出现 API 内容过滤错误（400, error 1301）
-
 ## 目录结构
 
 ```

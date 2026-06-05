@@ -36,7 +36,6 @@ __all__ = [
     "get_settings",
     "Settings",
     "LLMClient",
-    # 类型定义
     "FileStatus",
     "FileType",
     "ManifestEntry",

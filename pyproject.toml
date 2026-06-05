@@ -45,6 +45,9 @@ api = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
 ]
+leann = [
+    "leann-vector>=0.1.0",
+]
 audio = ["faster-whisper>=0.10.0"]
 pdf = [
     "PyPDF2>=3.0.0",
@@ -54,10 +57,6 @@ pdf = [
 ocr = [
     "pytesseract>=0.3.10",
     "Pillow>=10.0.0",
-]
-web = [
-    "gradio>=5.7.1,<6",
-    "huggingface-hub>=1.5.0,<2",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -71,7 +70,7 @@ dev = [
     "httpx>=0.24.0",
 ]
 all = [
-    "dochris[audio,pdf,ocr,dev,api,web]",
+    "dochris[audio,pdf,ocr,dev,api,leann]",
 ]
 
 [project.scripts]
@@ -86,6 +85,9 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.setuptools.package-data]
+dochris = []
 
 [project.urls]
 Homepage = "https://github.com/caozhangqing85-cyber/dochris"
