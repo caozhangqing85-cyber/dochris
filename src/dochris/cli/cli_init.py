@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from dochris.exceptions import ConfigurationError
+from dochris.settings.constants import CODING_LLM_API_BASE, DEFAULT_LLM_API_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +225,7 @@ def _prompt_api_key() -> str | None:
 def _prompt_api_plan() -> str:
     """询问 API 套餐类型，返回对应的 base_url"""
     if not sys.stdin.isatty() and not os.environ.get("DOCHRIS_ALLOW_PROMPT"):
-        return "https://open.bigmodel.cn/api/paas/v4"
+        return DEFAULT_LLM_API_BASE
 
     print("\n请选择 API 套餐类型:")
     print("  1. 通用 API（默认）")
@@ -232,12 +233,12 @@ def _prompt_api_plan() -> str:
     try:
         choice = input("选择 [1]: ").strip()
     except EOFError:
-        return "https://open.bigmodel.cn/api/paas/v4"
+        return DEFAULT_LLM_API_BASE
 
     if choice == "2":
         print("   ✓ 已选择 Coding Plan 端点")
-        return "https://open.bigmodel.cn/api/coding/paas/v4"
-    return "https://open.bigmodel.cn/api/paas/v4"
+        return CODING_LLM_API_BASE
+    return DEFAULT_LLM_API_BASE
 
 
 def _create_env_file(env_file: Path, api_key: str, base_url: str | None = None) -> None:
@@ -251,7 +252,7 @@ def _create_env_file(env_file: Path, api_key: str, base_url: str | None = None) 
     elif base_url:
         model = "glm-5.1"
     else:
-        base_url = "https://open.bigmodel.cn/api/paas/v4"
+        base_url = DEFAULT_LLM_API_BASE
         model = "glm-5.1"
 
     content = f"""# ============================================================

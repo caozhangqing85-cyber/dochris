@@ -33,14 +33,13 @@ async def verify_api_key(request: Request) -> None:
         # 未配置 API Key 时，仅允许本地访问和测试客户端
         client_info = getattr(request, "client", None)
         client_host = client_info.host if client_info else ""
-        allowed_hosts = {"127.0.0.1", "::1", "localhost", "testclient", ""}
+        allowed_hosts = {"127.0.0.1", "::1", "localhost", "testclient"}
         if client_host not in allowed_hosts:
             raise HTTPException(
                 status_code=403,
                 detail="API key not configured. Set DOCHRIS_API_KEY environment variable.",
             )
-        if not client_host:
-            logger.warning("API 运行在无认证模式（无客户端地址）。建议设置 DOCHRIS_API_KEY。")
+        logger.debug(f"无认证模式访问: {path} from {client_host}")
         return
 
     client_key = request.headers.get("X-API-Key") or request.query_params.get("api_key", "")

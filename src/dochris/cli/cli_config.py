@@ -11,8 +11,7 @@ def _find_env_file() -> Path | None:
     """查找 .env 文件路径"""
     env_paths = [
         Path.cwd() / ".env",
-        Path.home() / ".knowledge-base" / ".env",
-        Path.home() / ".openclaw" / "knowledge-base" / ".env",
+        Path.home() / ".dochris" / "knowledge-base" / ".env",
     ]
     # 也检查 WORKSPACE 环境变量
     import os
@@ -128,18 +127,29 @@ def _cmd_config_set(args: argparse.Namespace) -> int:
         return 1
 
     # 验证配置键是否为已知的配置项
-    _VALID_KEYS: frozenset[str] = frozenset({
-        "OPENAI_API_KEY", "OPENAI_API_BASE", "MODEL", "WORKSPACE",
-        "SOURCE_PATH", "MAX_CONCURRENCY", "MIN_QUALITY_SCORE",
-        "MAX_CONTENT_CHARS", "QUERY_MODEL", "EMBEDDING_MODEL",
-        "LOG_LEVEL", "LLM_PROVIDER", "VECTOR_STORE",
-    })
+    _VALID_KEYS: frozenset[str] = frozenset(
+        {
+            "OPENAI_API_KEY",
+            "OPENAI_API_BASE",
+            "MODEL",
+            "WORKSPACE",
+            "SOURCE_PATH",
+            "MAX_CONCURRENCY",
+            "MIN_QUALITY_SCORE",
+            "MAX_CONTENT_CHARS",
+            "QUERY_MODEL",
+            "EMBEDDING_MODEL",
+            "LOG_LEVEL",
+            "LLM_PROVIDER",
+            "VECTOR_STORE",
+        }
+    )
     if key not in _VALID_KEYS:
         from dochris.cli.cli_utils import warning
 
         print(f"\n{warning(f'⚠ 未知配置键: {key}')}")
         print(f"  已知配置键: {', '.join(sorted(_VALID_KEYS))}")
-        print(f"  如果确认要设置，请手动编辑 .env 文件")
+        print("  如果确认要设置，请手动编辑 .env 文件")
         return 1
 
     env_path = _find_env_file()

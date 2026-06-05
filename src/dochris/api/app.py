@@ -25,8 +25,10 @@ def _get_cors_origins() -> list[str]:
     return [
         "http://localhost:8000",
         "http://localhost:7860",
+        "http://localhost:3000",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:7860",
+        "http://127.0.0.1:3000",
     ]
 
 
@@ -51,9 +53,16 @@ def create_app() -> FastAPI:
     )
 
     from dochris.api.routes.compile import router as compile_router
+    from dochris.api.routes.config import router as config_router
+    from dochris.api.routes.contribution import router as contribution_router
+    from dochris.api.routes.files import router as files_router
     from dochris.api.routes.graph import router as graph_router
+    from dochris.api.routes.manifests import router as manifests_router
     from dochris.api.routes.promote import router as promote_router
+    from dochris.api.routes.quality import router as quality_router
     from dochris.api.routes.query import router as query_router
+    from dochris.api.routes.recompile import router as recompile_router
+    from dochris.api.routes.schema import router as schema_router
     from dochris.api.routes.status import router as status_router
 
     # API 路由需要认证（开发模式下 DOCHRIS_API_KEY 为空则跳过）
@@ -72,6 +81,27 @@ def create_app() -> FastAPI:
     application.include_router(
         graph_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
     )
+    application.include_router(
+        manifests_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        config_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        files_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        quality_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        contribution_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        schema_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
+    application.include_router(
+        recompile_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
+    )
 
     @application.get("/", tags=["root"])
     async def root() -> dict[str, object]:
@@ -87,6 +117,12 @@ def create_app() -> FastAPI:
                 "compile": "/api/v1/compile",
                 "promote": "/api/v1/promote/{src_id}",
                 "graph": "/api/v1/graph",
+                "candidates": "/api/v1/candidates",
+                "schema_enrich": "/api/v1/schema/enrich",
+                "schema_auto_tag": "/api/v1/schema/auto-tag",
+                "schema_stale": "/api/v1/schema/stale",
+                "recompile_status": "/api/v1/recompile/status",
+                "recompile_stale": "/api/v1/recompile/stale",
             },
         }
 
@@ -98,3 +134,21 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+@app.on_event("startup")
+async def _preload_embedding_model() -> None:
+    """应用启动时预加载嵌入模型，避免首次查询时冷启动延迟"""
+    import threading
+
+    def _load() -> None:
+        try:
+            from dochris.vector.chromadb_store import _build_embedding_function
+
+            _build_embedding_function("BAAI/bge-small-zh-v1.5")
+            logger.info("Embedding model preloaded successfully")
+        except Exception as exc:
+            logger.warning(f"Embedding model preload skipped: {exc}")
+
+    thread = threading.Thread(target=_load, daemon=True)
+    thread.start()

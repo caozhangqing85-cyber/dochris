@@ -64,7 +64,9 @@ def cmd_compile(args: argparse.Namespace) -> int:
         # 本次编译统计：比较编译前后的 manifest 数量差异
         total_compiled = len(compiled)
         total_failed = len(failed)
-        this_compiled = max(0, total_compiled - len([m for m in compiled if _was_before(m, start_time)]))
+        this_compiled = max(
+            0, total_compiled - len([m for m in compiled if _was_before(m, start_time)])
+        )
         this_failed = max(0, total_failed - len([m for m in failed if _was_before(m, start_time)]))
 
         # 计算平均质量分
@@ -109,7 +111,7 @@ def _format_duration(seconds: float) -> str:
 
 def _was_before(manifest: dict, timestamp: float) -> bool:
     """检查 manifest 的编译时间是否早于给定时间戳"""
-    ts = manifest.get("compiled_at") or manifest.get("updated_at") or ""
+    ts = manifest.get("date_compiled") or manifest.get("date_failed") or ""
     if not ts:
         return True  # 无时间信息的视为编译前已有
     try:

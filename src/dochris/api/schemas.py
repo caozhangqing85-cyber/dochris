@@ -65,6 +65,15 @@ class CompileResponse(BaseModel):
 # ── 状态 ─────────────────────────────────────────────────────
 
 
+class SystemInfo(BaseModel):
+    """系统运行环境信息"""
+
+    python_version: str = ""
+    platform: str = ""
+    disk_usage_bytes: int = 0
+    disk_total_bytes: int = 0
+
+
 class StatusResponse(BaseModel):
     """系统状态响应"""
 
@@ -72,6 +81,7 @@ class StatusResponse(BaseModel):
     version: str
     manifests: ManifestStats
     config: ConfigInfo
+    system: SystemInfo = SystemInfo()
 
 
 class ManifestStats(BaseModel):
@@ -84,6 +94,9 @@ class ManifestStats(BaseModel):
     promoted_to_wiki: int = 0
     promoted: int = 0
     by_type: dict[str, int] = Field(default_factory=dict)
+    trust_levels: dict[str, int] = Field(default_factory=dict)
+    concepts_count: int = 0
+    summaries_count: int = 0
 
 
 class ConfigInfo(BaseModel):
@@ -94,6 +107,10 @@ class ConfigInfo(BaseModel):
     max_concurrency: int = 1
     min_quality_score: int = 85
     has_api_key: bool = False
+    query_model: str = ""
+    llm_provider: str = "openai_compat"
+    workspace: str = ""
+    temperature: float = 0.1
 
 
 # ── 晋升 ─────────────────────────────────────────────────────
