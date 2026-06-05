@@ -98,6 +98,72 @@ def save_cached(cache_dir: Path, file_hash: str, result: dict[str, Any]) -> bool
         return False
 
 
+def query_cache_key(query: str, context: str) -> str:
+    """生成查询缓存的键（基于查询文本 + 上下文指纹）
+
+    Args:
+        query: 用户查询文本
+        context: 拼接后的上下文（concepts + summaries + vector results）
+
+    Returns:
+        SHA256 十六进制哈希字符串
+    """
+    combined = f"{query}\n---\n{context}"
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()
+
+
+def load_query_cache(workspace_cache_dir: Path, key: str) -> str | None:
+    """从缓存中加载查询回答
+
+    Args:
+        workspace_cache_dir: 工作区缓存目录 (workspace/cache/)
+        key: query_cache_key() 生成的哈希
+
+    Returns:
+        缓存的回答文本，未命中返回 None
+    """
+    query_cache = workspace_cache_dir / "query_answers"
+    entry = query_cache / f"{key}.json"
+    if not entry.exists():
+        return None
+    try:
+        with open(entry, encoding="utf-8") as f:
+            data = json.load(f)
+        return cast(str | None, data.get("answer"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def save_query_cache(workspace_cache_dir: Path, key: str, answer: str) -> bool | None:
+    """保存查询回答到缓存
+
+    Args:
+        workspace_cache_dir: 工作区缓存目录
+        key: query_cache_key() 生成的哈希
+        answer: LLM 生成的回答
+
+    Returns:
+        成功返回 True
+    """
+    query_cache = workspace_cache_dir / "query_answers"
+    query_cache.mkdir(parents=True, exist_ok=True)
+    entry = query_cache / f"{key}.json"
+    tmp = entry.with_suffix(".tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(
+                {"key": key, "answer": answer, "timestamp": str(datetime.now())},
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+        tmp.rename(entry)
+        return True
+    except (OSError, TypeError) as e:
+        logger.warning(f"Failed to save query cache: {e}")
+        return False
+
+
 def clear_cache(cache_dir: Path, older_than_days: int = 30) -> int:
     """
     清理旧缓存文件
