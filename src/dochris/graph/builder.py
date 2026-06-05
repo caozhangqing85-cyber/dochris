@@ -28,8 +28,12 @@ def build_graph(workspace_path: Path | str) -> KnowledgeGraph:
     graph = KnowledgeGraph()
 
     manifests_dir = workspace_path / "manifests" / "sources"
-    concepts_dir = workspace_path / "wiki" / "concepts"
-    summaries_dir = workspace_path / "wiki" / "summaries"
+    # 扫描 outputs/concepts（编译产物）和 wiki/concepts（已晋升），去重
+    concepts_dirs = [
+        workspace_path / "outputs" / "concepts",
+        workspace_path / "wiki" / "concepts",
+    ]
+    summaries_dir = workspace_path / "outputs" / "summaries"
 
     # 1. 从 manifest 创建 source 节点
     manifests_data: dict[str, dict] = {}
@@ -51,16 +55,25 @@ def build_graph(workspace_path: Path | str) -> KnowledgeGraph:
                     "type": data.get("type", "unknown"),
                     "status": data.get("status", "unknown"),
                     "quality_score": data.get("quality_score"),
+                    "trust_level": data.get("trust_level"),
                     "tags": data.get("tags", []),
                 },
             )
             graph.add_node(node)
             manifests_data[mid] = data
 
-    # 2. 从 wiki/concepts/ 创建 concept 节点
+    # 2. 从 concepts 目录创建 concept 节点（outputs + wiki，去重）
     concept_file_map: dict[str, str] = {}  # concept_name -> concept_id
-    if concepts_dir.exists():
+    seen_concept_files: set[str] = set()
+    for concepts_dir in concepts_dirs:
+        if not concepts_dir.exists():
+            continue
         for cf in sorted(concepts_dir.glob("*.md")):
+            # 去重：同名文件（含 _SRC-NNNN 后缀）只取第一个
+            base_stem = re.sub(r"_SRC-\d+$", "", cf.stem)
+            if base_stem in seen_concept_files:
+                continue
+            seen_concept_files.add(base_stem)
             name = cf.stem
             content = cf.read_text(encoding="utf-8", errors="ignore")
             concept_id = f"concept:{name}"
@@ -138,7 +151,14 @@ def build_graph(workspace_path: Path | str) -> KnowledgeGraph:
             # 从 manifest 的 compiled_summary.concepts 创建边
             compiled = data.get("compiled_summary") or {}
             concepts_list = compiled.get("concepts", [])
-            for concept_name in concepts_list:
+            for concept_entry in concepts_list:
+                # 概念可能是 dict 或 string
+                if isinstance(concept_entry, dict):
+                    concept_name = str(concept_entry.get("name", ""))
+                else:
+                    concept_name = str(concept_entry) if concept_entry else ""
+                if not concept_name:
+                    continue
                 concept_id = f"concept:{concept_name}"
                 if concept_id in graph.nodes:
                     edge = GraphEdge(

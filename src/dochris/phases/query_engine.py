@@ -11,6 +11,7 @@ import openai
 
 from dochris.phases.query_utils import (
     DATA_PATH,
+    MANIFESTS_PATH,
     OUTPUTS_CONCEPTS_PATH,
     OUTPUTS_SUMMARIES_PATH,
     WIKI_CONCEPTS_PATH,
@@ -22,9 +23,10 @@ from dochris.phases.query_utils import (
 from dochris.plugin import get_plugin_manager
 from dochris.settings import OPENCLAW_CONFIG_PATH, get_settings
 
-# 从 settings 获取默认模型
-_settings = get_settings()
-MODEL = _settings.query_model
+
+def _get_query_model() -> str:
+    """动态获取查询模型名称（每次调用读取最新 settings）"""
+    return get_settings().query_model
 
 # 全局缓存
 _llm_client_cache: openai.OpenAI | None = None
@@ -73,6 +75,9 @@ def get_vector_store() -> object:
     if settings.vector_store == "chromadb":
         # ChromaDB 使用 data_dir 作为持久化目录
         _vector_store_cache = store_cls(persist_directory=str(DATA_PATH))  # type: ignore[call-arg]
+    elif settings.vector_store == "leann":
+        # LEANN 使用 data_dir 下的子目录
+        _vector_store_cache = store_cls(index_dir=str(DATA_PATH / "leann_indexes"))  # type: ignore[call-arg]
     else:
         # 其他存储使用默认配置
         _vector_store_cache = store_cls()
@@ -86,7 +91,13 @@ def get_vector_store() -> object:
 
 
 def search_concepts(query: str, top_k: int = 5) -> list[dict]:
-    """搜索概念 — wiki 优先，outputs fallback"""
+    """搜索概念 — wiki 优先，outputs fallback，manifest 兜底
+
+    三级 fallback 策略:
+    1. wiki/concepts/ 关键词搜索（已晋升，高信任）
+    2. outputs/concepts/ 关键词搜索（编译产物）
+    3. manifest compiled_summary.concepts 遍历（兜底，覆盖宽泛查询）
+    """
     # 查询前处理
     plugin_manager = get_plugin_manager()
     processed_query = plugin_manager.call_hook_firstresult("pre_query", query) or query
@@ -101,13 +112,104 @@ def search_concepts(query: str, top_k: int = 5) -> list[dict]:
     if wiki_results:
         return wiki_results
 
-    return _keyword_search(
+    outputs_results = _keyword_search(
         processed_query,
         OUTPUTS_CONCEPTS_PATH,
         top_k,
         _extract_concept,
         "outputs",
     )
+    if outputs_results:
+        return outputs_results
+
+    # Fallback: 从 manifest 的 compiled_summary.concepts 中搜索
+    return _search_manifest_concepts(processed_query, top_k)
+
+
+def _search_manifest_concepts(query: str, top_k: int = 5) -> list[dict]:
+    """从 manifest 的 compiled_summary.concepts 中搜索概念
+
+    当文件名关键词匹配失败时，遍历所有已编译 manifest 的概念列表，
+    对概念名和解释做子串匹配。
+
+    Args:
+        query: 查询字符串
+        top_k: 最大返回数
+
+    Returns:
+        匹配的概念列表
+    """
+    if not MANIFESTS_PATH.exists():
+        return []
+
+    import json
+    import re
+
+    results: list[dict] = []
+    query_lower = query.lower()
+    # 提取查询中的关键词（中文按 2-3 字切分，英文按空格分词）
+    query_terms = set()
+    for token in re.findall(r"[a-z0-9_]+|[一-鿿]+", query_lower):
+        query_terms.add(token)
+        if re.fullmatch(r"[一-鿿]+", token):
+            query_terms.update(token[i : i + 2] for i in range(len(token) - 1))
+
+    if not query_terms:
+        return []
+
+    for manifest_file in MANIFESTS_PATH.glob("SRC-*.json"):
+        try:
+            with open(manifest_file, encoding="utf-8") as f:
+                m = json.load(f)
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            continue
+
+        compiled = m.get("compiled_summary")
+        if not compiled or not isinstance(compiled, dict):
+            continue
+
+        raw_concepts = compiled.get("concepts", [])
+        if not isinstance(raw_concepts, list):
+            continue
+
+        for concept in raw_concepts:
+            if isinstance(concept, dict):
+                name = str(concept.get("name", "") or "").strip()
+                explanation = str(concept.get("explanation", "") or "").strip()
+            elif isinstance(concept, str) and concept.strip():
+                name = concept.strip()
+                explanation = ""
+            else:
+                continue
+
+            if not name:
+                continue
+
+            name_lower = name.lower()
+            expl_lower = explanation.lower()
+
+            score = 0
+            for term in query_terms:
+                if term in name_lower:
+                    score += 5
+                if term in expl_lower:
+                    score += 2
+
+            if score > 0:
+                results.append(
+                    {
+                        "name": name,
+                        "definition": explanation,
+                        "title": name,
+                        "content": explanation,
+                        "score": score,
+                        "source": "outputs",
+                        "manifest_id": m.get("id"),
+                    }
+                )
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:top_k]
 
 
 def search_summaries(query: str, top_k: int = 5) -> list[dict]:
@@ -211,6 +313,11 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
     # chromadb 使用原有逻辑（保持向后兼容）
     global _chromadb_client_cache
     try:
+        import os
+
+        # 阻止 ChromaDB 默认 embedding function 尝试连接 HuggingFace Hub
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
         import chromadb
 
         if _chromadb_client_cache is None:
@@ -242,7 +349,7 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
                                 "manifest_id": None,
                             }
                         )
-            except (AttributeError, KeyError, ValueError) as e:
+            except Exception as e:
                 if logger:
                     logger.warning(f"ChromaDB query error: {e}")
 
@@ -324,6 +431,29 @@ def _vector_search_with_store(
 # ============================================================
 
 
+def _get_all_concept_names() -> list[str]:
+    """获取知识库中所有已知概念名（用于 wiki-link 白名单）"""
+    names: list[str] = []
+    for concepts_dir in [OUTPUTS_CONCEPTS_PATH, WIKI_CONCEPTS_PATH]:
+        if concepts_dir.exists():
+            for md_file in concepts_dir.glob("*.md"):
+                names.append(md_file.stem)
+    return list(dict.fromkeys(names))  # 去重保序
+
+
+def _sanitize_wiki_links(answer: str, valid_concepts: set[str]) -> str:
+    """后处理：验证 [[概念名]] 链接，移除指向不存在概念的双方括号"""
+    import re as _re
+
+    def _replace(match: _re.Match[str]) -> str:
+        name = match.group(1)
+        if name in valid_concepts:
+            return f"[[{name}]]"
+        return name
+
+    return _re.sub(r"\[\[([^\]]+)\]\]", _replace, answer)
+
+
 def generate_answer(
     query: str,
     concepts: list[dict],
@@ -331,8 +461,11 @@ def generate_answer(
     vector_results: list[dict],
     client: openai.OpenAI,
     logger: logging.Logger,
+    stream: bool = False,
 ) -> str | None:
-    """使用 LLM 综合生成回答
+    """使用 LLM 综合生成回答（三层幻觉防护：Prompt 锚定 + 概念白名单 + 后处理验证）
+
+    支持查询缓存：相同查询 + 相同上下文直接返回缓存结果。
 
     Args:
         query: 用户问题
@@ -341,63 +474,233 @@ def generate_answer(
         vector_results: 向量检索结果
         client: OpenAI 客户端
         logger: 日志记录器
+        stream: 是否使用流式输出（由 generate_answer_stream 使用）
 
     Returns:
         生成的回答文本，失败时返回 None
     """
     context_parts: list[str] = []
+    source_idx = 0
 
     if concepts:
         context_parts.append("### 相关概念\n")
         for c in concepts:
-            context_parts.append(f"**{c['name']}**: {c['definition']}")
+            source_idx += 1
+            name = c.get("name", "")
+            definition = c.get("definition", c.get("explanation", ""))
+            context_parts.append(f"[S{source_idx}] **{name}**: {definition}")
 
     if summaries:
         context_parts.append("\n### 相关资料\n")
         for s in summaries:
-            context_parts.append(f"**{s['title']}**: {s['one_line']}")
-            for kp in s["key_points"]:
+            source_idx += 1
+            title = s.get("title", "")
+            one_line = s.get("one_line", "")
+            context_parts.append(f"[S{source_idx}] **{title}**: {one_line}")
+            for kp in s.get("key_points", []):
                 context_parts.append(f"  - {kp}")
 
     if vector_results:
         context_parts.append("\n### 向量检索结果\n")
         for v in vector_results:
-            context_parts.append(f"[来源: {v['source']}]\n{v['text'][:300]}")
+            source_idx += 1
+            text = v.get("text", v.get("definition", v.get("content", "")))[:300]
+            context_parts.append(f"[S{source_idx}] [来源: {v.get('source', '')}] {text}")
 
     if not context_parts:
         return "未找到相关内容。请尝试其他关键词。"
 
     context = "\n".join(context_parts)
 
-    system = """你是一个知识库助手。根据提供的上下文信息回答用户的问题。
-要求：
-1. 只基于提供的上下文回答，不要编造信息
-2. 引用相关概念时使用 [[概念名]] 格式
-3. 回答要简洁、有条理
-4. 如果上下文中没有足够信息，明确说明"""
+    # 查询缓存检查
+    from dochris.core.cache import load_query_cache, query_cache_key, save_query_cache
 
-    prompt = f"""上下文信息：
+    settings = get_settings()
+    cache_key = query_cache_key(query, context)
+    cached = load_query_cache(settings.cache_dir, cache_key)
+    if cached is not None:
+        logger.info(f"Query cache hit for: {query[:50]}...")
+        return cached
+
+    # 构建 wiki-link 白名单：检索到的概念名 + 知识库全部概念名
+    retrieved_names = {c.get("name", "") for c in concepts if c.get("name")}
+    all_known = set(_get_all_concept_names()) | retrieved_names
+    concept_allowlist_str = "、".join(sorted(all_known)) if all_known else "（无）"
+
+    system = (
+        "你是一个严格基于源文档的知识库助手。\n\n"
+        "## 严格规则\n\n"
+        "1. **只使用上下文中的信息**：你的回答必须完全基于下方 CONTEXT 中提供的检索结果。"
+        "不得使用任何外部知识、推断或假设。\n"
+        "2. **强制引用**：每个事实性陈述必须标注来源编号 [S1], [S2] 等。"
+        "示例：「根据资料，软着陆是指房价通过长时间的价值回归实现下跌 [S1]。」\n"
+        f"3. **Wiki-link 规则**：使用 [[概念名]] 格式引用概念时，"
+        f"只能使用以下已知概念：{concept_allowlist_str}。不得为不存在的概念创建链接。\n"
+        "4. **信息不足时拒绝回答**：如果上下文中没有足够信息回答问题，"
+        "回复「根据当前知识库中的资料，无法完整回答这个问题。」并说明缺少哪些信息。\n"
+        "5. **不要添加无关内容**：不要扩展、不要解释上下文中未提到的内容。\n\n"
+        "## 输出格式\n\n"
+        "- 使用清晰的段落结构\n"
+        "- 每个事实后标注 [Sn] 引用\n"
+        "- 相关概念使用 [[概念名]] 链接（仅限上面列出的已知概念）"
+    )
+
+    prompt = f"""CONTEXT:
 {context}
 
 用户问题：{query}
 
-请根据上下文回答："""
+请严格基于 CONTEXT 回答，每个事实标注 [Sn] 引用，概念链接仅使用已知概念列表中的名称。"""
 
     try:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]  # type: ignore[list-item]
         response = client.chat.completions.create(
-            model=MODEL,
+            model=_get_query_model(),
             max_tokens=2048,
+            temperature=0.1,
             messages=messages,  # type: ignore[arg-type]
+            stream=stream,
         )
+
+        if stream:
+            return response  # type: ignore[return-value]
+
         content = response.choices[0].message.content
-        return content.strip() if content else None
+        if not content:
+            return None
+        answer = content.strip()
+
+        # Layer 3: 后处理验证，清除虚假 wiki-link
+        answer = _sanitize_wiki_links(answer, all_known)
+
+        # 保存到缓存
+        save_query_cache(settings.cache_dir, cache_key, answer)
+        return answer
     except (openai.APIError, openai.APITimeoutError, openai.RateLimitError) as e:
         logger.error(f"LLM API error: {e}")
         return None
     except (AttributeError, KeyError, IndexError) as e:
         logger.error(f"LLM response parsing error: {e}")
         return None
+
+
+def generate_answer_stream(
+    query: str,
+    concepts: list[dict],
+    summaries: list[dict],
+    vector_results: list[dict],
+    client: openai.OpenAI,
+    logger: logging.Logger,
+):
+    """流式生成回答，逐 chunk 返回
+
+    Yields:
+        str: 每个 chunk 的文本内容
+    """
+    # 构建上下文和 prompt（与 generate_answer 相同的逻辑）
+    context_parts: list[str] = []
+    source_idx = 0
+
+    if concepts:
+        context_parts.append("### 相关概念\n")
+        for c in concepts:
+            source_idx += 1
+            name = c.get("name", "")
+            definition = c.get("definition", c.get("explanation", ""))
+            context_parts.append(f"[S{source_idx}] **{name}**: {definition}")
+
+    if summaries:
+        context_parts.append("\n### 相关资料\n")
+        for s in summaries:
+            source_idx += 1
+            title = s.get("title", "")
+            one_line = s.get("one_line", "")
+            context_parts.append(f"[S{source_idx}] **{title}**: {one_line}")
+            for kp in s.get("key_points", []):
+                context_parts.append(f"  - {kp}")
+
+    if vector_results:
+        context_parts.append("\n### 向量检索结果\n")
+        for v in vector_results:
+            source_idx += 1
+            text = v.get("text", v.get("definition", v.get("content", "")))[:300]
+            context_parts.append(f"[S{source_idx}] [来源: {v.get('source', '')}] {text}")
+
+    if not context_parts:
+        yield "未找到相关内容。请尝试其他关键词。"
+        return
+
+    context = "\n".join(context_parts)
+
+    # 查询缓存检查
+    from dochris.core.cache import load_query_cache, query_cache_key, save_query_cache
+
+    settings = get_settings()
+    cache_key = query_cache_key(query, context)
+    cached = load_query_cache(settings.cache_dir, cache_key)
+    if cached is not None:
+        logger.info(f"Query cache hit (stream) for: {query[:50]}...")
+        yield cached
+        return
+
+    # 构建 prompt
+    retrieved_names = {c.get("name", "") for c in concepts if c.get("name")}
+    all_known = set(_get_all_concept_names()) | retrieved_names
+    concept_allowlist_str = "、".join(sorted(all_known)) if all_known else "（无）"
+
+    system = (
+        "你是一个严格基于源文档的知识库助手。\n\n"
+        "## 严格规则\n\n"
+        "1. **只使用上下文中的信息**：你的回答必须完全基于下方 CONTEXT 中提供的检索结果。"
+        "不得使用任何外部知识、推断或假设。\n"
+        "2. **强制引用**：每个事实性陈述必须标注来源编号 [S1], [S2] 等。"
+        "示例：「根据资料，软着陆是指房价通过长时间的价值回归实现下跌 [S1]。」\n"
+        f"3. **Wiki-link 规则**：使用 [[概念名]] 格式引用概念时，"
+        f"只能使用以下已知概念：{concept_allowlist_str}。不得为不存在的概念创建链接。\n"
+        "4. **信息不足时拒绝回答**：如果上下文中没有足够信息回答问题，"
+        "回复「根据当前知识库中的资料，无法完整回答这个问题。」并说明缺少哪些信息。\n"
+        "5. **不要添加无关内容**：不要扩展、不要解释上下文中未提到的内容。\n\n"
+        "## 输出格式\n\n"
+        "- 使用清晰的段落结构\n"
+        "- 每个事实后标注 [Sn] 引用\n"
+        "- 相关概念使用 [[概念名]] 链接（仅限上面列出的已知概念）"
+    )
+
+    prompt = f"""CONTEXT:
+{context}
+
+用户问题：{query}
+
+请严格基于 CONTEXT 回答，每个事实标注 [Sn] 引用，概念链接仅使用已知概念列表中的名称。"""
+
+    try:
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]  # type: ignore[list-item]
+        stream_resp = client.chat.completions.create(
+            model=_get_query_model(),
+            max_tokens=2048,
+            temperature=0.1,
+            messages=messages,  # type: ignore[arg-type]
+            stream=True,
+        )
+
+        full_answer = []
+        for chunk in stream_resp:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                full_answer.append(delta.content)
+                yield delta.content
+
+        # 后处理并缓存完整回答
+        answer = "".join(full_answer).strip()
+        answer = _sanitize_wiki_links(answer, all_known)
+        save_query_cache(settings.cache_dir, cache_key, answer)
+
+    except (openai.APIError, openai.APITimeoutError, openai.RateLimitError) as e:
+        logger.error(f"LLM API error (stream): {e}")
+        yield f"\n\n[错误] LLM 请求失败: {e}"
+    except (AttributeError, KeyError, IndexError) as e:
+        logger.error(f"LLM response parsing error (stream): {e}")
+        yield f"\n\n[错误] 响应解析失败: {e}"
 
 
 # ============================================================

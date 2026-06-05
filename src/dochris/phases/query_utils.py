@@ -185,7 +185,15 @@ def _keyword_search(
     query_lower = query.lower()
     query_terms = _split_query_terms(query_lower)
 
-    for md_file in search_dir.glob("*.md"):
+    # 收集文件并去重：无后缀版本优先于 _SRC-NNNN 后缀版本
+    all_files = sorted(search_dir.glob("*.md"), key=lambda f: f.stem)
+    deduped_files: dict[str, Path] = {}
+    for md_file in all_files:
+        base_stem = re.sub(r"_SRC-\d+$", "", md_file.stem)
+        if base_stem not in deduped_files:
+            deduped_files[base_stem] = md_file
+
+    for md_file in deduped_files.values():
         try:
             text = md_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -242,7 +250,9 @@ def _extract_concept(file_path: Path, text: str) -> dict:
 
     return {
         "name": file_path.stem,
+        "title": file_path.stem,
         "definition": definition.strip(),
+        "content": definition.strip(),
     }
 
 
@@ -284,8 +294,15 @@ def _extract_summary(file_path: Path, text: str) -> dict:
     if not one_line and heading and has_structured_section:
         one_line = heading
 
+    content_parts = []
+    if one_line:
+        content_parts.append(one_line)
+    for kp in key_points[:3]:
+        content_parts.append(f"• {kp}")
+
     return {
         "title": file_path.stem,
         "one_line": one_line,
         "key_points": key_points[:3],
+        "content": "\n".join(content_parts),
     }
