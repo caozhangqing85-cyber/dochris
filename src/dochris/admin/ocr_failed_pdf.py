@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def _init_paths() -> None:
     """延迟初始化路径常量"""
     global WORKSPACE, TRANSCRIPTS_DIR, RAW_DIR, LOGS_PATH
-    WORKSPACE = Path.home() / ".openclaw/knowledge-base"
+    WORKSPACE = Path.home() / ".dochris/knowledge-base"
     TRANSCRIPTS_DIR = WORKSPACE / "transcripts"
     RAW_DIR = WORKSPACE / "raw"
     LOGS_PATH = WORKSPACE / "logs"

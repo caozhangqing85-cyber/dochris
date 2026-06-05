@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 # 路径配置
-KB_PATH = Path.home() / ".openclaw/knowledge-base"
+KB_PATH = Path.home() / ".dochris/knowledge-base"
 PROGRESS_FILE = KB_PATH / "progress.json"
 LOGS_PATH = KB_PATH / "logs"
 SUMMARIES_PATH = KB_PATH / "wiki" / "summaries"

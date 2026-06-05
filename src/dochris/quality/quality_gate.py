@@ -157,18 +157,22 @@ def quality_gate(
 ) -> dict[str, Any]:
     """质量门禁检查
 
-    检查 manifest 是否满足 promote 条件：
+    质量分数作为信号展示，不作为硬门禁。真正的门禁条件：
     1. status 必须是 "compiled"
-    2. quality_score >= min_score
-    3. error_message 必须为空
-    4. summary 必须存在
+    2. error_message 必须为空
+    3. summary 必须存在
+    4. lint 必须通过（无 error 级别问题）
+
+    质量分数 < min_score 时标记为 warning，但不阻止晋升。
 
     Returns:
         {
             "passed": bool,
             "src_id": str,
             "reason": str,
-            "checks": { "status": bool, "score": bool, "error": bool, "summary": bool },
+            "quality_score": int,
+            "quality_level": "high" | "medium" | "low",
+            "checks": { "status": bool, "error": bool, "summary": bool, "lint": bool },
         }
     """
     workspace_path = Path(workspace_path)
@@ -182,11 +186,47 @@ def quality_gate(
             "checks": {},
         }
 
+    # Phase A: Lint 检查（从 compiled_summary 中读取）
+    compiled_summary = manifest.get("compiled_summary", {}) or {}
+    lint_data = compiled_summary.get("lint")
+    lint_passed = True
+    lint_errors: list[str] = []
+    concept_quality_warnings = 0
+    if lint_data and isinstance(lint_data, dict):
+        lint_passed = lint_data.get("passed", True)
+        for issue in lint_data.get("issues", []):
+            severity = issue.get("severity", "")
+            if severity == "error":
+                lint_errors.append(issue.get("message", ""))
+            if issue.get("rule") == "concept_quality" and severity == "warning":
+                concept_quality_warnings += 1
+    # 概念质量问题阻止晋升
+    if concept_quality_warnings > 0:
+        lint_passed = False
+        lint_errors.append(f"存在 {concept_quality_warnings} 个概念使用了默认解释")
+
+    # Provenance 检查（信息性，不阻止晋升）
+    provenance_data = compiled_summary.get("provenance")
+    provenance_label = None
+    if provenance_data and isinstance(provenance_data, dict):
+        provenance_label = provenance_data.get("overall_label")
+
+    # 质量分数 → 信号灯级别（信息性，不阻止晋升）
+    quality_score = manifest.get("quality_score", 0)
+    if quality_score >= 80:
+        quality_level = "high"
+    elif quality_score >= 50:
+        quality_level = "medium"
+    else:
+        quality_level = "low"
+    score_warning = quality_score < min_score
+
+    # 真正的门禁条件（不含分数）
     checks = {
         "status": manifest["status"] == "compiled",
-        "score": manifest.get("quality_score", 0) >= min_score,
         "error": manifest.get("error_message") is None,
         "summary": manifest.get("summary") is not None,
+        "lint": lint_passed,
     }
 
     all_passed = all(checks.values())
@@ -194,19 +234,21 @@ def quality_gate(
     reasons = []
     if not checks["status"]:
         reasons.append(f"状态为 '{manifest['status']}'，需要 'compiled'")
-    if not checks["score"]:
-        score = manifest.get("quality_score", 0)
-        reasons.append(f"质量分数 {score} < {min_score}")
     if not checks["error"]:
         reasons.append(f"存在错误: {manifest.get('error_message', 'unknown')}")
     if not checks["summary"]:
         reasons.append("缺少 summary 数据")
+    if not checks["lint"]:
+        reasons.append(f"Lint 未通过: {'; '.join(lint_errors[:3])}")
 
     result = {
         "passed": all_passed,
         "src_id": src_id,
         "title": manifest.get("title", ""),
-        "quality_score": manifest.get("quality_score", 0),
+        "quality_score": quality_score,
+        "quality_level": quality_level,
+        "score_warning": score_warning,
+        "provenance": provenance_label,
         "reason": "通过" if all_passed else "; ".join(reasons),
         "checks": checks,
     }
