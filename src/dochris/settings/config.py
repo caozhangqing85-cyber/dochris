@@ -8,6 +8,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Callable, ClassVar
 
 from dochris.settings.constants import CODING_LLM_API_BASE, DEFAULT_LLM_API_BASE
 
@@ -56,6 +57,53 @@ class Settings:
 
     配置优先级: .env 文件 > 环境变量 > 默认值
     """
+
+    # ============================================================
+    # 环境变量自动映射
+    # ============================================================
+
+    # 格式: {field_name: (env_var_name, default_value, converter_or_None)}
+    # converter 用于类型转换，如 int、float、bool 解析
+    # 特殊字段（workspace、source_path、obsidian_vaults、api_key、api_base、
+    # plugin_dirs、plugins_enabled、plugins_disabled）有独立的解析逻辑，
+    # 不在此映射中，由 from_env() 手动处理。
+    _env_mapping: ClassVar[dict[str, tuple[str, Any, Callable | None]]] = {
+        "model": ("MODEL", "glm-5.1", None),
+        "llm_provider": ("LLM_PROVIDER", "openai_compat", None),
+        "query_model": ("QUERY_MODEL", "glm-4-flash", None),
+        "embedding_model": ("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5", None),
+        "vector_store": ("VECTOR_STORE", "chromadb", None),
+        "max_concurrency": ("MAX_CONCURRENCY", "3", int),
+        "min_quality_score": ("MIN_QUALITY_SCORE", "70", int),
+        "max_content_chars": ("MAX_CONTENT_CHARS", "20000", int),
+        "log_level": ("LOG_LEVEL", "INFO", None),
+        "local_llm_base_url": ("LOCAL_LLM_BASE_URL", "", None),
+        "local_llm_model": ("LOCAL_LLM_MODEL", "qwen:14b", None),
+        "local_llm_api_key": ("LOCAL_LLM_API_KEY", "ollama", None),
+        # --- 后续 RAG 改进方案新增配置项在此添加 ---
+        # "reranker_enabled": ("RERANKER_ENABLED", "false", _parse_bool),
+        # "reranker_provider": ("RERANKER_PROVIDER", "bge", None),
+        # "observability_enabled": ("OBSERVABILITY_ENABLED", "false", _parse_bool),
+    }
+
+    @classmethod
+    def _load_env_fields(cls) -> dict[str, Any]:
+        """从 _env_mapping 自动读取环境变量，返回 kwargs 字典。
+
+        后续新增配置项只需在 _env_mapping 加一行，
+        不再需要手写 os.environ.get() 调用。
+        """
+        kwargs: dict[str, Any] = {}
+        for field_name, (env_var, default, converter) in cls._env_mapping.items():
+            raw = os.environ.get(env_var, default)
+            if converter is not None and raw is not None:
+                try:
+                    kwargs[field_name] = converter(raw)
+                except (ValueError, TypeError):
+                    kwargs[field_name] = default
+            else:
+                kwargs[field_name] = raw
+        return kwargs
 
     # ============================================================
     # 路径配置
@@ -297,25 +345,21 @@ class Settings:
         plugins_disabled_str = os.environ.get("PLUGINS_DISABLED", "")
         plugins_disabled = plugins_disabled_str.split(",") if plugins_disabled_str else []
 
-        # 3. 创建实例
+        # 3. 通过 _env_mapping 自动加载标准字段
+        env_fields = cls._load_env_fields()
+
+        # 4. 创建实例（手动解析的特殊字段覆盖 env_fields 中的同名项）
         return cls(
             workspace=workspace,
             source_path=source_path,
             obsidian_vaults=obsidian_vaults,
             api_key=api_key,
             api_base=api_base,
-            model=model,
-            llm_provider=os.environ.get("LLM_PROVIDER", "openai_compat"),
-            query_model=os.environ.get("QUERY_MODEL", "glm-4-flash"),
-            embedding_model=os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"),
-            vector_store=os.environ.get("VECTOR_STORE", "chromadb"),
-            max_concurrency=int(os.environ.get("MAX_CONCURRENCY", "3")),
-            min_quality_score=int(os.environ.get("MIN_QUALITY_SCORE", "70")),
-            max_content_chars=int(os.environ.get("MAX_CONTENT_CHARS", "20000")),
-            log_level=os.environ.get("LOG_LEVEL", "INFO"),
             plugin_dirs=[str(p) for p in plugin_dirs],
             plugins_enabled=plugins_enabled,
             plugins_disabled=plugins_disabled,
+            # 标准字段：由 _env_mapping 自动管理
+            **env_fields,
         )
 
     # ============================================================
