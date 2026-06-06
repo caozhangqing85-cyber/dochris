@@ -283,6 +283,117 @@ def search_all(query: str, top_k: int = 5) -> dict:
 
 
 # ============================================================
+# 统一候选模型转换
+# ============================================================
+
+
+def retrieve_candidates(
+    query: str,
+    top_k: int = 5,
+    candidate_k: int | None = None,
+) -> list["RetrievalCandidate"]:
+    """将多通道检索结果转为统一 RetrievalCandidate 列表。
+
+    新入口，不影响 search_all() 的返回格式。返回强类型
+    RetrievalCandidate 列表，所有后续方案通过此模型访问检索结果，
+    不再猜测分数语义。
+
+    Args:
+        query: 查询文本
+        top_k: 每个通道的最大结果数
+        candidate_k: 总候选数上限（默认不限制）
+
+    Returns:
+        按 normalized_score 降序排列的 RetrievalCandidate 列表
+    """
+    from dochris.rag.schemas import RetrievalCandidate, normalize_score
+
+    raw_results = search_all(query, top_k)
+    candidates: list[RetrievalCandidate] = []
+
+    # 转换 concepts
+    for i, item in enumerate(raw_results.get("concepts", [])):
+        raw_score = float(item.get("score", 0))
+        c = RetrievalCandidate(
+            id=f"concept_{item.get('manifest_id', 'unknown')}_{i}",
+            text=item.get("definition", item.get("content", "")),
+            source=item.get("source", ""),
+            channel="concept",
+            retriever="keyword_concept",
+            raw_score=raw_score,
+            score_kind="keyword",
+            normalized_score=normalize_score(raw_score, "keyword"),
+            channel_rank=i + 1,
+            manifest_id=item.get("manifest_id"),
+            metadata={"name": item.get("name", ""), "title": item.get("title", "")},
+        )
+        candidates.append(c)
+
+    # 转换 summaries
+    for i, item in enumerate(raw_results.get("summaries", [])):
+        raw_score = float(item.get("score", 0))
+        c = RetrievalCandidate(
+            id=f"summary_{item.get('manifest_id', 'unknown')}_{i}",
+            text=item.get("content", item.get("text", "")),
+            source=item.get("source", ""),
+            channel="summary",
+            retriever="keyword_summary",
+            raw_score=raw_score,
+            score_kind="keyword",
+            normalized_score=normalize_score(raw_score, "keyword"),
+            channel_rank=i + 1,
+            manifest_id=item.get("manifest_id"),
+            metadata={"title": item.get("title", "")},
+        )
+        candidates.append(c)
+
+    # 转换 vector_results
+    settings = get_settings()
+    vector_store_type = settings.vector_store
+    for i, item in enumerate(raw_results.get("vector_results", [])):
+        raw_score = float(item.get("score", 0))
+        raw_distance = raw_score  # vector search returns distance as score
+        score_kind = "cosine_distance" if vector_store_type == "chromadb" else "l2_distance"
+        c = RetrievalCandidate(
+            id=f"vec_{item.get('manifest_id', 'unknown')}_{i}",
+            text=item.get("text", ""),
+            source=item.get("source", ""),
+            channel="vector",
+            retriever=vector_store_type,
+            raw_score=raw_score,
+            raw_distance=raw_distance,
+            score_kind=score_kind,
+            normalized_score=normalize_score(raw_score, score_kind, raw_distance),
+            channel_rank=i + 1,
+            manifest_id=item.get("manifest_id"),
+            metadata={"type": item.get("type", "")},
+        )
+        candidates.append(c)
+
+    # 按归一化分数降序排列
+    candidates.sort(key=lambda x: x.normalized_score, reverse=True)
+
+    # 去重：同一 manifest_id + 内容 hash 只保留归一化分数最高的候选
+    seen: set[str] = set()
+    deduped: list[RetrievalCandidate] = []
+    for c in candidates:
+        dedup_key = f"{c.manifest_id}_{c.content_hash()}"
+        if dedup_key not in seen:
+            seen.add(dedup_key)
+            deduped.append(c)
+
+    # 填充全局 rank
+    for i, c in enumerate(deduped):
+        c.rank = i + 1
+
+    # 截断到 candidate_k
+    if candidate_k is not None:
+        deduped = deduped[:candidate_k]
+
+    return deduped
+
+
+# ============================================================
 # 向量检索（保持不变）
 # ============================================================
 

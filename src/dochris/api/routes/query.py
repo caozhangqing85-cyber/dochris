@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -13,34 +12,11 @@ from fastapi.responses import StreamingResponse
 from dochris.api.schemas import ErrorResponse, QueryResponse, SearchResult
 from dochris.phases.phase3_query import query as do_query
 from dochris.phases import query_engine
+from dochris.rag.schemas import normalize_score
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["query"])
-
-
-def _normalize_keyword_score(raw: float) -> float:
-    """将关键词搜索的整数累加分归一化到 [0, 1]
-
-    关键词评分体系: 文件名精确 +10, 术语命中 +5, 文本命中 +1~3
-    使用 1 - exp(-score/k) 映射，k=5 时:
-      score=5  → 0.63, score=10 → 0.86, score=15 → 0.95, score=20 → 0.98
-    """
-    if raw <= 0:
-        return 0.0
-    return min(1.0, round(1.0 - math.exp(-raw / 5.0), 3))
-
-
-def _normalize_vector_score(raw_distance: float) -> float:
-    """将向量距离转换为相似度 [0, 1]
-
-    支持 L2 (范围 [0, inf)) 和 cosine (范围 [0, 2]) 两种距离度量:
-    使用 1/(1+d) 映射:
-      d=0.1 → 0.91, d=0.5 → 0.67, d=1.0 → 0.50, d=2.0 → 0.33
-    """
-    if raw_distance < 0:
-        return 1.0
-    return round(1.0 / (1.0 + raw_distance), 3)
 
 
 def _to_search_result(
@@ -55,9 +31,9 @@ def _to_search_result(
     """
     raw_score = item.get("score", 0.0)
     if score_type == "vector":
-        normalized = _normalize_vector_score(raw_score)
+        normalized = normalize_score(raw_score, "cosine_distance", raw_distance=raw_score)
     else:
-        normalized = _normalize_keyword_score(raw_score)
+        normalized = normalize_score(raw_score, "keyword")
 
     return SearchResult(
         title=item.get("title", ""),
