@@ -40,29 +40,37 @@ class TestProtocolsModule:
         assert isinstance(mock, LLMProvider)
 
     def test_vector_store_protocol(self):
-        """测试 VectorStore 协议"""
+        """测试 VectorStore 协议（已对齐 BaseVectorStore ABC）"""
         from dochris.protocols import VectorStore
 
         class MockVectorStore:
-            def add(
+            def add_documents(
                 self,
                 collection: str,
                 documents: list[str],
                 ids: list[str],
-                metadatas: list[dict] | None = None,
+                metadatas: list[dict[str, Any]] | None = None,
             ) -> None:
                 pass
 
             def query(
-                self, collection: str, query_text: str, n_results: int = 5, **kwargs: Any
-            ) -> dict[str, Any]:
-                return {"results": []}
+                self,
+                collection: str,
+                query_text: str,
+                n_results: int = 5,
+                where: dict[str, Any] | None = None,
+                **kwargs: Any,
+            ) -> list[dict[str, Any]]:
+                return []
 
             def delete(self, collection: str, ids: list[str]) -> None:
                 pass
 
             def list_collections(self) -> list[str]:
                 return ["collection1"]
+
+            def get_collection_count(self, collection: str) -> int:
+                return 0
 
         mock = MockVectorStore()
         assert isinstance(mock, VectorStore)
@@ -101,13 +109,14 @@ class TestProtocolsModule:
         assert hasattr(LLMProvider, "close")
 
     def test_vector_store_has_required_methods(self):
-        """测试 VectorStore 有必需的方法"""
+        """测试 VectorStore 有必需的方法（已对齐 BaseVectorStore ABC）"""
         from dochris.protocols import VectorStore
 
-        assert hasattr(VectorStore, "add")
+        assert hasattr(VectorStore, "add_documents")
         assert hasattr(VectorStore, "query")
         assert hasattr(VectorStore, "delete")
         assert hasattr(VectorStore, "list_collections")
+        assert hasattr(VectorStore, "get_collection_count")
 
     def test_file_parser_has_required_methods(self):
         """测试 FileParser 有必需的方法"""
@@ -150,18 +159,18 @@ class TestProtocolUsage:
         await llm.close()
 
     def test_concrete_vector_store_implementation(self):
-        """测试具体的向量存储实现"""
+        """测试具体的向量存储实现（已对齐 BaseVectorStore ABC）"""
 
         class SimpleVectorStore:
             def __init__(self):
                 self.data: dict[str, dict[str, Any]] = {}
 
-            def add(
+            def add_documents(
                 self,
                 collection: str,
                 documents: list[str],
                 ids: list[str],
-                metadatas: list[dict] | None = None,
+                metadatas: list[dict[str, Any]] | None = None,
             ) -> None:
                 if collection not in self.data:
                     self.data[collection] = {}
@@ -169,9 +178,14 @@ class TestProtocolUsage:
                     self.data[collection][doc_id] = {"text": doc}
 
             def query(
-                self, collection: str, query_text: str, n_results: int = 5, **kwargs: Any
-            ) -> dict[str, Any]:
-                return {"results": list(self.data.get(collection, {}).keys())}
+                self,
+                collection: str,
+                query_text: str,
+                n_results: int = 5,
+                where: dict[str, Any] | None = None,
+                **kwargs: Any,
+            ) -> list[dict[str, Any]]:
+                return [{"id": k, "text": v["text"]} for k, v in self.data.get(collection, {}).items()]
 
             def delete(self, collection: str, ids: list[str]) -> None:
                 for doc_id in ids:
@@ -180,6 +194,10 @@ class TestProtocolUsage:
             def list_collections(self) -> list[str]:
                 return list(self.data.keys())
 
+            def get_collection_count(self, collection: str) -> int:
+                return len(self.data.get(collection, {}))
+
         store = SimpleVectorStore()
-        store.add("test_col", ["doc1", "doc2"], ["id1", "id2"])
+        store.add_documents("test_col", ["doc1", "doc2"], ["id1", "id2"])
         assert "test_col" in store.list_collections()
+        assert store.get_collection_count("test_col") == 2

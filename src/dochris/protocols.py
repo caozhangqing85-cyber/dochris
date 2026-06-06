@@ -23,23 +23,34 @@ class LLMProvider(Protocol):
 
 @runtime_checkable
 class VectorStore(Protocol):
-    """向量数据库接口"""
+    """向量数据库接口
 
-    def add(
+    与 BaseVectorStore ABC 保持一致。Protocol 用于鸭子类型检查（isinstance），
+    ABC 用于继承实现。两者方法签名和返回类型必须对齐。
+    """
+
+    def add_documents(
         self,
         collection: str,
         documents: list[str],
         ids: list[str],
-        metadatas: list[dict] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
     ) -> None: ...
 
     def query(
-        self, collection: str, query_text: str, n_results: int = 5, **kwargs: Any
-    ) -> dict[str, Any]: ...
+        self,
+        collection: str,
+        query_text: str,
+        n_results: int = 5,
+        where: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]: ...
 
     def delete(self, collection: str, ids: list[str]) -> None: ...
 
     def list_collections(self) -> list[str]: ...
+
+    def get_collection_count(self, collection: str) -> int: ...
 
 
 @runtime_checkable

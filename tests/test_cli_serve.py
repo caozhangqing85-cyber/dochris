@@ -86,30 +86,6 @@ class TestCmdServe:
         assert result == 1
         mock_run.assert_not_called()
 
-    @patch("uvicorn.run")
-    def test_cmd_serve_web_uses_mounted_app(self, mock_run):
-        """Web UI 使用 Gradio 返回的 mounted app 启动"""
-        from dochris.cli.cli_serve import cmd_serve
-
-        fastapi_app = MagicMock(name="fastapi_app")
-        gradio_app = MagicMock(name="gradio_app")
-        mounted_app = MagicMock(name="mounted_app")
-        args = MagicMock(spec=[], host="127.0.0.1", web_port=7860, web=True)
-
-        with (
-            patch("dochris.api.app.create_app", return_value=fastapi_app),
-            patch("dochris.web.app.create_web_app", return_value=gradio_app),
-            patch("gradio.mount_gradio_app", return_value=mounted_app) as mock_mount,
-            patch("builtins.print"),
-        ):
-            result = cmd_serve(args)
-
-        mock_mount.assert_called_once_with(
-            fastapi_app,
-            gradio_app,
-            path="/ui",
-            server_name="127.0.0.1",
-            server_port=7860,
-        )
-        mock_run.assert_called_once_with(mounted_app, host="127.0.0.1", port=7860)
-        assert result == 0
+    # NOTE: test_cmd_serve_web_uses_mounted_app 已移除
+    # Web UI 已从 Gradio 迁移为独立前端项目（frontend/），
+    # cli_serve.py 不再支持 --web 参数。
