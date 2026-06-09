@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Phase 3: 查询系统（v2 — wiki 优先 + manifest 来源追踪）
+Phase 3: 查询系统（v3 — async-first + wiki 优先 + manifest 来源追踪）
 
 搜索优先级：
 1. wiki/concepts/ + wiki/summaries/  （已晋升，高信任）
 2. outputs/concepts/ + outputs/summaries/  （编译产物，中信任）
 3. ChromaDB 向量检索  （历史索引）
 
-新增功能：
-- search_all(): wiki 优先搜索，fallback 到 outputs/
-- manifest_id 追踪：每个结果关联到对应的 SRC-NNNN manifest
-- 来源可信度标注：wiki / outputs / vector
+架构特点：
+- query_async() 为异步主入口，FastAPI 直接 await
+- query() 为同步入口，CLI 通过 asyncio.run() 调用
+- LLM 调用通过 BaseLLMProvider（OpenAICompatProvider），与编译链路统一
 """
 
+import asyncio
 import logging
 import sys
 import time
@@ -71,13 +72,19 @@ def _get_manifest_id(file_path: str) -> str | None:
 # --- 搜索引擎（使用 module 引用，保证缓存共享） ---
 from dochris.phases import query_engine
 
-# 向后兼容：直接暴露所有公开符号
+# 向后兼容：直接暴露搜索和工具函数（不涉及 LLM）
 search_concepts = query_engine.search_concepts
 search_summaries = query_engine.search_summaries
-generate_answer = query_engine.generate_answer
 read_openclaw_config = query_engine.read_openclaw_config
-create_client = query_engine.create_client
 print_result = query_engine.print_result
+
+# LLM 相关：指向新的 async 函数
+create_query_provider = query_engine.create_query_provider
+generate_answer_async = query_engine.generate_answer_async
+generate_answer_stream_async = query_engine.generate_answer_stream_async
+
+# 向后兼容别名：供尚未迁移的测试和调用方使用
+create_client = query_engine.create_client
 
 
 def search_all(query: str, top_k: int = 5) -> dict:
@@ -103,29 +110,17 @@ def search_all(query: str, top_k: int = 5) -> dict:
     }
 
 
-# 向后兼容：缓存变量需要可直接通过 phase3_query 模块修改
-# 使用 property 不可行，直接在 module 上做 proxy
-_chromadb_client_cache = query_engine._chromadb_client_cache
-_llm_client_cache = query_engine._llm_client_cache
-
-
 def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list:
-    """向量搜索包装器，确保读写本模块的缓存"""
-    global _chromadb_client_cache
-    # 同步缓存到 query_engine
-    query_engine._chromadb_client_cache = _chromadb_client_cache
-    result = query_engine.vector_search(query, top_k, logger)
-    # 同步缓存回来
-    _chromadb_client_cache = query_engine._chromadb_client_cache
-    return cast(list, result)
+    """向量搜索包装器，直接委托给 query_engine"""
+    return cast(list, query_engine.vector_search(query, top_k, logger))
 
 
 # ============================================================
-# 统一查询
+# 统一查询（双入口模式）
 # ============================================================
 
 
-def query(
+async def query_async(
     query_str: str,
     mode: str = "combined",
     top_k: int = 5,
@@ -133,18 +128,21 @@ def query(
     contribute: bool = False,
     workspace_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """
-    执行查询
+    """异步查询主入口。FastAPI 应 await 此函数。
 
-    mode:
-      "concept"  — 概念搜索（wiki 优先）
-      "summary"  — 摘要搜索（wiki 优先）
-      "vector"   — 向量检索
-      "combined" — 综合查询
-      "all"      — 搜索全部，返回 search_sources 标注
+    搜索阶段（概念/摘要/向量）使用同步调用（本地文件 I/O），
+    LLM 生成阶段使用异步 Provider（AsyncOpenAI）。
 
-    contribute: 启用 Query-as-Contribution，将回答写回候选区
-    workspace_path: contribute=True 时需要提供工作区路径
+    Args:
+        query_str: 查询字符串
+        mode: 查询模式 (concept/summary/vector/combined/all)
+        top_k: 返回结果数量
+        logger: 日志记录器
+        contribute: 启用 Query-as-Contribution
+        workspace_path: contribute=True 时需要提供工作区路径
+
+    Returns:
+        查询结果字典
     """
     if logger is None:
         logger = logging.getLogger("phase3")
@@ -161,6 +159,7 @@ def query(
         "time_seconds": 0,
     }
 
+    # --- 搜索阶段（同步，本地文件 I/O） ---
     if mode == "all":
         all_result = search_all(query_str, top_k)
         result["concepts"] = all_result["concepts"]
@@ -183,28 +182,23 @@ def query(
             if result["vector_results"]:
                 result["search_sources"].append("vector")
 
-    # 综合模式使用 LLM 生成回答
+    # --- LLM 生成阶段（异步） ---
     if mode in ("combined", "all") and (
         result["concepts"] or result["summaries"] or result["vector_results"]
     ):
-        # 同步 LLM 客户端缓存
-        global _llm_client_cache
-        query_engine._llm_client_cache = _llm_client_cache
-        client = create_client(logger)
-        _llm_client_cache = query_engine._llm_client_cache
-
-        if client:
-            result["answer"] = generate_answer(
+        provider = create_query_provider(logger)
+        if provider:
+            result["answer"] = await generate_answer_async(
                 query_str,
                 result["concepts"],
                 result["summaries"],
                 result["vector_results"],
-                client,
+                provider,
                 logger,
             )
         else:
             result["answer"] = "（LLM 不可用，以下为纯检索结果。请检查 API 认证配置。）"
-            logger.warning("LLM client creation failed, showing retrieval results only")
+            logger.warning("LLM provider creation failed, showing retrieval results only")
 
     result["time_seconds"] = round(time.time() - start, 2)
 
@@ -228,6 +222,31 @@ def query(
             logger.warning(f"Query-as-Contribution 失败: {e}")
 
     return result
+
+
+def query(
+    query_str: str,
+    mode: str = "combined",
+    top_k: int = 5,
+    logger: logging.Logger | None = None,
+    contribute: bool = False,
+    workspace_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """同步查询入口。CLI 使用此函数。
+
+    内部通过 asyncio.run() 调用 query_async()，
+    安全因为 CLI 不在事件循环中运行。
+    """
+    return asyncio.run(
+        query_async(
+            query_str,
+            mode=mode,
+            top_k=top_k,
+            logger=logger,
+            contribute=contribute,
+            workspace_path=workspace_path,
+        )
+    )
 
 
 def interactive_mode(logger: logging.Logger) -> None:

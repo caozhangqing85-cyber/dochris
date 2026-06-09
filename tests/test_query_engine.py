@@ -4,7 +4,7 @@
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -158,41 +158,48 @@ class TestCreateClient:
     """测试 create_client 函数"""
 
     def test_create_client_with_env_key(self, monkeypatch):
-        """测试使用环境变量 API Key 创建客户端"""
+        """测试使用环境变量 API Key 创建 Provider"""
         import dochris.phases.query_engine
+        from dochris.llm.openai_compat import OpenAICompatProvider
 
         dochris.phases.query_engine._llm_client_cache = None
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-env-key")
 
-        with patch("dochris.phases.query_engine.openai.OpenAI") as mock_openai:
-            mock_client = MagicMock()
-            mock_openai.return_value = mock_client
+        with patch("dochris.phases.query_engine.get_settings") as mock_settings:
+            mock_config = MagicMock()
+            mock_config.api_key = None
+            mock_config.api_base = None
+            mock_config.query_model = "test-model"
+            mock_settings.return_value = mock_config
 
             logger = MagicMock()
             result = dochris.phases.query_engine.create_client(logger)
 
-            assert result == mock_client
-            mock_openai.assert_called_once()
+            assert isinstance(result, OpenAICompatProvider)
+            assert result.api_key == "test-env-key"
 
     def test_create_client_caching(self, monkeypatch):
-        """测试客户端缓存"""
+        """测试 Provider 缓存"""
         import dochris.phases.query_engine
+        from dochris.llm.openai_compat import OpenAICompatProvider
 
         dochris.phases.query_engine._llm_client_cache = None
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-cache-key")
 
-        with patch("dochris.phases.query_engine.openai.OpenAI") as mock_openai:
-            mock_client = MagicMock()
-            mock_openai.return_value = mock_client
+        with patch("dochris.phases.query_engine.get_settings") as mock_settings:
+            mock_config = MagicMock()
+            mock_config.api_key = None
+            mock_config.api_base = None
+            mock_config.query_model = "test-model"
+            mock_settings.return_value = mock_config
 
             logger = MagicMock()
             client1 = dochris.phases.query_engine.create_client(logger)
             client2 = dochris.phases.query_engine.create_client(logger)
 
-            # 应该只调用一次（第二次使用缓存）
-            assert mock_openai.call_count == 1
+            assert isinstance(client1, OpenAICompatProvider)
             assert client1 is client2
 
 
@@ -265,21 +272,23 @@ class TestVectorSearch:
 
 
 class TestGenerateAnswer:
-    """测试 generate_answer 函数"""
+    """测试 generate_answer_async 函数"""
 
-    def test_generate_answer_with_empty_context(self):
+    @pytest.mark.asyncio
+    async def test_generate_answer_with_empty_context(self):
         """测试空上下文时的回答"""
-        from dochris.phases.query_engine import generate_answer
+        from dochris.llm.openai_compat import OpenAICompatProvider
+        from dochris.phases.query_engine import generate_answer_async
 
-        mock_client = MagicMock()
+        mock_provider = AsyncMock(spec=OpenAICompatProvider)
         logger = MagicMock()
 
-        result = generate_answer(
+        result = await generate_answer_async(
             "测试问题",
             concepts=[],
             summaries=[],
             vector_results=[],
-            client=mock_client,
+            provider=mock_provider,
             logger=logger,
         )
 
@@ -287,14 +296,14 @@ class TestGenerateAnswer:
         assert result is not None
         assert "未找到相关内容" in result
 
-    def test_generate_answer_with_concepts(self):
+    @pytest.mark.asyncio
+    async def test_generate_answer_with_concepts(self):
         """测试有概念时的回答"""
-        from dochris.phases.query_engine import generate_answer
+        from dochris.llm.openai_compat import OpenAICompatProvider
+        from dochris.phases.query_engine import generate_answer_async
 
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock(message=MagicMock(content="测试回答"))]
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_provider = AsyncMock(spec=OpenAICompatProvider)
+        mock_provider.generate_with_messages = AsyncMock(return_value="测试回答")
 
         logger = MagicMock()
 
@@ -303,17 +312,18 @@ class TestGenerateAnswer:
         # Mock 缓存未命中，确保 LLM 被调用
         with patch("dochris.core.cache.load_query_cache", return_value=None):
             with patch("dochris.core.cache.save_query_cache", return_value=True):
-                result = generate_answer(
-                    "测试问题",
-                    concepts=concepts,
-                    summaries=[],
-                    vector_results=[],
-                    client=mock_client,
-                    logger=logger,
-                )
+                with patch("dochris.phases.query_engine.get_settings"):
+                    result = await generate_answer_async(
+                        "测试问题",
+                        concepts=concepts,
+                        summaries=[],
+                        vector_results=[],
+                        provider=mock_provider,
+                        logger=logger,
+                    )
 
         assert result == "测试回答"
-        mock_client.chat.completions.create.assert_called_once()
+        mock_provider.generate_with_messages.assert_called_once()
 
 
 class TestSearchAll:

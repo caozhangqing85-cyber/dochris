@@ -2,12 +2,12 @@
 Phase 3 查询引擎：搜索接口、向量检索、LLM 回答生成、客户端管理
 """
 
+import hashlib
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
 from typing import Any, cast
-
-import openai
 
 from dochris.phases.query_utils import (
     DATA_PATH,
@@ -21,6 +21,8 @@ from dochris.phases.query_utils import (
     _keyword_search,
 )
 from dochris.plugin import get_plugin_manager
+from dochris.llm.openai_compat import OpenAICompatProvider
+from dochris.rag.schemas import SourceRef
 from dochris.settings import OPENCLAW_CONFIG_PATH, get_settings
 
 
@@ -29,7 +31,7 @@ def _get_query_model() -> str:
     return get_settings().query_model
 
 # 全局缓存
-_llm_client_cache: openai.OpenAI | None = None
+_llm_client_cache: OpenAICompatProvider | None = None
 _chromadb_client_cache: Any | None = None
 _vector_store_cache: Any | None = None
 
@@ -565,32 +567,25 @@ def _sanitize_wiki_links(answer: str, valid_concepts: set[str]) -> str:
     return _re.sub(r"\[\[([^\]]+)\]\]", _replace, answer)
 
 
-def generate_answer(
-    query: str,
+def build_answer_context(
     concepts: list[dict],
     summaries: list[dict],
     vector_results: list[dict],
-    client: openai.OpenAI,
-    logger: logging.Logger,
-    stream: bool = False,
-) -> str | None:
-    """使用 LLM 综合生成回答（三层幻觉防护：Prompt 锚定 + 概念白名单 + 后处理验证）
-
-    支持查询缓存：相同查询 + 相同上下文直接返回缓存结果。
+) -> tuple[str, dict[str, SourceRef]]:
+    """从检索结果构建统一的上下文字符串和来源引用映射。
 
     Args:
-        query: 用户问题
-        concepts: 相关概念列表
-        summaries: 相关摘要列表
-        vector_results: 向量检索结果
-        client: OpenAI 客户端
-        logger: 日志记录器
-        stream: 是否使用流式输出（由 generate_answer_stream 使用）
+        concepts: 概念检索结果列表
+        summaries: 摘要检索结果列表
+        vector_results: 向量检索结果列表
 
     Returns:
-        生成的回答文本，失败时返回 None
+        (context_text, source_map):
+          - context_text: 用于 LLM prompt 的拼接上下文字符串，空结果时为 ""
+          - source_map: 来源编号 "S1"/"S2"/... 到 SourceRef 的映射，空结果时为空 dict
     """
     context_parts: list[str] = []
+    source_map: dict[str, SourceRef] = {}
     source_idx = 0
 
     if concepts:
@@ -600,6 +595,13 @@ def generate_answer(
             name = c.get("name", "")
             definition = c.get("definition", c.get("explanation", ""))
             context_parts.append(f"[S{source_idx}] **{name}**: {definition}")
+            source_map[f"S{source_idx}"] = SourceRef(
+                manifest_id=c.get("manifest_id"),
+                source=c.get("source", ""),
+                channel="concept",
+                text_hash=hashlib.md5(definition.encode()).hexdigest()[:12],
+                score=float(c.get("score", 0)),
+            )
 
     if summaries:
         context_parts.append("\n### 相关资料\n")
@@ -610,6 +612,13 @@ def generate_answer(
             context_parts.append(f"[S{source_idx}] **{title}**: {one_line}")
             for kp in s.get("key_points", []):
                 context_parts.append(f"  - {kp}")
+            source_map[f"S{source_idx}"] = SourceRef(
+                manifest_id=s.get("manifest_id"),
+                source=s.get("source", ""),
+                channel="summary",
+                text_hash=hashlib.md5((one_line + title).encode()).hexdigest()[:12],
+                score=float(s.get("score", 0)),
+            )
 
     if vector_results:
         context_parts.append("\n### 向量检索结果\n")
@@ -617,22 +626,33 @@ def generate_answer(
             source_idx += 1
             text = v.get("text", v.get("definition", v.get("content", "")))[:300]
             context_parts.append(f"[S{source_idx}] [来源: {v.get('source', '')}] {text}")
-
-    if not context_parts:
-        return "未找到相关内容。请尝试其他关键词。"
+            source_map[f"S{source_idx}"] = SourceRef(
+                manifest_id=v.get("manifest_id"),
+                source=v.get("source", ""),
+                channel="vector",
+                text_hash=hashlib.md5(text.encode()).hexdigest()[:12],
+                score=float(v.get("score", 0)),
+            )
 
     context = "\n".join(context_parts)
+    return context, source_map
 
-    # 查询缓存检查
-    from dochris.core.cache import load_query_cache, query_cache_key, save_query_cache
 
-    settings = get_settings()
-    cache_key = query_cache_key(query, context)
-    cached = load_query_cache(settings.cache_dir, cache_key)
-    if cached is not None:
-        logger.info(f"Query cache hit for: {query[:50]}...")
-        return cached
+def build_answer_prompt(
+    context: str,
+    query: str,
+    concepts: list[dict],
+) -> tuple[str, str, set[str]]:
+    """构建 system prompt 和 user prompt。
 
+    Args:
+        context: 由 build_answer_context() 返回的上下文字符串
+        query: 用户查询
+        concepts: 概念列表（用于构建 wiki-link 白名单）
+
+    Returns:
+        (system_prompt, user_prompt, all_known_concepts)
+    """
     # 构建 wiki-link 白名单：检索到的概念名 + 知识库全部概念名
     retrieved_names = {c.get("name", "") for c in concepts if c.get("name")}
     all_known = set(_get_all_concept_names()) | retrieved_names
@@ -663,23 +683,58 @@ def generate_answer(
 
 请严格基于 CONTEXT 回答，每个事实标注 [Sn] 引用，概念链接仅使用已知概念列表中的名称。"""
 
+    return system, prompt, all_known
+
+
+async def generate_answer_async(
+    query: str,
+    concepts: list[dict],
+    summaries: list[dict],
+    vector_results: list[dict],
+    provider: OpenAICompatProvider,
+    logger: logging.Logger,
+) -> str | None:
+    """使用 LLM 异步生成回答（三层幻觉防护：Prompt 锚定 + 概念白名单 + 后处理验证）
+
+    通过 BaseLLMProvider 子类调用 LLM，与编译链路共享抽象层。
+    支持查询缓存：相同查询 + 相同上下文直接返回缓存结果。
+
+    Args:
+        query: 用户问题
+        concepts: 相关概念列表
+        summaries: 相关摘要列表
+        vector_results: 向量检索结果
+        provider: OpenAICompatProvider 实例
+        logger: 日志记录器
+
+    Returns:
+        生成的回答文本，失败时返回 None
+    """
+    context, _source_map = build_answer_context(concepts, summaries, vector_results)
+    if not context:
+        return "未找到相关内容。请尝试其他关键词。"
+
+    # 查询缓存检查
+    from dochris.core.cache import load_query_cache, query_cache_key, save_query_cache
+
+    settings = get_settings()
+    cache_key = query_cache_key(query, context)
+    cached = load_query_cache(settings.cache_dir, cache_key)
+    if cached is not None:
+        logger.info(f"Query cache hit for: {query[:50]}...")
+        return cached
+
+    system, prompt, all_known = build_answer_prompt(context, query, concepts)
+
     try:
-        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]  # type: ignore[list-item]
-        response = client.chat.completions.create(
-            model=_get_query_model(),
+        answer = await provider.generate_with_messages(
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             max_tokens=2048,
             temperature=0.1,
-            messages=messages,  # type: ignore[arg-type]
-            stream=stream,
         )
-
-        if stream:
-            return response  # type: ignore[return-value]
-
-        content = response.choices[0].message.content
-        if not content:
+        if not answer:
             return None
-        answer = content.strip()
+        answer = answer.strip()
 
         # Layer 3: 后处理验证，清除虚假 wiki-link
         answer = _sanitize_wiki_links(answer, all_known)
@@ -687,61 +742,30 @@ def generate_answer(
         # 保存到缓存
         save_query_cache(settings.cache_dir, cache_key, answer)
         return answer
-    except (openai.APIError, openai.APITimeoutError, openai.RateLimitError) as e:
+    except Exception as e:
         logger.error(f"LLM API error: {e}")
         return None
-    except (AttributeError, KeyError, IndexError) as e:
-        logger.error(f"LLM response parsing error: {e}")
-        return None
 
 
-def generate_answer_stream(
+async def generate_answer_stream_async(
     query: str,
     concepts: list[dict],
     summaries: list[dict],
     vector_results: list[dict],
-    client: openai.OpenAI,
+    provider: OpenAICompatProvider,
     logger: logging.Logger,
-):
-    """流式生成回答，逐 chunk 返回
+) -> AsyncIterator[str]:
+    """异步流式生成回答，逐 chunk yield。
+
+    通过 BaseLLMProvider.generate_stream() 调用 LLM。
 
     Yields:
         str: 每个 chunk 的文本内容
     """
-    # 构建上下文和 prompt（与 generate_answer 相同的逻辑）
-    context_parts: list[str] = []
-    source_idx = 0
-
-    if concepts:
-        context_parts.append("### 相关概念\n")
-        for c in concepts:
-            source_idx += 1
-            name = c.get("name", "")
-            definition = c.get("definition", c.get("explanation", ""))
-            context_parts.append(f"[S{source_idx}] **{name}**: {definition}")
-
-    if summaries:
-        context_parts.append("\n### 相关资料\n")
-        for s in summaries:
-            source_idx += 1
-            title = s.get("title", "")
-            one_line = s.get("one_line", "")
-            context_parts.append(f"[S{source_idx}] **{title}**: {one_line}")
-            for kp in s.get("key_points", []):
-                context_parts.append(f"  - {kp}")
-
-    if vector_results:
-        context_parts.append("\n### 向量检索结果\n")
-        for v in vector_results:
-            source_idx += 1
-            text = v.get("text", v.get("definition", v.get("content", "")))[:300]
-            context_parts.append(f"[S{source_idx}] [来源: {v.get('source', '')}] {text}")
-
-    if not context_parts:
+    context, _source_map = build_answer_context(concepts, summaries, vector_results)
+    if not context:
         yield "未找到相关内容。请尝试其他关键词。"
         return
-
-    context = "\n".join(context_parts)
 
     # 查询缓存检查
     from dochris.core.cache import load_query_cache, query_cache_key, save_query_cache
@@ -754,68 +778,31 @@ def generate_answer_stream(
         yield cached
         return
 
-    # 构建 prompt
-    retrieved_names = {c.get("name", "") for c in concepts if c.get("name")}
-    all_known = set(_get_all_concept_names()) | retrieved_names
-    concept_allowlist_str = "、".join(sorted(all_known)) if all_known else "（无）"
-
-    system = (
-        "你是一个严格基于源文档的知识库助手。\n\n"
-        "## 严格规则\n\n"
-        "1. **只使用上下文中的信息**：你的回答必须完全基于下方 CONTEXT 中提供的检索结果。"
-        "不得使用任何外部知识、推断或假设。\n"
-        "2. **强制引用**：每个事实性陈述必须标注来源编号 [S1], [S2] 等。"
-        "示例：「根据资料，软着陆是指房价通过长时间的价值回归实现下跌 [S1]。」\n"
-        f"3. **Wiki-link 规则**：使用 [[概念名]] 格式引用概念时，"
-        f"只能使用以下已知概念：{concept_allowlist_str}。不得为不存在的概念创建链接。\n"
-        "4. **信息不足时拒绝回答**：如果上下文中没有足够信息回答问题，"
-        "回复「根据当前知识库中的资料，无法完整回答这个问题。」并说明缺少哪些信息。\n"
-        "5. **不要添加无关内容**：不要扩展、不要解释上下文中未提到的内容。\n\n"
-        "## 输出格式\n\n"
-        "- 使用清晰的段落结构\n"
-        "- 每个事实后标注 [Sn] 引用\n"
-        "- 相关概念使用 [[概念名]] 链接（仅限上面列出的已知概念）"
-    )
-
-    prompt = f"""CONTEXT:
-{context}
-
-用户问题：{query}
-
-请严格基于 CONTEXT 回答，每个事实标注 [Sn] 引用，概念链接仅使用已知概念列表中的名称。"""
+    system, prompt, all_known = build_answer_prompt(context, query, concepts)
 
     try:
-        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]  # type: ignore[list-item]
-        stream_resp = client.chat.completions.create(
-            model=_get_query_model(),
+        full_answer: list[str] = []
+        async for chunk in provider.generate_stream(
+            prompt=prompt,
+            system_prompt=system,
             max_tokens=2048,
             temperature=0.1,
-            messages=messages,  # type: ignore[arg-type]
-            stream=True,
-        )
-
-        full_answer = []
-        for chunk in stream_resp:
-            delta = chunk.choices[0].delta
-            if delta.content:
-                full_answer.append(delta.content)
-                yield delta.content
+        ):
+            full_answer.append(chunk)
+            yield chunk
 
         # 后处理并缓存完整回答
         answer = "".join(full_answer).strip()
         answer = _sanitize_wiki_links(answer, all_known)
         save_query_cache(settings.cache_dir, cache_key, answer)
 
-    except (openai.APIError, openai.APITimeoutError, openai.RateLimitError) as e:
+    except Exception as e:
         logger.error(f"LLM API error (stream): {e}")
         yield f"\n\n[错误] LLM 请求失败: {e}"
-    except (AttributeError, KeyError, IndexError) as e:
-        logger.error(f"LLM response parsing error (stream): {e}")
-        yield f"\n\n[错误] 响应解析失败: {e}"
 
 
 # ============================================================
-# 客户端管理（保持不变）
+# 客户端管理
 # ============================================================
 
 
@@ -851,81 +838,105 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
         return None
 
 
-def create_client(logger: logging.Logger | None = None) -> openai.OpenAI | None:
-    """创建 OpenAI 兼容客户端（按优先级读取 API Key）
+def _try_create_provider(
+    api_key: str,
+    base_url: str | None,
+    model: str,
+    logger: logging.Logger | None,
+    source_label: str,
+) -> OpenAICompatProvider | None:
+    """尝试用给定参数创建 OpenAICompatProvider。
+
+    Args:
+        api_key: API 密钥
+        base_url: API 基础 URL（可为 None）
+        model: 模型名称
+        logger: 日志记录器
+        source_label: 来源标签（用于日志）
+
+    Returns:
+        创建成功的 provider，失败时返回 None
+    """
+    try:
+        provider = OpenAICompatProvider(
+            api_key=api_key,
+            api_base=base_url,
+            model=model,
+            max_tokens=2048,
+            temperature=0.1,
+            timeout=60,
+        )
+        if logger:
+            logger.info(f"Query LLM provider created ({source_label}, base_url={base_url})")
+        return provider
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to create provider ({source_label}): {e}")
+        return None
+
+
+def create_query_provider(logger: logging.Logger | None = None) -> OpenAICompatProvider | None:
+    """创建查询链路 LLM Provider（3 级 fallback：env → settings → OpenClaw）
+
+    使用 OpenAICompatProvider（内部 AsyncOpenAI），与编译链路统一抽象。
 
     API Key 优先级:
     1. 环境变量 OPENAI_API_KEY
-    2. settings.py 中的 api_key
+    2. settings 中的 api_key
     3. OpenClaw 配置文件（fallback）
 
     Args:
         logger: 日志记录器
 
     Returns:
-        OpenAI 客户端实例，失败时返回 None
+        OpenAICompatProvider 实例，失败时返回 None
     """
     global _llm_client_cache
     if _llm_client_cache is not None:
         return _llm_client_cache
 
+    settings = get_settings()
+    model = settings.query_model
+
     # 1. 优先尝试环境变量
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
-        try:
-            settings = get_settings()
-            base_url = settings.api_base
-            if base_url:
-                _llm_client_cache = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=60)
-            else:
-                _llm_client_cache = openai.OpenAI(api_key=api_key, timeout=60)
-            if logger:
-                logger.info(f"OpenAI 兼容客户端创建成功（使用环境变量，Base URL: {base_url}）")
+        provider = _try_create_provider(api_key, settings.api_base, model, logger, "env var")
+        if provider:
+            _llm_client_cache = provider
             return _llm_client_cache
-        except (openai.OpenAIError, ValueError) as e:
-            if logger:
-                logger.error(f"使用环境变量创建客户端失败: {e}")
 
-    # 2. 尝试 settings.py 中的 api_key
-    settings = get_settings()
+    # 2. 尝试 settings 中的 api_key
     if settings.api_key:
-        try:
-            if settings.api_base:
-                _llm_client_cache = openai.OpenAI(
-                    api_key=settings.api_key, base_url=settings.api_base, timeout=60
-                )
-            else:
-                _llm_client_cache = openai.OpenAI(api_key=settings.api_key, timeout=60)
-            if logger:
-                logger.info(
-                    f"OpenAI 兼容客户端创建成功（使用 settings，Base URL: {settings.api_base}）"
-                )
+        provider = _try_create_provider(
+            settings.api_key, settings.api_base, model, logger, "settings"
+        )
+        if provider:
+            _llm_client_cache = provider
             return _llm_client_cache
-        except (openai.OpenAIError, ValueError) as e:
-            if logger:
-                logger.error(f"使用 settings 创建客户端失败: {e}")
 
     # 3. Fallback: 尝试 OpenClaw 配置文件
-    provider = read_openclaw_config(logger)
-    if provider:
-        try:
-            base_url = provider.get("baseUrl", "") or ""
-            if base_url:
-                _llm_client_cache = openai.OpenAI(
-                    api_key=provider["apiKey"], base_url=base_url, timeout=60
-                )
-            else:
-                _llm_client_cache = openai.OpenAI(api_key=provider["apiKey"], timeout=60)
-            if logger:
-                logger.info("OpenAI 兼容客户端创建成功（使用 OpenClaw 配置）")
+    openclaw = read_openclaw_config(logger)
+    if openclaw:
+        base_url = openclaw.get("baseUrl") or None
+        provider = _try_create_provider(
+            openclaw["apiKey"], base_url, model, logger, "OpenClaw config"
+        )
+        if provider:
+            _llm_client_cache = provider
             return _llm_client_cache
-        except (openai.OpenAIError, TypeError, ValueError) as e:
-            if logger:
-                logger.error(f"使用 OpenClaw 配置创建客户端失败: {e}")
 
     if logger:
-        logger.error("无法创建 LLM 客户端：环境变量、settings、OpenClaw 配置中均未找到 API Key")
+        logger.error("Cannot create query LLM provider: no API key found in env/settings/OpenClaw")
     return None
+
+
+def create_client(logger: logging.Logger | None = None) -> OpenAICompatProvider | None:
+    """已废弃：请使用 create_query_provider()。
+
+    保留为向后兼容 alias，供尚未迁移的调用方使用。
+    """
+    return create_query_provider(logger)
 
 
 # ============================================================

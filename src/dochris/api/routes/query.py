@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from dochris.api.schemas import ErrorResponse, QueryResponse, SearchResult
-from dochris.phases.phase3_query import query as do_query
+from dochris.phases.phase3_query import query_async as do_query_async
 from dochris.phases import query_engine
 from dochris.rag.schemas import normalize_score
 from dochris.settings import get_settings
@@ -67,7 +67,7 @@ async def query_knowledge_base(
     workspace_path = settings.workspace
 
     try:
-        result = do_query(
+        result = await do_query_async(
             q,
             mode=mode,
             top_k=top_k,
@@ -115,25 +115,22 @@ async def query_stream(
     - event: error       — 错误信息
     """
     settings = get_settings()
-    workspace_path = settings.workspace
 
     def _sse_event(event: str, data: Any) -> str:
         payload = json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else str(data)
         return f"event: {event}\ndata: {payload}\n\n"
 
-    def _generate() -> Any:
+    async def _async_generate() -> Any:
         try:
-            # 1. 执行检索（非 LLM 部分）
             import time
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
-            start = time.time()
 
             from dochris.phases.phase3_query import (
                 search_concepts,
                 search_summaries,
                 vector_search,
-                create_client,
             )
+
+            start = time.time()
 
             concepts: list[dict] = []
             summaries: list[dict] = []
@@ -165,42 +162,37 @@ async def query_stream(
                 "vector_results": [],
             })
 
-            # 4. 向量检索（可能耗时较长，加超时保护）
+            # 4. 向量检索（异步，通过 provider 抽象层）
             if mode in ("vector", "combined"):
-                executor = ThreadPoolExecutor(max_workers=1)
                 try:
-                    future = executor.submit(vector_search, q, top_k, logger)
-                    vector_results = future.result(timeout=10)
+                    import asyncio
+
+                    vector_results = await asyncio.to_thread(vector_search, q, top_k, logger)
                     if vector_results:
                         search_sources.append("vector")
-                        # 发送补充的向量检索结果
                         yield _sse_event("results", {
                             "concepts": [_to_search_result(r, "keyword").model_dump() for r in concepts],
                             "summaries": [_to_search_result(r, "keyword").model_dump() for r in summaries],
                             "vector_results": [_to_search_result(r, "vector").model_dump() for r in vector_results],
                         })
-                except FuturesTimeout:
-                    logger.warning("Vector search timed out (10s), skipping")
                 except Exception as e:
                     logger.warning(f"Vector search failed: {e}")
-                finally:
-                    executor.shutdown(wait=False, cancel_futures=True)
 
-            # 5. 流式生成 LLM 回答
+            # 5. 流式生成 LLM 回答（异步）
             has_context = concepts or summaries or vector_results
             if not has_context:
                 yield _sse_event("answer", "未找到相关内容。请尝试其他关键词。")
                 yield _sse_event("done", {"time_seconds": round(time.time() - start, 2)})
                 return
 
-            client = create_client(logger)
-            if not client:
+            provider = query_engine.create_query_provider(logger)
+            if not provider:
                 yield _sse_event("answer", "（LLM 不可用，请检查 API 认证配置。）")
                 yield _sse_event("done", {"time_seconds": round(time.time() - start, 2)})
                 return
 
-            for chunk in query_engine.generate_answer_stream(
-                q, concepts, summaries, vector_results, client, logger
+            async for chunk in query_engine.generate_answer_stream_async(
+                q, concepts, summaries, vector_results, provider, logger
             ):
                 yield _sse_event("answer", chunk)
 
@@ -211,7 +203,7 @@ async def query_stream(
             yield _sse_event("error", str(exc))
 
     return StreamingResponse(
-        _generate(),
+        _async_generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

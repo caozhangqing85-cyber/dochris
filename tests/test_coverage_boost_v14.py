@@ -1,6 +1,6 @@
 """覆盖率提升 v14 — phases/phase3_query.py + workers/__main__.py"""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ============================================================
@@ -79,8 +79,12 @@ class TestPhase3QueryModule:
                 "dochris.phases.phase3_query.search_summaries", return_value=[{"source": "outputs"}]
             ),
             patch("dochris.phases.phase3_query.vector_search", return_value=[{"id": "v1"}]),
-            patch("dochris.phases.phase3_query.create_client", return_value=MagicMock()),
-            patch("dochris.phases.phase3_query.generate_answer", return_value="answer text"),
+            patch("dochris.phases.phase3_query.create_query_provider", return_value=MagicMock()),
+            patch(
+                "dochris.phases.phase3_query.generate_answer_async",
+                new_callable=AsyncMock,
+                return_value="answer text",
+            ),
         ):
             from dochris.phases.phase3_query import query
 
@@ -93,7 +97,7 @@ class TestPhase3QueryModule:
             patch("dochris.phases.phase3_query.search_concepts", return_value=[{"source": "wiki"}]),
             patch("dochris.phases.phase3_query.search_summaries", return_value=[]),
             patch("dochris.phases.phase3_query.vector_search", return_value=[]),
-            patch("dochris.phases.phase3_query.create_client", return_value=None),
+            patch("dochris.phases.phase3_query.create_query_provider", return_value=None),
         ):
             from dochris.phases.phase3_query import query
 
@@ -111,8 +115,12 @@ class TestPhase3QueryModule:
                     "search_sources": ["wiki", "vector"],
                 },
             ),
-            patch("dochris.phases.phase3_query.create_client", return_value=MagicMock()),
-            patch("dochris.phases.phase3_query.generate_answer", return_value="combined answer"),
+            patch("dochris.phases.phase3_query.create_query_provider", return_value=MagicMock()),
+            patch(
+                "dochris.phases.phase3_query.generate_answer_async",
+                new_callable=AsyncMock,
+                return_value="combined answer",
+            ),
         ):
             from dochris.phases.phase3_query import query
 

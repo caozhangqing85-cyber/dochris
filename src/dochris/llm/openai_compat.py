@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 from .base import BaseLLMProvider
@@ -123,6 +124,40 @@ class OpenAICompatProvider(BaseLLMProvider):
             **kwargs,
         )
         return response.choices[0].message.content or ""
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """流式生成文本，逐 chunk yield。
+
+        使用 AsyncOpenAI 的 stream=True 模式。
+
+        Yields:
+            str: 每个 chunk 的文本内容
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        client = self._get_client()
+        stream = await client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            max_tokens=max_tokens or self.max_tokens,
+            temperature=temperature if temperature is not None else self.temperature,
+            stream=True,
+            **kwargs,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield delta.content
 
     async def close(self) -> None:
         """关闭客户端连接"""

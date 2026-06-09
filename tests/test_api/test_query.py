@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -52,7 +52,7 @@ class TestQueryEndpoint:
 
     def test_query_basic(self, client) -> None:
         """基本查询"""
-        with patch("dochris.api.routes.query.do_query") as mock_query:
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = _mock_query_result("费曼技巧")
 
             resp = client.get("/api/v1/query", params={"q": "费曼技巧"})
@@ -67,7 +67,7 @@ class TestQueryEndpoint:
 
     def test_query_with_mode(self, client) -> None:
         """指定查询模式"""
-        with patch("dochris.api.routes.query.do_query") as mock_query:
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = _mock_query_result(mode="concept")
 
             resp = client.get("/api/v1/query", params={"q": "学习", "mode": "concept"})
@@ -79,7 +79,7 @@ class TestQueryEndpoint:
 
     def test_query_with_top_k(self, client) -> None:
         """指定返回数量"""
-        with patch("dochris.api.routes.query.do_query") as mock_query:
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = _mock_query_result()
 
             resp = client.get("/api/v1/query", params={"q": "测试", "top_k": 10})
@@ -100,7 +100,7 @@ class TestQueryEndpoint:
 
     def test_query_internal_error(self, client) -> None:
         """查询内部错误返回 500"""
-        with patch("dochris.api.routes.query.do_query") as mock_query:
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = RuntimeError("LLM 服务不可用")
 
             resp = client.get("/api/v1/query", params={"q": "测试"})
@@ -109,7 +109,7 @@ class TestQueryEndpoint:
 
     def test_query_no_results(self, client) -> None:
         """查询无结果"""
-        with patch("dochris.api.routes.query.do_query") as mock_query:
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = {
                 "query": "不存在的内容",
                 "mode": "combined",

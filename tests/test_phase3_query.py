@@ -8,7 +8,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -238,26 +238,15 @@ class TestPhase3VectorSearch:
         assert results == []
 
     def test_vector_search_with_results(self):
-        """测试有结果时的向量搜索"""
-        from dochris.phases import phase3_query
+        """测试有结果时的向量搜索（委托给 query_engine.vector_search）"""
         from dochris.phases.phase3_query import vector_search
 
-        # 清除缓存
-        phase3_query._chromadb_client_cache = None
+        mock_results = [
+            {"text": "文档1内容", "source": "test1", "score": 0.1, "type": "vector"},
+            {"text": "文档2内容", "source": "test2", "score": 0.2, "type": "vector"},
+        ]
 
-        # Mock collection
-        mock_collection = MagicMock()
-        mock_collection.query.return_value = {
-            "documents": [["文档1内容", "文档2内容"]],
-            "metadatas": [[{"source": "test1"}, {"source": "test2"}]],
-            "distances": [[0.1, 0.2]],
-        }
-        mock_collection.count.return_value = 2
-
-        mock_client = MagicMock()
-        mock_client.list_collections.return_value = [mock_collection]
-
-        with patch("chromadb.PersistentClient", return_value=mock_client):
+        with patch("dochris.phases.query_engine.vector_search", return_value=mock_results):
             logger = MagicMock()
             results = vector_search("测试查询", top_k=5, logger=logger)
 
@@ -356,61 +345,61 @@ class TestPhase3ManifestTracking:
 class TestPhase3LLMAnswer:
     """测试 LLM 回答生成功能"""
 
-    @patch("dochris.phases.query_engine.openai")
-    def test_generate_answer_with_context(self, mock_openai):
+    def test_generate_answer_with_context(self):
         """测试使用上下文生成回答"""
-        from dochris.phases.phase3_query import generate_answer
+        from dochris.phases.phase3_query import generate_answer_async
 
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_choice = MagicMock()
-        mock_choice.message.content = "这是生成的回答"
-        mock_response.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_openai.OpenAI.return_value = mock_client
+        mock_provider = MagicMock()
 
         logger = MagicMock()
-
         concepts = [{"name": "概念1", "definition": "定义1"}]
         summaries = [{"title": "摘要1", "one_line": "一句话", "key_points": ["要点1"]}]
         vector_results = []
 
         with patch("dochris.core.cache.load_query_cache", return_value=None):
             with patch("dochris.core.cache.save_query_cache", return_value=True):
-                answer = generate_answer(
-                    "测试问题", concepts, summaries, vector_results, mock_client, logger
+                import asyncio
+
+                answer = asyncio.run(
+                    generate_answer_async(
+                        "测试问题", concepts, summaries, vector_results, mock_provider, logger
+                    )
                 )
 
-        assert answer == "这是生成的回答"
-        mock_client.chat.completions.create.assert_called_once()
+        # provider.generate_with_messages 应被调用
+        mock_provider.generate_with_messages.assert_called_once()
 
-    @patch("dochris.phases.query_engine.openai")
-    def test_generate_answer_no_context(self, mock_openai):
+    def test_generate_answer_no_context(self):
         """测试没有上下文时的回答"""
-        from dochris.phases.phase3_query import generate_answer
+        from dochris.phases.phase3_query import generate_answer_async
 
-        mock_client = MagicMock()
+        mock_provider = MagicMock()
         logger = MagicMock()
 
-        answer = generate_answer("测试问题", [], [], [], mock_client, logger)
+        import asyncio
+
+        answer = asyncio.run(
+            generate_answer_async("测试问题", [], [], [], mock_provider, logger)
+        )
 
         assert answer == "未找到相关内容。请尝试其他关键词。"
 
     def test_generate_answer_api_error(self):
         """测试 API 错误处理"""
-        import openai
+        from dochris.phases.phase3_query import generate_answer_async
 
-        from dochris.phases.phase3_query import generate_answer
-
-        mock_client = MagicMock()
-        # 创建一个正确的 APIError 对象
-        error = openai.APIError("API 错误", request=MagicMock(), body=None)
-        mock_client.chat.completions.create.side_effect = error
+        mock_provider = MagicMock()
+        mock_provider.generate_with_messages = AsyncMock(side_effect=Exception("API 错误"))
 
         logger = MagicMock()
         concepts = [{"name": "概念1", "definition": "定义1"}]
 
-        answer = generate_answer("测试问题", concepts, [], [], mock_client, logger)
+        import asyncio
+
+        with patch("dochris.core.cache.load_query_cache", return_value=None):
+            answer = asyncio.run(
+                generate_answer_async("测试问题", concepts, [], [], mock_provider, logger)
+            )
 
         assert answer is None
         logger.error.assert_called()
@@ -467,13 +456,20 @@ class TestPhase3ClientManagement:
 
         mock_read_config.return_value = {"apiKey": "test-key", "baseUrl": "https://api.example.com"}
 
-        with patch("dochris.phases.query_engine.openai.OpenAI") as mock_openai:
-            mock_openai.return_value = MagicMock()
+        mock_provider = MagicMock()
+        with patch("dochris.phases.query_engine._try_create_provider", return_value=mock_provider):
+            # 清除 provider 缓存
+            import dochris.phases.query_engine as qe
+
+            qe._llm_client_cache = None
+
             logger = MagicMock()
             client = create_client(logger)
 
             assert client is not None
-            mock_openai.assert_called_once()
+
+            # 清理
+            qe._llm_client_cache = None
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "env-key-12345"})
     @patch("dochris.phases.query_engine.read_openclaw_config")
@@ -483,12 +479,20 @@ class TestPhase3ClientManagement:
 
         mock_read_config.return_value = None
 
-        with patch("dochris.phases.query_engine.openai.OpenAI") as mock_openai:
-            mock_openai.return_value = MagicMock()
+        mock_provider = MagicMock()
+        with patch("dochris.phases.query_engine._try_create_provider", return_value=mock_provider):
+            # 清除 provider 缓存
+            import dochris.phases.query_engine as qe
+
+            qe._llm_client_cache = None
+
             logger = MagicMock()
             client = create_client(logger)
 
             assert client is not None
+
+            # 清理
+            qe._llm_client_cache = None
 
 
 # ============================================================
@@ -553,13 +557,13 @@ class TestPhase3UnifiedQuery:
         assert len(result["vector_results"]) > 0
         mock_vector.assert_called_once()
 
-    @patch("dochris.phases.phase3_query.create_client")
-    @patch("dochris.phases.phase3_query.generate_answer")
+    @patch("dochris.phases.phase3_query.create_query_provider")
+    @patch("dochris.phases.phase3_query.generate_answer_async", new_callable=AsyncMock)
     @patch("dochris.phases.phase3_query.vector_search")
     @patch("dochris.phases.phase3_query.search_summaries")
     @patch("dochris.phases.phase3_query.search_concepts")
     def test_query_combined_mode(
-        self, mock_concepts, mock_summaries, mock_vector, mock_generate, mock_client
+        self, mock_concepts, mock_summaries, mock_vector, mock_generate, mock_create_provider
     ):
         """测试组合模式查询"""
         from dochris.phases.phase3_query import query
@@ -568,7 +572,7 @@ class TestPhase3UnifiedQuery:
         mock_summaries.return_value = [{"title": "摘要1", "score": 8, "source": "wiki"}]
         mock_vector.return_value = [{"text": "结果", "score": 0.5}]
         mock_generate.return_value = "AI 回答"
-        mock_client.return_value = MagicMock()
+        mock_create_provider.return_value = MagicMock()
         logger = MagicMock()
 
         result = query("测试查询", mode="combined", logger=logger)

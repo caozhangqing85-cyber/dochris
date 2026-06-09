@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from typing import Any
 
 
@@ -95,6 +96,30 @@ class BaseLLMProvider(ABC):
             生成的文本
         """
         ...
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """流式生成文本，逐 chunk yield。
+
+        默认回退到非流式 generate()，子类可覆写为真正的流式实现。
+
+        Args:
+            prompt: 用户提示
+            system_prompt: 系统提示（可选）
+            max_tokens: 最大生成 token 数
+            temperature: 采样温度
+
+        Yields:
+            str: 每个 chunk 的文本内容
+        """
+        result = await self.generate(prompt, system_prompt, max_tokens, temperature, **kwargs)
+        yield result
 
     async def close(self) -> None:  # noqa: B027
         """清理资源

@@ -10,7 +10,9 @@ import tempfile
 import unittest
 from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -272,64 +274,63 @@ class TestVectorSearchWithStore(unittest.TestCase):
         self.assertEqual(result[0]["score"], 0.1)
 
 
-class TestGenerateAnswer(unittest.TestCase):
+class TestGenerateAnswer:
     """测试 LLM 回答生成"""
 
-    @patch("dochris.phases.query_engine.openai")
-    def test_generate_answer_with_context(self, mock_openai):
+    @pytest.mark.asyncio
+    async def test_generate_answer_with_context(self):
         """测试有上下文时生成回答"""
-        from dochris.phases.query_engine import generate_answer
+        from dochris.llm.openai_compat import OpenAICompatProvider
+        from dochris.phases.query_engine import generate_answer_async
 
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-        mock_message.content = "Generated answer"
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_provider = AsyncMock(spec=OpenAICompatProvider)
+        mock_provider.generate_with_messages = AsyncMock(return_value="Generated answer")
 
         concepts = [{"name": "概念1", "definition": "定义1"}]
         summaries = [{"title": "标题1", "one_line": "摘要", "key_points": ["要点1"]}]
         vector_results = [{"text": "向量内容", "source": "test.md"}]
 
-        result = generate_answer(
-            "test query", concepts, summaries, vector_results, mock_client, Mock()
-        )
+        with patch("dochris.core.cache.load_query_cache", return_value=None):
+            with patch("dochris.core.cache.save_query_cache", return_value=True):
+                with patch("dochris.phases.query_engine.get_settings"):
+                    result = await generate_answer_async(
+                        "test query", concepts, summaries, vector_results, mock_provider, Mock()
+                    )
 
-        self.assertIsNotNone(result)
-        self.assertEqual(result, "Generated answer")
+        assert result is not None
+        assert result == "Generated answer"
 
-    @patch("dochris.phases.query_engine.openai")
-    def test_generate_answer_no_context(self, mock_openai):
+    @pytest.mark.asyncio
+    async def test_generate_answer_no_context(self):
         """测试无上下文时返回提示"""
-        from dochris.phases.query_engine import generate_answer
+        from dochris.llm.openai_compat import OpenAICompatProvider
+        from dochris.phases.query_engine import generate_answer_async
 
-        mock_client = Mock()
+        mock_provider = AsyncMock(spec=OpenAICompatProvider)
         logger = Mock()
 
-        result = generate_answer("test query", [], [], [], mock_client, logger)
+        result = await generate_answer_async("test query", [], [], [], mock_provider, logger)
 
-        self.assertEqual(result, "未找到相关内容。请尝试其他关键词。")
+        assert result == "未找到相关内容。请尝试其他关键词。"
 
-    def test_generate_answer_api_error(self):
+    @pytest.mark.asyncio
+    async def test_generate_answer_api_error(self):
         """测试 API 错误时返回 None"""
-        import openai
+        from dochris.llm.openai_compat import OpenAICompatProvider
+        from dochris.phases.query_engine import generate_answer_async
 
-        from dochris.phases.query_engine import generate_answer
-
-        mock_client = Mock()
-        # 创建一个模拟的 APIError（需要 request 和 body 参数）
-        mock_request = Mock()
-        mock_body = Mock()
-        api_error = openai.APIError("API Error", request=mock_request, body=mock_body)
-        mock_client.chat.completions.create.side_effect = api_error
+        mock_provider = AsyncMock(spec=OpenAICompatProvider)
+        mock_provider.generate_with_messages = AsyncMock(side_effect=Exception("API Error"))
         logger = Mock()
 
         concepts = [{"name": "概念1", "definition": "定义1"}]
-        result = generate_answer("test query", concepts, [], [], mock_client, logger)
+        with patch("dochris.core.cache.load_query_cache", return_value=None):
+            with patch("dochris.phases.query_engine.get_settings"):
+                result = await generate_answer_async(
+                    "test query", concepts, [], [], mock_provider, logger
+                )
 
-        self.assertIsNone(result)
+        assert result is None
         logger.error.assert_called()
 
 
@@ -407,10 +408,10 @@ class TestCreateClient(unittest.TestCase):
         if "OPENAI_API_KEY" in os.environ:
             del os.environ["OPENAI_API_KEY"]
 
-    @patch("dochris.phases.query_engine.openai")
     @patch("dochris.phases.query_engine.get_settings")
-    def test_create_client_from_env(self, mock_settings, mock_openai):
-        """测试从环境变量创建客户端"""
+    def test_create_client_from_env(self, mock_settings):
+        """测试从环境变量创建 Provider"""
+        from dochris.llm.openai_compat import OpenAICompatProvider
         from dochris.phases.query_engine import create_client
 
         os.environ["OPENAI_API_KEY"] = "env-key"
@@ -418,32 +419,32 @@ class TestCreateClient(unittest.TestCase):
         mock_config = Mock()
         mock_config.api_key = None
         mock_config.api_base = "https://api.test.com"
+        mock_config.query_model = "test-model"
         mock_settings.return_value = mock_config
-
-        mock_client = Mock()
-        mock_openai.OpenAI.return_value = mock_client
 
         result = create_client()
 
-        self.assertEqual(result, mock_client)
+        self.assertIsInstance(result, OpenAICompatProvider)
+        self.assertEqual(result.api_key, "env-key")
+        self.assertEqual(result.api_base, "https://api.test.com")
+        self.assertEqual(result.model, "test-model")
 
-    @patch("dochris.phases.query_engine.openai")
     @patch("dochris.phases.query_engine.get_settings")
-    def test_create_client_from_settings(self, mock_settings, mock_openai):
-        """测试从 settings 创建客户端"""
+    def test_create_client_from_settings(self, mock_settings):
+        """测试从 settings 创建 Provider"""
+        from dochris.llm.openai_compat import OpenAICompatProvider
         from dochris.phases.query_engine import create_client
 
         mock_config = Mock()
         mock_config.api_key = "settings-key"
         mock_config.api_base = "https://api.test.com"
+        mock_config.query_model = "test-model"
         mock_settings.return_value = mock_config
-
-        mock_client = Mock()
-        mock_openai.OpenAI.return_value = mock_client
 
         result = create_client()
 
-        self.assertEqual(result, mock_client)
+        self.assertIsInstance(result, OpenAICompatProvider)
+        self.assertEqual(result.api_key, "settings-key")
 
     def test_create_client_no_api_key(self):
         """测试无 API Key 时返回 None"""
