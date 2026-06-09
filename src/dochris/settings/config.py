@@ -81,10 +81,14 @@ class Settings:
         "local_llm_base_url": ("LOCAL_LLM_BASE_URL", "", None),
         "local_llm_model": ("LOCAL_LLM_MODEL", "qwen:14b", None),
         "local_llm_api_key": ("LOCAL_LLM_API_KEY", "ollama", None),
-        # --- 后续 RAG 改进方案新增配置项在此添加 ---
-        # "reranker_enabled": ("RERANKER_ENABLED", "false", _parse_bool),
-        # "reranker_provider": ("RERANKER_PROVIDER", "bge", None),
-        # "observability_enabled": ("OBSERVABILITY_ENABLED", "false", _parse_bool),
+        # --- RAG 改进方案配置项（默认关闭，不影响现有行为）---
+        "reranker_enabled": ("RERANKER_ENABLED", "false", None),
+        "reranker_provider": ("RERANKER_PROVIDER", "bge", None),
+        "reranker_model": ("RERANKER_MODEL", "BAAI/bge-reranker-base", None),
+        "observability_enabled": ("OBSERVABILITY_ENABLED", "false", None),
+        "prometheus_enabled": ("PROMETHEUS_ENABLED", "false", None),
+        "chunk_strategy": ("CHUNK_STRATEGY", "structure", None),
+        "index_raw_chunks": ("INDEX_RAW_CHUNKS", "false", None),
     }
 
     @classmethod
@@ -269,6 +273,31 @@ class Settings:
 
     min_text_length: int = 100
     """文本最小长度（判断是否有意义）"""
+
+    # ============================================================
+    # RAG 改进方案配置（默认关闭，不影响现有行为）
+    # ============================================================
+
+    reranker_enabled: str = "false"
+    """是否启用 Reranker 重排序（true/false）"""
+
+    reranker_provider: str = "bge"
+    """Reranker 提供商（bge / cohere）"""
+
+    reranker_model: str = "BAAI/bge-reranker-base"
+    """Reranker 模型名称"""
+
+    observability_enabled: str = "false"
+    """是否启用可观测性（true/false）"""
+
+    prometheus_enabled: str = "false"
+    """是否启用 Prometheus 指标导出（true/false）"""
+
+    chunk_strategy: str = "structure"
+    """分块策略（structure / recursive / semantic）"""
+
+    index_raw_chunks: str = "false"
+    """是否索引原始文本块（true/false）"""
 
     # ============================================================
     # 工厂方法
