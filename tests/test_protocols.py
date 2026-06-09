@@ -185,7 +185,9 @@ class TestProtocolUsage:
                 where: dict[str, Any] | None = None,
                 **kwargs: Any,
             ) -> list[dict[str, Any]]:
-                return [{"id": k, "text": v["text"]} for k, v in self.data.get(collection, {}).items()]
+                return [
+                    {"id": k, "text": v["text"]} for k, v in self.data.get(collection, {}).items()
+                ]
 
             def delete(self, collection: str, ids: list[str]) -> None:
                 for doc_id in ids:

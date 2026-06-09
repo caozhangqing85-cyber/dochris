@@ -1,7 +1,7 @@
 """覆盖率提升 v22 — auth API key + graph builder/models + web app handlers"""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

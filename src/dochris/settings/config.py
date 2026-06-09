@@ -6,9 +6,10 @@ Settings 配置类
 
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Any, ClassVar
 
 from dochris.settings.constants import CODING_LLM_API_BASE, DEFAULT_LLM_API_BASE
 
@@ -329,8 +330,6 @@ class Settings:
         # 解析 API 配置
         api_key = _detect_api_key()
         api_base = _detect_api_base()
-        model = os.environ.get("MODEL", "glm-5.1")
-
         # 解析插件配置
         plugin_dirs_str = os.environ.get("PLUGIN_DIRS", "")
         plugin_dirs = (

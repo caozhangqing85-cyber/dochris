@@ -57,6 +57,8 @@ async def get_config() -> ConfigResponse:
         workspace=str(settings.workspace),
         vector_store=settings.vector_store,
     )
+
+
 @router.put("/config", response_model=ConfigResponse)
 async def update_config(body: ConfigUpdateRequest) -> ConfigResponse:
     """更新配置到 .env 文件"""
@@ -105,6 +107,7 @@ async def update_config(body: ConfigUpdateRequest) -> ConfigResponse:
 
     # 清理 query_engine 缓存（LLM 客户端需要重新创建以使用新模型）
     from dochris.phases.query_engine import clear_caches
+
     clear_caches()
     try:
         new_settings = get_settings()

@@ -103,9 +103,7 @@ class LeannStore(BaseVectorStore):
         try:
             from leann.api import LeannBuilder
         except ImportError as e:
-            raise ImportError(
-                "leann-vector not installed. Run: pip install leann-vector"
-            ) from e
+            raise ImportError("leann-vector not installed. Run: pip install leann-vector") from e
 
         col_dir = self._collection_dir(collection)
 
@@ -188,24 +186,28 @@ class LeannStore(BaseVectorStore):
                     doc_id = ""
                 else:
                     continue
-                output.append({
-                    "id": doc_id,
-                    "document": text,
-                    "metadata": {},
-                    "distance": score,
-                })
+                output.append(
+                    {
+                        "id": doc_id,
+                        "document": text,
+                        "metadata": {},
+                        "distance": score,
+                    }
+                )
         elif isinstance(results, dict):
             texts = results.get("texts", results.get("documents", []))
             scores = results.get("scores", results.get("distances", []))
             for i, text in enumerate(texts[:n_results]):
                 score = scores[i] if i < len(scores) else 0
                 doc_id = id_list[i] if i < len(id_list) else f"doc-{i}"
-                output.append({
-                    "id": doc_id,
-                    "document": text,
-                    "metadata": {},
-                    "distance": float(score),
-                })
+                output.append(
+                    {
+                        "id": doc_id,
+                        "document": text,
+                        "metadata": {},
+                        "distance": float(score),
+                    }
+                )
 
         return output
 

@@ -9,6 +9,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
+from dochris.llm.openai_compat import OpenAICompatProvider
 from dochris.phases.query_utils import (
     DATA_PATH,
     MANIFESTS_PATH,
@@ -21,14 +22,14 @@ from dochris.phases.query_utils import (
     _keyword_search,
 )
 from dochris.plugin import get_plugin_manager
-from dochris.llm.openai_compat import OpenAICompatProvider
-from dochris.rag.schemas import SourceRef
+from dochris.rag.schemas import RetrievalCandidate, SourceRef
 from dochris.settings import OPENCLAW_CONFIG_PATH, get_settings
 
 
 def _get_query_model() -> str:
     """动态获取查询模型名称（每次调用读取最新 settings）"""
     return get_settings().query_model
+
 
 # 全局缓存
 _llm_client_cache: OpenAICompatProvider | None = None

@@ -124,6 +124,7 @@ class TestAPIConfig:
     def test_query_model(self):
         """测试查询模型名（运行时可能被 .env 覆盖）"""
         from dochris.constants import DEFAULT_QUERY_MODEL
+
         # QUERY_MODEL 来自 settings，可能被环境变量覆盖
         # 只验证它是非空字符串
         assert QUERY_MODEL and isinstance(QUERY_MODEL, str)
@@ -226,13 +227,20 @@ class TestValidateApiKey:
 
     def test_validate_api_key_missing(self, monkeypatch):
         """测试 API 密钥缺失时抛出异常"""
+        from unittest.mock import patch
+
         from dochris.settings import get_settings, reset_settings
 
+        # 清除所有可能的 API key 来源
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
-        reset_settings()  # 重置以清除缓存的 API key
-        with pytest.raises(ValueError, match="OPENAI_API_KEY 环境变量未设置"):
-            get_settings().validate_api_key()
+        monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+
+        # 阻止 load_dotenv 从 .env 文件恢复 API key
+        with patch("dochris.settings.config.load_dotenv"):
+            reset_settings()  # 重置以清除缓存的 API key
+            with pytest.raises(ValueError, match="OPENAI_API_KEY 环境变量未设置"):
+                get_settings().validate_api_key()
 
     def test_validate_api_key_present(self, monkeypatch):
         """测试 API 密钥存在时返回密钥"""

@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from dochris.api.schemas import ErrorResponse, QueryResponse, SearchResult
-from dochris.phases.phase3_query import query_async as do_query_async
 from dochris.phases import query_engine
+from dochris.phases.phase3_query import query_async as do_query_async
 from dochris.rag.schemas import normalize_score
 from dochris.settings import get_settings
 
@@ -114,10 +114,11 @@ async def query_stream(
     - event: done        — 流结束
     - event: error       — 错误信息
     """
-    settings = get_settings()
 
     def _sse_event(event: str, data: Any) -> str:
-        payload = json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else str(data)
+        payload = (
+            json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else str(data)
+        )
         return f"event: {event}\ndata: {payload}\n\n"
 
     async def _async_generate() -> Any:
@@ -149,18 +150,25 @@ async def query_stream(
                     search_sources.append(summaries[0].get("source", ""))
 
             # 2. 立即发送 meta 事件（不等向量搜索）
-            yield _sse_event("meta", {
-                "query": q, "mode": mode,
-                "search_sources": sorted(set(search_sources)),
-                "time_seconds": round(time.time() - start, 2),
-            })
+            yield _sse_event(
+                "meta",
+                {
+                    "query": q,
+                    "mode": mode,
+                    "search_sources": sorted(set(search_sources)),
+                    "time_seconds": round(time.time() - start, 2),
+                },
+            )
 
             # 3. 发送概念+摘要结果（让用户立即看到部分结果）
-            yield _sse_event("results", {
-                "concepts": [_to_search_result(r, "keyword").model_dump() for r in concepts],
-                "summaries": [_to_search_result(r, "keyword").model_dump() for r in summaries],
-                "vector_results": [],
-            })
+            yield _sse_event(
+                "results",
+                {
+                    "concepts": [_to_search_result(r, "keyword").model_dump() for r in concepts],
+                    "summaries": [_to_search_result(r, "keyword").model_dump() for r in summaries],
+                    "vector_results": [],
+                },
+            )
 
             # 4. 向量检索（异步，通过 provider 抽象层）
             if mode in ("vector", "combined"):
@@ -170,11 +178,21 @@ async def query_stream(
                     vector_results = await asyncio.to_thread(vector_search, q, top_k, logger)
                     if vector_results:
                         search_sources.append("vector")
-                        yield _sse_event("results", {
-                            "concepts": [_to_search_result(r, "keyword").model_dump() for r in concepts],
-                            "summaries": [_to_search_result(r, "keyword").model_dump() for r in summaries],
-                            "vector_results": [_to_search_result(r, "vector").model_dump() for r in vector_results],
-                        })
+                        yield _sse_event(
+                            "results",
+                            {
+                                "concepts": [
+                                    _to_search_result(r, "keyword").model_dump() for r in concepts
+                                ],
+                                "summaries": [
+                                    _to_search_result(r, "keyword").model_dump() for r in summaries
+                                ],
+                                "vector_results": [
+                                    _to_search_result(r, "vector").model_dump()
+                                    for r in vector_results
+                                ],
+                            },
+                        )
                 except Exception as e:
                     logger.warning(f"Vector search failed: {e}")
 

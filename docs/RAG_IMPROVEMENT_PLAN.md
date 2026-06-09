@@ -1736,35 +1736,37 @@ keyword / vector / chunk retrievers
 
 > **总时间**：3.5-4 周（含前置任务）。前置任务解决架构性阻碍，确保后续方案不重复处理同一问题。
 
-### 第 0 周：前置任务（2-3 天）
+### 第 0 周：前置任务（2-3 天） ✅ 已完成（2026-06-09）
 
-Day 0a（0.5-1 天）：
+Day 0a（0.5-1 天）：✅
 
-- 新增 `src/dochris/rag/schemas.py`，定义 `RetrievalCandidate` 数据类。
-- 从 `query_engine.py` 的 `search_all()` 中抽取 `retrieve_candidates()` 函数。
-- 实现分数归一化策略（keyword / vector distance 归一化到 0-1）。
-- 实现去重策略（同一 manifest_id + text hash 保留最高分）。
-- 现有 `search_all()` 行为不受影响。
+- [x] 新增 `src/dochris/rag/schemas.py`，定义 `RetrievalCandidate` 数据类。
+- [x] 从 `query_engine.py` 的 `search_all()` 中抽取 `retrieve_candidates()` 函数。
+- [x] 实现分数归一化策略（keyword / vector distance 归一化到 0-1）。
+- [x] 实现去重策略（同一 manifest_id + text hash 保留最高分）。
+- [x] 现有 `search_all()` 行为不受影响。
 
-Day 0b（0.5 天）：
+Day 0b（0.5 天）：✅
 
-- 更新 `protocols.VectorStore` 方法名和返回类型对齐 `BaseVectorStore` ABC。
-- 验证 `isinstance(ChromaDBStore(), VectorStore)` 通过。
+- [x] 更新 `protocols.VectorStore` 方法名和返回类型对齐 `BaseVectorStore` ABC。
+- [x] 验证 `isinstance(ChromaDBStore(), VectorStore)` 通过。
 
 Day 0c（1-1.5 天）：
 
-- 抽取 `build_answer_context()`，消除 `generate_answer()` 和 `generate_answer_stream()` 中约 54 行重复的 context 构建逻辑。
-- 迁移 `create_client()` 从同步 `openai.OpenAI` 到 `BaseLLMProvider` / `AsyncOpenAI`。
-- 采用双入口模式：`query_async()` 为异步主实现，FastAPI `await` 调用；CLI 通过 `asyncio.run(query_async())` 同步调用。
-- 全量查询测试验证无回归。
+Day 0c（1-1.5 天）：✅
 
-Day 0d（0.5 天）：
+- [x] 抽取 `build_answer_context()`，消除 `generate_answer()` 和 `generate_answer_stream()` 中约 54 行重复的 context 构建逻辑。
+- [x] 迁移 `create_client()` 从同步 `openai.OpenAI` 到 `BaseLLMProvider` / `AsyncOpenAI`。
+- [x] 采用双入口模式：`query_async()` 为异步主实现，FastAPI `await` 调用；CLI 通过 `asyncio.run(query_async())` 同步调用。
+- [x] 全量查询测试验证无回归。
 
-- 在 `Settings` 中实现 typed env helper（`_env_mapping` 类变量或等价机制），支持新增配置项自动从环境变量读取。
-- 将后续方案所需的 20+ 个配置项通过此机制一次性注册，避免每个 PR 手写 `from_env()` 映射。
-- 验证现有配置项行为不变。
+Day 0d（0.5 天）：✅
 
-### 第 1 周：Reranker + RAG 评估（5 天）
+- [x] 在 `Settings` 中实现 typed env helper（`_env_mapping` 类变量或等价机制），支持新增配置项自动从环境变量读取。
+- [x] 将后续方案所需的 20+ 个配置项通过此机制一次性注册，避免每个 PR 手写 `from_env()` 映射。
+- [x] 验证现有配置项行为不变。
+
+### 第 1 周：Reranker + RAG 评估（5 天） 🔜 下一步
 
 Day 1-2：
 

@@ -20,7 +20,6 @@ from dochris.rag.schemas import (
     normalize_vector_score,
 )
 
-
 # ============================================================
 # 归一化函数测试
 # ============================================================
@@ -281,7 +280,13 @@ class TestRetrieveCandidates(unittest.TestCase):
         mock_settings.return_value = mock_config
 
         mock_concepts.return_value = [
-            {"name": "概念1", "definition": "定义1", "score": 10, "source": "wiki", "manifest_id": "SRC-0001"}
+            {
+                "name": "概念1",
+                "definition": "定义1",
+                "score": 10,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            }
         ]
         mock_summaries.return_value = []
         mock_vector.return_value = []
@@ -440,10 +445,22 @@ class TestRetrieveCandidates(unittest.TestCase):
         mock_settings.return_value = mock_config
 
         mock_concepts.return_value = [
-            {"name": "低分概念", "definition": "内容", "score": 3, "source": "wiki", "manifest_id": "SRC-0001"}
+            {
+                "name": "低分概念",
+                "definition": "内容",
+                "score": 3,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            }
         ]
         mock_summaries.return_value = [
-            {"title": "高分摘要", "content": "内容", "score": 20, "source": "wiki", "manifest_id": "SRC-0002"}
+            {
+                "title": "高分摘要",
+                "content": "内容",
+                "score": 20,
+                "source": "wiki",
+                "manifest_id": "SRC-0002",
+            }
         ]
         mock_vector.return_value = []
 
@@ -469,10 +486,22 @@ class TestRetrieveCandidates(unittest.TestCase):
 
         # 同一 manifest_id + 相同内容 → 应去重
         mock_concepts.return_value = [
-            {"name": "概念A", "definition": "相同内容", "score": 5, "source": "wiki", "manifest_id": "SRC-0001"}
+            {
+                "name": "概念A",
+                "definition": "相同内容",
+                "score": 5,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            }
         ]
         mock_summaries.return_value = [
-            {"title": "摘要A", "content": "相同内容", "score": 15, "source": "wiki", "manifest_id": "SRC-0001"}
+            {
+                "title": "摘要A",
+                "content": "相同内容",
+                "score": 15,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            }
         ]
         mock_vector.return_value = []
 
@@ -497,10 +526,22 @@ class TestRetrieveCandidates(unittest.TestCase):
         mock_settings.return_value = mock_config
 
         mock_concepts.return_value = [
-            {"name": "概念A", "definition": "相同内容", "score": 5, "source": "wiki", "manifest_id": "SRC-0001"}
+            {
+                "name": "概念A",
+                "definition": "相同内容",
+                "score": 5,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            }
         ]
         mock_summaries.return_value = [
-            {"title": "摘要B", "content": "相同内容", "score": 10, "source": "wiki", "manifest_id": "SRC-0002"}
+            {
+                "title": "摘要B",
+                "content": "相同内容",
+                "score": 10,
+                "source": "wiki",
+                "manifest_id": "SRC-0002",
+            }
         ]
         mock_vector.return_value = []
 
@@ -523,7 +564,13 @@ class TestRetrieveCandidates(unittest.TestCase):
         mock_settings.return_value = mock_config
 
         mock_concepts.return_value = [
-            {"name": f"概念{i}", "definition": f"内容{i}", "score": 10 - i, "source": "wiki", "manifest_id": f"SRC-000{i}"}
+            {
+                "name": f"概念{i}",
+                "definition": f"内容{i}",
+                "score": 10 - i,
+                "source": "wiki",
+                "manifest_id": f"SRC-000{i}",
+            }
             for i in range(5)
         ]
         mock_summaries.return_value = []
@@ -547,8 +594,20 @@ class TestRetrieveCandidates(unittest.TestCase):
         mock_settings.return_value = mock_config
 
         mock_concepts.return_value = [
-            {"name": "A", "definition": "内容A", "score": 5, "source": "wiki", "manifest_id": "SRC-0001"},
-            {"name": "B", "definition": "内容B", "score": 3, "source": "wiki", "manifest_id": "SRC-0002"},
+            {
+                "name": "A",
+                "definition": "内容A",
+                "score": 5,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            },
+            {
+                "name": "B",
+                "definition": "内容B",
+                "score": 3,
+                "source": "wiki",
+                "manifest_id": "SRC-0002",
+            },
         ]
         mock_summaries.return_value = []
         mock_vector.return_value = []
@@ -575,8 +634,20 @@ class TestRetrieveCandidates(unittest.TestCase):
 
         # 两个 concept 候选，channel_rank 分别为 1 和 2
         mock_concepts.return_value = [
-            {"name": "概念1", "definition": "内容1", "score": 10, "source": "wiki", "manifest_id": "SRC-0001"},
-            {"name": "概念2", "definition": "内容2", "score": 5, "source": "wiki", "manifest_id": "SRC-0002"},
+            {
+                "name": "概念1",
+                "definition": "内容1",
+                "score": 10,
+                "source": "wiki",
+                "manifest_id": "SRC-0001",
+            },
+            {
+                "name": "概念2",
+                "definition": "内容2",
+                "score": 5,
+                "source": "wiki",
+                "manifest_id": "SRC-0002",
+            },
         ]
         mock_summaries.return_value = []
         mock_vector.return_value = []
@@ -602,9 +673,7 @@ class TestRetrieveCandidates(unittest.TestCase):
     @patch("dochris.phases.query_engine.search_summaries")
     @patch("dochris.phases.query_engine.search_concepts")
     @patch("dochris.phases.query_engine.get_settings")
-    def test_empty_results(
-        self, mock_settings, mock_concepts, mock_summaries, mock_vector
-    ) -> None:
+    def test_empty_results(self, mock_settings, mock_concepts, mock_summaries, mock_vector) -> None:
         """所有通道都无结果时返回空列表"""
         mock_config = Mock()
         mock_config.vector_store = "chromadb"

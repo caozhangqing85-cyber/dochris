@@ -1312,6 +1312,13 @@ def test_llm_call_latency(benchmark):
 - [x] Dockerfile（容器化部署支持）
 
 ### 仍待完成
-- [ ] API 文档站点（mkdocs-material）
-- [ ] Web UI 查询面板
-- [ ] 知识图谱可视化
+- [ ] RAG 高风险短板修复（详见 RAG_IMPROVEMENT_PLAN.md）
+  - [x] ~~前置任务 A：统一查询链路 LLM 客户端~~ ✅ (2026-06-09)
+  - [x] ~~前置任务 B：统一候选模型 RetrievalCandidate~~ ✅ (2026-06-09)
+  - [x] ~~前置任务 C：统一 VectorStore 接口~~ ✅ (2026-06-09)
+  - [x] ~~前置任务 D：Settings _env_mapping~~ ✅ (2026-06-09)
+  - [ ] 短板 1：RAG 评估体系
+  - [ ] 短板 2：Reranker 重排序
+  - [ ] 短板 3：可观测性监控
+  - [ ] 短板 4：流式输出工程化
+  - [ ] 短板 5：语义分块策略优化

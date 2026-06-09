@@ -360,7 +360,7 @@ class TestPhase3LLMAnswer:
             with patch("dochris.core.cache.save_query_cache", return_value=True):
                 import asyncio
 
-                answer = asyncio.run(
+                _ = asyncio.run(
                     generate_answer_async(
                         "测试问题", concepts, summaries, vector_results, mock_provider, logger
                     )
@@ -378,9 +378,7 @@ class TestPhase3LLMAnswer:
 
         import asyncio
 
-        answer = asyncio.run(
-            generate_answer_async("测试问题", [], [], [], mock_provider, logger)
-        )
+        answer = asyncio.run(generate_answer_async("测试问题", [], [], [], mock_provider, logger))
 
         assert answer == "未找到相关内容。请尝试其他关键词。"
 
