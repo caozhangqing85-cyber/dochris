@@ -69,6 +69,18 @@
 - [x] P3-3: API 文档站点（mkdocs-material）✅ (v1.4.0)
 - [x] P3-4: 知识图谱可视化 ✅ (v1.3.1)
 
+### P4：RAG 高风险短板修复（~3.5 周）— 详见 `docs/RAG_IMPROVEMENT_PLAN.md`
+- [x] P4-0: 前置任务（第 0 周）✅ (2026-06-09)
+  - [x] Day 0a: RetrievalCandidate 统一候选模型 + retrieve_candidates()
+  - [x] Day 0b: VectorStore Protocol 对齐 BaseVectorStore ABC
+  - [x] Day 0c: 查询链路统一到 BaseLLMProvider + async-first + build_answer_context()
+  - [x] Day 0d: Settings _env_mapping 自动映射 + 7 个 RAG 配置项
+- [ ] P4-1: Reranker 重排序（第 1 周，Day 1-2）
+- [ ] P4-2: RAG 评估体系（第 1 周，Day 3-5）
+- [ ] P4-3: 可观测性监控（第 2 周，Day 1-4）
+- [ ] P4-4: 流式输出工程化（第 2 周，Day 5-7）
+- [ ] P4-5: 语义分块策略优化（第 3 周）
+
 ---
 
 ## P0：本周完成（~3 小时）
@@ -1311,14 +1323,12 @@ def test_llm_call_latency(benchmark):
 - [x] CHANGELOG 自动生成（git-cliff 配置）
 - [x] Dockerfile（容器化部署支持）
 
-### 仍待完成
-- [ ] RAG 高风险短板修复（详见 RAG_IMPROVEMENT_PLAN.md）
-  - [x] ~~前置任务 A：统一查询链路 LLM 客户端~~ ✅ (2026-06-09)
-  - [x] ~~前置任务 B：统一候选模型 RetrievalCandidate~~ ✅ (2026-06-09)
-  - [x] ~~前置任务 C：统一 VectorStore 接口~~ ✅ (2026-06-09)
-  - [x] ~~前置任务 D：Settings _env_mapping~~ ✅ (2026-06-09)
-  - [ ] 短板 1：RAG 评估体系
-  - [ ] 短板 2：Reranker 重排序
-  - [ ] 短板 3：可观测性监控
-  - [ ] 短板 4：流式输出工程化
-  - [ ] 短板 5：语义分块策略优化
+### 仍待完成 — RAG 高风险短板修复
+> 进度详见 TODO 总览 P4 节，完整方案详见 `docs/RAG_IMPROVEMENT_PLAN.md`
+
+- [x] ~~P4-0: 前置任务（第 0 周）~~ ✅ (2026-06-09)
+- [ ] P4-1: Reranker 重排序（第 1 周 Day 1-2）— `src/dochris/rag/reranker/`
+- [ ] P4-2: RAG 评估体系（第 1 周 Day 3-5）— `src/dochris/eval/`
+- [ ] P4-3: 可观测性监控（第 2 周 Day 1-4）— `src/dochris/observability/`
+- [ ] P4-4: 流式输出工程化（第 2 周 Day 5-7）— `src/dochris/api/sse.py`
+- [ ] P4-5: 语义分块策略优化（第 3 周）— `src/dochris/rag/chunking/`
