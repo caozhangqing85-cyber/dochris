@@ -30,6 +30,7 @@ from dochris.phases.query_utils import (
     MANIFESTS_PATH,
     setup_logging,
 )
+from dochris.rag.schemas import RetrievalCandidate
 
 # 向后兼容代理：缓存变量和函数通过本模块暴露
 # 使测试的 @patch('phase3_query.xxx') 生效
@@ -80,7 +81,7 @@ print_result = query_engine.print_result
 
 
 # --- Reranker 候选转 dict 辅助函数 ---
-def _candidate_to_concept_dict(c: Any) -> dict[str, Any]:
+def _candidate_to_concept_dict(c: RetrievalCandidate) -> dict[str, Any]:
     """将 RetrievalCandidate 转回概念搜索结果的 dict 格式。"""
     return {
         "definition": c.text,
@@ -92,7 +93,7 @@ def _candidate_to_concept_dict(c: Any) -> dict[str, Any]:
     }
 
 
-def _candidate_to_summary_dict(c: Any) -> dict[str, Any]:
+def _candidate_to_summary_dict(c: RetrievalCandidate) -> dict[str, Any]:
     """将 RetrievalCandidate 转回摘要搜索结果的 dict 格式。"""
     return {
         "content": c.text,
@@ -103,7 +104,7 @@ def _candidate_to_summary_dict(c: Any) -> dict[str, Any]:
     }
 
 
-def _candidate_to_vector_dict(c: Any) -> dict[str, Any]:
+def _candidate_to_vector_dict(c: RetrievalCandidate) -> dict[str, Any]:
     """将 RetrievalCandidate 转回向量搜索结果的 dict 格式。"""
     return {
         "text": c.text,

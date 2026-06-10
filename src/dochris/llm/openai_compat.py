@@ -125,8 +125,8 @@ class OpenAICompatProvider(BaseLLMProvider):
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=max_tokens or self.max_tokens,
-                temperature=temperature or self.temperature,
+                max_tokens=max_tokens if max_tokens is not None else self.max_tokens,
+                temperature=temperature if temperature is not None else self.temperature,
                 **kwargs,
             )
 
@@ -218,12 +218,14 @@ class OpenAICompatProvider(BaseLLMProvider):
         stream = await client.chat.completions.create(
             model=self.model,
             messages=messages,
-            max_tokens=max_tokens or self.max_tokens,
+            max_tokens=max_tokens if max_tokens is not None else self.max_tokens,
             temperature=temperature if temperature is not None else self.temperature,
             stream=True,
             **kwargs,
         )
         async for chunk in stream:
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta
             if delta.content:
                 yield delta.content

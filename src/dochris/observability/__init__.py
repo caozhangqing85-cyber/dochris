@@ -12,6 +12,8 @@
     obs.record_llm_usage(LLMUsage(...))
 """
 
+from collections.abc import Generator
+
 from dochris.observability.cost import CostEstimator
 from dochris.observability.metrics import (
     LLMUsage,
@@ -65,7 +67,7 @@ class ObservabilityManager:
         """是否启用可观测性。"""
         return self._enabled
 
-    def span(self, name: str, **attrs: str | int | float) -> "span":
+    def span(self, name: str, **attrs: str | int | float) -> Generator[SpanContext, None, None]:
         """创建 trace span（上下文管理器）。
 
         即使 disabled 也返回有效的 context manager，不报错。
@@ -108,7 +110,11 @@ class ObservabilityManager:
         collection_name: str | None = None,
         retriever_type: str | None = None,
     ) -> None:
-        """记录检索指标。"""
+        """记录检索指标。
+
+        注意：query / collection_name 当前未传递给底层 metrics，
+        保留签名供后续按查询/集合维度聚合使用。
+        """
         if not self._enabled:
             return
         retriever = retriever_type or "unknown"

@@ -75,13 +75,13 @@ class TestPrecisionAtK(TestCase):
     """precision@k 测试"""
 
     def test_perfect_precision(self) -> None:
-        """全部命中"""
+        """全部命中（检索结果数 = k）"""
         metrics = compute_retrieval_metrics(
             retrieved_ids=["A", "B"],
             expected_ids=["A", "B"],
-            k=5,
+            k=2,
         )
-        self.assertEqual(metrics["precision@5"], 1.0)
+        self.assertEqual(metrics["precision@2"], 1.0)
 
     def test_partial_precision(self) -> None:
         """部分命中"""
@@ -210,7 +210,8 @@ class TestEvaluateSample(TestCase):
 
         self.assertEqual(result.sample_id, "q1")
         self.assertEqual(result.metrics["recall@5"], 1.0)
-        self.assertEqual(result.metrics["precision@5"], 1.0)
+        # 标准定义：1 条命中 / k=5 个槽位 = 0.2
+        self.assertEqual(result.metrics["precision@5"], 0.2)
         self.assertEqual(len(result.failures), 0)
 
     def test_missed_retrieval(self) -> None:

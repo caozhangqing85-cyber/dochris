@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from dochris.rag.reranker.base import BaseReranker
@@ -43,26 +44,32 @@ class CrossEncoderReranker(BaseReranker):
         self._max_length = max_length
         self._device = device
         self._model = None
+        self._lock = threading.Lock()
 
     def _ensure_model(self) -> None:
-        """延迟加载模型，首次调用时初始化。"""
+        """延迟加载模型，首次调用时初始化（线程安全双重检查）。"""
         if self._model is not None:
             return
-        try:
-            from sentence_transformers import CrossEncoder
-        except ImportError:
-            raise ImportError(
-                "sentence-transformers 未安装，无法使用 CrossEncoder Reranker。\n"
-                "安装命令: pip install sentence-transformers"
-            ) from None
+        with self._lock:
+            if self._model is not None:
+                return
+            try:
+                from sentence_transformers import CrossEncoder
+            except ImportError:
+                raise ImportError(
+                    "sentence-transformers 未安装，无法使用 CrossEncoder Reranker。\n"
+                    "安装命令: pip install sentence-transformers"
+                ) from None
 
-        logger.info("加载 CrossEncoder 模型: %s (device=%s)", self._model_name, self._device)
-        self._model = CrossEncoder(
-            self._model_name,
-            max_length=self._max_length,
-            device=self._device if self._device != "auto" else None,
-        )
-        logger.info("CrossEncoder 模型加载完成")
+            logger.info(
+                "加载 CrossEncoder 模型: %s (device=%s)", self._model_name, self._device
+            )
+            self._model = CrossEncoder(
+                self._model_name,
+                max_length=self._max_length,
+                device=self._device if self._device != "auto" else None,
+            )
+            logger.info("CrossEncoder 模型加载完成")
 
     def rerank(
         self,
@@ -133,8 +140,10 @@ class IdentityReranker(BaseReranker):
         candidates: list[RetrievalCandidate],
         top_k: int = 5,
     ) -> list[RetrievalCandidate]:
-        """直接返回前 top_k 候选，不修改分数。"""
-        return candidates[:top_k]
+        """直接返回前 top_k 候选的防御性拷贝，不修改分数。"""
+        from dataclasses import replace
+
+        return [replace(c) for c in candidates[:top_k]]
 
 
 def _copy_with_rerank(
@@ -146,20 +155,14 @@ def _copy_with_rerank(
     不修改原始候选（防御性拷贝），同时更新 score_kind 和 normalized_score
     以反映 rerank 分数为新的排序依据。
     """
+    from dataclasses import replace
+
     from dochris.rag.schemas import normalize_score
 
     new_score = normalize_score(rerank_score, "rerank")
-    # dataclass 不是 frozen，直接构造新实例
-    from dataclasses import fields as dc_fields
-
-    kwargs = {}
-    for f in dc_fields(candidate):
-        kwargs[f.name] = getattr(candidate, f.name)
-
-    kwargs["rerank_score"] = rerank_score
-    kwargs["score_kind"] = "rerank"
-    kwargs["normalized_score"] = new_score
-
-    from dochris.rag.schemas import RetrievalCandidate
-
-    return RetrievalCandidate(**kwargs)
+    return replace(
+        candidate,
+        rerank_score=rerank_score,
+        score_kind="rerank",
+        normalized_score=new_score,
+    )

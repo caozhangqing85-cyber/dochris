@@ -52,6 +52,15 @@ def _detect_api_key() -> str | None:
     )
 
 
+def _parse_bool(v: str) -> str:
+    """将环境变量布尔值统一为 "true"/"false"。
+
+    支持 "true"/"1"/"yes"（不区分大小写）为真值，
+    其他值一律为 "false"。
+    """
+    return "true" if v.lower().strip() in ("true", "1", "yes") else "false"
+
+
 @dataclass
 class Settings:
     """知识库系统配置
@@ -82,15 +91,15 @@ class Settings:
         "local_llm_model": ("LOCAL_LLM_MODEL", "qwen:14b", None),
         "local_llm_api_key": ("LOCAL_LLM_API_KEY", "ollama", None),
         # --- RAG 改进方案配置项（默认关闭，不影响现有行为）---
-        "reranker_enabled": ("RERANKER_ENABLED", "false", None),
+        "reranker_enabled": ("RERANKER_ENABLED", "false", _parse_bool),
         "reranker_provider": ("RERANKER_PROVIDER", "bge", None),
         "reranker_model": ("RERANKER_MODEL", "BAAI/bge-reranker-base", None),
         "reranker_candidate_k": ("RERANKER_CANDIDATE_K", "50", int),
         "reranker_top_k": ("RERANKER_TOP_K", "5", int),
-        "observability_enabled": ("OBSERVABILITY_ENABLED", "false", None),
-        "prometheus_enabled": ("PROMETHEUS_ENABLED", "false", None),
+        "observability_enabled": ("OBSERVABILITY_ENABLED", "false", _parse_bool),
+        "prometheus_enabled": ("PROMETHEUS_ENABLED", "false", _parse_bool),
         "chunk_strategy": ("CHUNK_STRATEGY", "structure", None),
-        "index_raw_chunks": ("INDEX_RAW_CHUNKS", "false", None),
+        "index_raw_chunks": ("INDEX_RAW_CHUNKS", "false", _parse_bool),
     }
 
     @classmethod

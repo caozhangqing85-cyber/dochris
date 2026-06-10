@@ -83,7 +83,10 @@ class RAGEvaluator:
         evidence = self._extract_evidence(result)
 
         # 计算检索指标
-        return evaluate_sample(sample, evidence, k=self.k)
+        eval_result = evaluate_sample(sample, evidence, k=self.k)
+        # 直接复用本次查询的 answer，避免二次查询
+        eval_result.answer = result.get("answer", "")
+        return eval_result
 
     async def evaluate_dataset(
         self,
@@ -102,19 +105,6 @@ class RAGEvaluator:
         for i, sample in enumerate(samples, 1):
             logger.info("评估样本 %d/%d: %s", i, len(samples), sample.id)
             eval_result = await self.evaluate_sample(sample)
-            # 补充 LLM 回答（如有）
-            try:
-                from dochris.phases.phase3_query import query_async
-
-                query_result = await query_async(
-                    sample.question,
-                    mode=self.mode,
-                    top_k=self.k,
-                    rerank=self.rerank,
-                )
-                eval_result.answer = query_result.get("answer", "")
-            except Exception:
-                pass
             results.append(eval_result)
 
         # 汇总

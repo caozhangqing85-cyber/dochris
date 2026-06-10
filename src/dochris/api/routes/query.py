@@ -42,6 +42,8 @@ def _to_search_result(
         file_path=item.get("file_path", ""),
         manifest_id=item.get("manifest_id", item.get("src_id")),
         score=normalized,
+        rerank_score=item.get("rerank_score"),
+        rank_source="rerank" if item.get("rerank_score") is not None else score_type,
     )
 
 
@@ -105,6 +107,7 @@ async def query_stream(
     q: str = Query(..., min_length=1, max_length=500, description="查询关键词"),
     mode: str = Query(default="combined", description="查询模式"),
     top_k: int = Query(default=5, ge=1, le=50, description="返回结果数量"),
+    rerank: bool = Query(default=False, description="启用 Reranker 重排序"),
 ) -> StreamingResponse:
     """流式查询知识库 — SSE 端点
 

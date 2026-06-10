@@ -13,13 +13,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from dochris.rag.reranker.base import BaseReranker
 from dochris.rag.reranker.cross_encoder import CrossEncoderReranker, IdentityReranker
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

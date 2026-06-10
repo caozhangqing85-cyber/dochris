@@ -46,13 +46,13 @@ def compute_retrieval_metrics(
     top_k = retrieved_ids[:k]
     expected_set = set(expected_ids)
 
-    # 命中集合
-    hits = [mid for mid in top_k if mid in expected_set]
+    # 命中集合（去重：同一文档出现多次只算一次）
+    hits_set = expected_set & set(top_k)
 
-    recall = len(hits) / len(expected_set) if expected_set else 0.0
-    precision = len(hits) / len(top_k) if top_k else 0.0
+    recall = len(hits_set) / len(expected_set) if expected_set else 0.0
+    precision = len(hits_set) / k if k > 0 else 0.0
     mrr = _compute_mrr(top_k, expected_set)
-    ndcg = _compute_ndcg(top_k, expected_set)
+    ndcg = _compute_ndcg(top_k, expected_set, k)
 
     return {
         f"recall@{k}": round(recall, 4),
@@ -81,11 +81,11 @@ def _compute_mrr(top_k: list[str], expected_set: set[str]) -> float:
     return 0.0
 
 
-def _compute_ndcg(top_k: list[str], expected_set: set[str]) -> float:
+def _compute_ndcg(top_k: list[str], expected_set: set[str], k: int = 5) -> float:
     """计算 NDCG（Normalized Discounted Cumulative Gain）。
 
-    DCG = Σ (relevance / log2(rank + 1))
-    IDCG = Σ (1 / log2(rank + 1))  for |expected| items
+    DCG = Σ (relevance / log2(rank + 1))  每个期望 ID 最多贡献一次
+    IDCG = Σ (1 / log2(rank + 1))  for min(|expected|, k) items
     NDCG = DCG / IDCG
 
     简化：相关性为二元（命中=1，未命中=0）。
@@ -93,6 +93,7 @@ def _compute_ndcg(top_k: list[str], expected_set: set[str]) -> float:
     Args:
         top_k: 前 k 个检索结果的 ID
         expected_set: 期望 ID 集合
+        k: 截断位置（用于 IDCG 计算）
 
     Returns:
         NDCG 值 [0, 1]
@@ -100,15 +101,17 @@ def _compute_ndcg(top_k: list[str], expected_set: set[str]) -> float:
     if not expected_set:
         return 0.0
 
-    # DCG：实际排序下的增益
+    # DCG：实际排序下的增益（去重：每个期望 ID 最多贡献一次）
     dcg = 0.0
+    seen: set[str] = set()
     for i, mid in enumerate(top_k, 1):
-        if mid in expected_set:
+        if mid in expected_set and mid not in seen:
             dcg += 1.0 / math.log2(i + 1)
+            seen.add(mid)
 
-    # IDCG：最优排序下的增益（所有期望文档排最前）
+    # IDCG：最优排序下的增益（min(|expected|, k) 个期望文档排最前）
     idcg = 0.0
-    for i in range(1, min(len(expected_set), len(top_k)) + 1):
+    for i in range(1, min(len(expected_set), k) + 1):
         idcg += 1.0 / math.log2(i + 1)
 
     return dcg / idcg if idcg > 0 else 0.0

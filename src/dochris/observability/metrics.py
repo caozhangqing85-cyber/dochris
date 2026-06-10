@@ -90,7 +90,10 @@ _cache_counter = None
 
 
 def _register_metrics() -> None:
-    """注册所有 Prometheus 指标（只调用一次）。"""
+    """注册所有 Prometheus 指标（只调用一次）。
+
+    使用 try/except 防止热重载或测试场景下重复注册导致 ValueError。
+    """
     global \
         _query_counter, _query_latency, \
         _llm_counter, _llm_latency, _llm_tokens, \
@@ -100,60 +103,64 @@ def _register_metrics() -> None:
 
     from prometheus_client import Counter, Histogram
 
-    _query_counter = Counter(
-        "dochris_query_total",
-        "Total number of queries",
-        ["mode", "status"],
-    )
-    _query_latency = Histogram(
-        "dochris_query_latency_seconds",
-        "Query latency in seconds",
-        ["mode"],
-        buckets=[0.5, 1, 2, 5, 10, 30, 60],
-    )
-    _llm_counter = Counter(
-        "dochris_llm_calls_total",
-        "Total LLM API calls",
-        ["provider", "model", "operation", "status"],
-    )
-    _llm_latency = Histogram(
-        "dochris_llm_latency_seconds",
-        "LLM API call latency in seconds",
-        ["provider", "model"],
-        buckets=[0.5, 1, 2, 5, 10, 30, 60, 120],
-    )
-    _llm_tokens = Counter(
-        "dochris_llm_tokens_total",
-        "Total LLM token usage",
-        ["provider", "model", "type"],  # type: prompt / completion
-    )
-    _retrieval_counter = Counter(
-        "dochris_retrieval_total",
-        "Total retrieval operations",
-        ["retriever", "status"],
-    )
-    _retrieval_latency = Histogram(
-        "dochris_retrieval_latency_seconds",
-        "Retrieval latency in seconds",
-        ["retriever"],
-        buckets=[0.1, 0.25, 0.5, 1, 2, 5],
-    )
-    _rerank_counter = Counter(
-        "dochris_rerank_total",
-        "Total rerank operations",
-        ["provider", "status"],
-    )
-    _rerank_latency = Histogram(
-        "dochris_rerank_latency_seconds",
-        "Rerank latency in seconds",
-        ["provider"],
-        buckets=[0.1, 0.25, 0.5, 1, 2, 5],
-    )
-    _cache_counter = Counter(
-        "dochris_cache_total",
-        "Cache hit/miss counter",
-        ["result"],  # result: hit / miss
-    )
+    try:
+        _query_counter = Counter(
+            "dochris_query_total",
+            "Total number of queries",
+            ["mode", "status"],
+        )
+        _query_latency = Histogram(
+            "dochris_query_latency_seconds",
+            "Query latency in seconds",
+            ["mode"],
+            buckets=[0.5, 1, 2, 5, 10, 30, 60],
+        )
+        _llm_counter = Counter(
+            "dochris_llm_calls_total",
+            "Total LLM API calls",
+            ["provider", "model", "operation", "status"],
+        )
+        _llm_latency = Histogram(
+            "dochris_llm_latency_seconds",
+            "LLM API call latency in seconds",
+            ["provider", "model"],
+            buckets=[0.5, 1, 2, 5, 10, 30, 60, 120],
+        )
+        _llm_tokens = Counter(
+            "dochris_llm_tokens_total",
+            "Total LLM token usage",
+            ["provider", "model", "type"],  # type: prompt / completion
+        )
+        _retrieval_counter = Counter(
+            "dochris_retrieval_total",
+            "Total retrieval operations",
+            ["retriever", "status"],
+        )
+        _retrieval_latency = Histogram(
+            "dochris_retrieval_latency_seconds",
+            "Retrieval latency in seconds",
+            ["retriever"],
+            buckets=[0.1, 0.25, 0.5, 1, 2, 5],
+        )
+        _rerank_counter = Counter(
+            "dochris_rerank_total",
+            "Total rerank operations",
+            ["provider", "status"],
+        )
+        _rerank_latency = Histogram(
+            "dochris_rerank_latency_seconds",
+            "Rerank latency in seconds",
+            ["provider"],
+            buckets=[0.1, 0.25, 0.5, 1, 2, 5],
+        )
+        _cache_counter = Counter(
+            "dochris_cache_total",
+            "Cache hit/miss counter",
+            ["result"],  # result: hit / miss
+        )
+    except ValueError:
+        # 热重载或测试场景下可能已注册，跳过重复注册
+        logger.warning("Prometheus 指标已注册，跳过重复注册")
 
 
 def record_query(mode: str, status: str = "success", latency: float = 0.0) -> None:
