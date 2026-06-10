@@ -115,15 +115,84 @@ class OpenAICompatProvider(BaseLLMProvider):
         Returns:
             生成的文本
         """
-        client = self._get_client()
-        response = await client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=max_tokens or self.max_tokens,
-            temperature=temperature or self.temperature,
-            **kwargs,
-        )
-        return response.choices[0].message.content or ""
+        import time
+
+        start = time.time()
+        error_type: str | None = None
+
+        try:
+            client = self._get_client()
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature or self.temperature,
+                **kwargs,
+            )
+
+            # 记录 LLM usage（可观测性）
+            latency_ms = (time.time() - start) * 1000
+            self._record_usage(response, latency_ms, "generate_with_messages")
+
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            error_type = type(e).__name__
+            latency_ms = (time.time() - start) * 1000
+            self._record_usage_error(latency_ms, "generate_with_messages", error_type)
+            raise
+
+    def _record_usage(self, response: Any, latency_ms: float, operation: str) -> None:
+        """记录 LLM 调用到可观测性系统。"""
+        try:
+            from dochris.observability import get_observability
+
+            obs = get_observability()
+            if not obs.enabled:
+                return
+
+            usage = getattr(response, "usage", None)
+            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+            total_tokens = getattr(usage, "total_tokens", 0) or 0
+
+            from dochris.observability.metrics import LLMUsage
+
+            llm_usage = LLMUsage(
+                provider="openai_compat",
+                model=self.model,
+                operation=operation,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                latency_ms=latency_ms,
+            )
+            obs.record_llm_usage(llm_usage)
+        except Exception:
+            # 可观测性记录失败不应影响正常调用
+            pass
+
+    def _record_usage_error(
+        self, latency_ms: float, operation: str, error_type: str
+    ) -> None:
+        """记录 LLM 调用错误。"""
+        try:
+            from dochris.observability import get_observability
+            from dochris.observability.metrics import LLMUsage
+
+            obs = get_observability()
+            if not obs.enabled:
+                return
+
+            llm_usage = LLMUsage(
+                provider="openai_compat",
+                model=self.model,
+                operation=operation,
+                latency_ms=latency_ms,
+                error_type=error_type,
+            )
+            obs.record_llm_usage(llm_usage)
+        except Exception:
+            pass
 
     async def generate_stream(
         self,

@@ -52,12 +52,18 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-API-Key"],
     )
 
+    # 可观测性：trace_id 中间件（CORS → tracing → auth）
+    from dochris.observability.middleware import TracingMiddleware
+
+    application.add_middleware(TracingMiddleware)
+
     from dochris.api.routes.compile import router as compile_router
     from dochris.api.routes.config import router as config_router
     from dochris.api.routes.contribution import router as contribution_router
     from dochris.api.routes.files import router as files_router
     from dochris.api.routes.graph import router as graph_router
     from dochris.api.routes.manifests import router as manifests_router
+    from dochris.api.routes.metrics import router as metrics_router
     from dochris.api.routes.promote import router as promote_router
     from dochris.api.routes.quality import router as quality_router
     from dochris.api.routes.query import router as query_router
@@ -102,6 +108,9 @@ def create_app() -> FastAPI:
     application.include_router(
         recompile_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
     )
+
+    # Prometheus /metrics 端点（无需认证，由 endpoint 自身检查开关）
+    application.include_router(metrics_router, prefix="/api/v1")
 
     @application.get("/", tags=["root"])
     async def root() -> dict[str, object]:

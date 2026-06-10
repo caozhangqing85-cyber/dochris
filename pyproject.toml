@@ -44,6 +44,8 @@ dependencies = [
 api = [
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",
+    "prometheus-client>=0.20.0",
+    "sse-starlette>=2.1.0",
 ]
 leann = [
     "leann-vector>=0.1.0",

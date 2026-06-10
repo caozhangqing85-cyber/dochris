@@ -45,6 +45,9 @@ class QueryResponse(BaseModel):
     reranked: bool = False
     """是否经过 Reranker 重排序"""
 
+    trace_id: str = ""
+    """请求追踪 ID，用于关联后端日志"""
+
 
 # ── 编译 ─────────────────────────────────────────────────────
 

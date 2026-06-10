@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -10,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from dochris.api.schemas import ErrorResponse, QueryResponse, SearchResult
+from dochris.observability.tracing import get_current_trace_id
 from dochris.phases import query_engine
 from dochris.phases.phase3_query import query_async as do_query_async
 from dochris.rag.schemas import normalize_score
@@ -91,6 +91,7 @@ async def query_knowledge_base(
         answer=result.get("answer"),
         time_seconds=result.get("time_seconds", 0.0),
         reranked="reranker" in result.get("search_sources", []),
+        trace_id=get_current_trace_id(),
     )
 
     return response
@@ -110,24 +111,27 @@ async def query_stream(
     先返回检索结果（concepts, summaries, vector_results），
     然后流式返回 LLM 生成的回答。
 
-    SSE 事件格式:
-    - event: meta        — 查询元信息 (query, mode, search_sources)
-    - event: results     — 检索结果 JSON (concepts + summaries + vector_results)
-    - event: answer      — LLM 回答的一个文本 chunk
-    - event: done        — 流结束
-    - event: error       — 错误信息
+    SSE 事件格式 (v=1):
+    - event: meta         — 查询元信息 (query, mode, search_sources)
+    - event: retrieval    — 检索结果 JSON (concepts + summaries + vector_results)
+    - event: answer_delta — LLM 回答的一个文本 chunk
+    - event: done         — 流结束（含 trace_id）
+    - event: error        — 错误信息
+    - event: ping         — 心跳保活
     """
-
-    def _sse_event(event: str, data: Any) -> str:
-        payload = (
-            json.dumps(data, ensure_ascii=False) if isinstance(data, (dict, list)) else str(data)
-        )
-        return f"event: {event}\ndata: {payload}\n\n"
 
     async def _async_generate() -> Any:
         try:
+            import asyncio
             import time
 
+            from dochris.api.sse import (
+                sse_answer_delta,
+                sse_done_event,
+                sse_error_event,
+                sse_meta_event,
+                sse_retrieval_event,
+            )
             from dochris.phases.phase3_query import (
                 search_concepts,
                 search_summaries,
@@ -153,48 +157,30 @@ async def query_stream(
                     search_sources.append(summaries[0].get("source", ""))
 
             # 2. 立即发送 meta 事件（不等向量搜索）
-            yield _sse_event(
-                "meta",
-                {
-                    "query": q,
-                    "mode": mode,
-                    "search_sources": sorted(set(search_sources)),
-                    "time_seconds": round(time.time() - start, 2),
-                },
+            yield sse_meta_event(
+                query=q,
+                mode=mode,
+                search_sources=sorted(set(search_sources)),
+                time_seconds=time.time() - start,
             )
 
             # 3. 发送概念+摘要结果（让用户立即看到部分结果）
-            yield _sse_event(
-                "results",
-                {
-                    "concepts": [_to_search_result(r, "keyword").model_dump() for r in concepts],
-                    "summaries": [_to_search_result(r, "keyword").model_dump() for r in summaries],
-                    "vector_results": [],
-                },
+            yield sse_retrieval_event(
+                concepts=[_to_search_result(r, "keyword").model_dump() for r in concepts],
+                summaries=[_to_search_result(r, "keyword").model_dump() for r in summaries],
+                vector_results=[],
             )
 
             # 4. 向量检索（异步，通过 provider 抽象层）
             if mode in ("vector", "combined"):
                 try:
-                    import asyncio
-
                     vector_results = await asyncio.to_thread(vector_search, q, top_k, logger)
                     if vector_results:
                         search_sources.append("vector")
-                        yield _sse_event(
-                            "results",
-                            {
-                                "concepts": [
-                                    _to_search_result(r, "keyword").model_dump() for r in concepts
-                                ],
-                                "summaries": [
-                                    _to_search_result(r, "keyword").model_dump() for r in summaries
-                                ],
-                                "vector_results": [
-                                    _to_search_result(r, "vector").model_dump()
-                                    for r in vector_results
-                                ],
-                            },
+                        yield sse_retrieval_event(
+                            concepts=[_to_search_result(r, "keyword").model_dump() for r in concepts],
+                            summaries=[_to_search_result(r, "keyword").model_dump() for r in summaries],
+                            vector_results=[_to_search_result(r, "vector").model_dump() for r in vector_results],
                         )
                 except Exception as e:
                     logger.warning(f"Vector search failed: {e}")
@@ -202,26 +188,26 @@ async def query_stream(
             # 5. 流式生成 LLM 回答（异步）
             has_context = concepts or summaries or vector_results
             if not has_context:
-                yield _sse_event("answer", "未找到相关内容。请尝试其他关键词。")
-                yield _sse_event("done", {"time_seconds": round(time.time() - start, 2)})
+                yield sse_answer_delta("未找到相关内容。请尝试其他关键词。")
+                yield sse_done_event(time.time() - start, trace_id=get_current_trace_id())
                 return
 
             provider = query_engine.create_query_provider(logger)
             if not provider:
-                yield _sse_event("answer", "（LLM 不可用，请检查 API 认证配置。）")
-                yield _sse_event("done", {"time_seconds": round(time.time() - start, 2)})
+                yield sse_answer_delta("（LLM 不可用，请检查 API 认证配置。）")
+                yield sse_done_event(time.time() - start, trace_id=get_current_trace_id())
                 return
 
             async for chunk in query_engine.generate_answer_stream_async(
                 q, concepts, summaries, vector_results, provider, logger
             ):
-                yield _sse_event("answer", chunk)
+                yield sse_answer_delta(chunk)
 
-            yield _sse_event("done", {"time_seconds": round(time.time() - start, 2)})
+            yield sse_done_event(time.time() - start, trace_id=get_current_trace_id())
 
         except Exception as exc:
             logger.exception("流式查询失败")
-            yield _sse_event("error", str(exc))
+            yield sse_error_event(str(exc))
 
     return StreamingResponse(
         _async_generate(),

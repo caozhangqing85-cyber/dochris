@@ -311,7 +311,16 @@ def retrieve_candidates(
     """
     from dochris.rag.schemas import RetrievalCandidate, normalize_score
 
+    # 可观测性：记录检索操作
+    _obs_start = _obs_time()
     raw_results = search_all(query, top_k)
+
+    _record_retrieval_obs(
+        retriever="search_all",
+        candidate_count=sum(len(raw_results.get(k, [])) for k in ("concepts", "summaries", "vector_results")),
+        latency_ms=_obs_elapsed_ms(_obs_start),
+    )
+
     candidates: list[RetrievalCandidate] = []
 
     # 转换 concepts
@@ -436,7 +445,16 @@ def rerank_candidates(
             provider=settings.reranker_provider,
             model_name=settings.reranker_model,
         )
+        _rerank_start = _obs_time()
         reranked = reranker.rerank(query, candidates, top_k=top_k)
+
+        _record_rerank_obs(
+            provider=settings.reranker_provider,
+            input_count=len(candidates),
+            output_count=len(reranked),
+            latency_ms=_obs_elapsed_ms(_rerank_start),
+        )
+
         logger = logging.getLogger("query_engine")
         logger.info(
             "Reranker 重排序完成: %d → %d 候选 (provider=%s, model=%s)",
@@ -1044,3 +1062,61 @@ def print_result(result: dict) -> None:
     if result["answer"]:
         print("\n## AI 回答")
         print(result["answer"])
+
+
+# ============================================================
+# 可观测性辅助函数（零开销 fallback）
+# ============================================================
+
+
+def _obs_time() -> float:
+    """获取当前时间（秒）。"""
+    import time
+
+    return time.time()
+
+
+def _obs_elapsed_ms(start: float) -> float:
+    """计算耗时（毫秒）。"""
+    import time
+
+    return (time.time() - start) * 1000
+
+
+def _record_retrieval_obs(
+    retriever: str, candidate_count: int, latency_ms: float
+) -> None:
+    """记录检索可观测性指标（静默 fallback）。"""
+    try:
+        from dochris.observability import get_observability
+
+        obs = get_observability()
+        if obs.enabled:
+            obs.record_retrieval(
+                query="",
+                candidate_count=candidate_count,
+                latency_ms=latency_ms,
+                retriever_type=retriever,
+            )
+    except Exception:
+        pass
+
+
+def _record_rerank_obs(
+    provider: str,
+    input_count: int,
+    output_count: int,
+    latency_ms: float,
+) -> None:
+    """记录 Rerank 可观测性指标（静默 fallback）。"""
+    try:
+        from dochris.observability.metrics import record_rerank
+
+        record_rerank(
+            provider=provider,
+            input_count=input_count,
+            output_count=output_count,
+            latency=latency_ms / 1000.0,
+        )
+    except Exception:
+        pass
