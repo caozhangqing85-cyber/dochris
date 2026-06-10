@@ -253,6 +253,9 @@ def main() -> int:
         help="查询模式（默认: combined）",
     )
     parser_query.add_argument("--top-k", type=int, default=5, help="返回结果数量（默认: 5）")
+    parser_query.add_argument(
+        "--rerank", action="store_true", default=False, help="启用 Reranker 重排序"
+    )
 
     # status 命令
     subparsers.add_parser(

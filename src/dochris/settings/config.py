@@ -85,6 +85,8 @@ class Settings:
         "reranker_enabled": ("RERANKER_ENABLED", "false", None),
         "reranker_provider": ("RERANKER_PROVIDER", "bge", None),
         "reranker_model": ("RERANKER_MODEL", "BAAI/bge-reranker-base", None),
+        "reranker_candidate_k": ("RERANKER_CANDIDATE_K", "50", int),
+        "reranker_top_k": ("RERANKER_TOP_K", "5", int),
         "observability_enabled": ("OBSERVABILITY_ENABLED", "false", None),
         "prometheus_enabled": ("PROMETHEUS_ENABLED", "false", None),
         "chunk_strategy": ("CHUNK_STRATEGY", "structure", None),
@@ -286,6 +288,12 @@ class Settings:
 
     reranker_model: str = "BAAI/bge-reranker-base"
     """Reranker 模型名称"""
+
+    reranker_candidate_k: int = 50
+    """Reranker 粗召回候选数量（第一阶段检索扩大召回）"""
+
+    reranker_top_k: int = 5
+    """Reranker 最终返回的候选数量（第二阶段精排后截断）"""
 
     observability_enabled: str = "false"
     """是否启用可观测性（true/false）"""

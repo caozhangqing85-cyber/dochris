@@ -397,6 +397,66 @@ def retrieve_candidates(
 
 
 # ============================================================
+# Reranker 重排序
+# ============================================================
+
+
+def rerank_candidates(
+    query: str,
+    candidates: list[RetrievalCandidate],
+    top_k: int = 5,
+) -> list[RetrievalCandidate]:
+    """对已归一化的候选列表进行重排序。
+
+    仅在 Settings.reranker_enabled == "true" 时执行重排序，
+    否则直接截断到 top_k 返回。
+
+    Args:
+        query: 用户查询文本
+        candidates: retrieve_candidates() 返回的已归一化候选列表
+        top_k: 最终返回的候选数量
+
+    Returns:
+        重排序后的候选列表（长度 <= top_k），
+        每个候选的 rerank_score 被填充
+    """
+    settings = get_settings()
+
+    if settings.reranker_enabled != "true":
+        # Reranker 未启用，直接截断
+        return candidates[:top_k]
+
+    if not candidates:
+        return []
+
+    try:
+        from dochris.rag.reranker.factory import create_reranker
+
+        reranker = create_reranker(
+            provider=settings.reranker_provider,
+            model_name=settings.reranker_model,
+        )
+        reranked = reranker.rerank(query, candidates, top_k=top_k)
+        logger = logging.getLogger("query_engine")
+        logger.info(
+            "Reranker 重排序完成: %d → %d 候选 (provider=%s, model=%s)",
+            len(candidates),
+            len(reranked),
+            settings.reranker_provider,
+            settings.reranker_model,
+        )
+        return reranked
+    except ImportError as e:
+        logger = logging.getLogger("query_engine")
+        logger.warning("Reranker 依赖未安装，跳过重排序: %s", e)
+        return candidates[:top_k]
+    except Exception as e:
+        logger = logging.getLogger("query_engine")
+        logger.warning("Reranker 执行失败，回退到原始排序: %s", e)
+        return candidates[:top_k]
+
+
+# ============================================================
 # 向量检索（保持不变）
 # ============================================================
 

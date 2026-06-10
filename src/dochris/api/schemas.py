@@ -26,6 +26,9 @@ class SearchResult(BaseModel):
     file_path: str = ""
     manifest_id: str | None = None
     score: float = 0.0
+    rerank_score: float | None = None
+    rank_source: str = ""
+    """排序来源: keyword / vector / rerank"""
 
 
 class QueryResponse(BaseModel):
@@ -39,6 +42,8 @@ class QueryResponse(BaseModel):
     search_sources: list[str] = []
     answer: str | None = None
     time_seconds: float = 0.0
+    reranked: bool = False
+    """是否经过 Reranker 重排序"""
 
 
 # ── 编译 ─────────────────────────────────────────────────────

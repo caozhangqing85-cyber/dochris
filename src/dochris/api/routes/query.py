@@ -57,6 +57,7 @@ async def query_knowledge_base(
     contribute: bool = Query(
         default=False, description="启用 Query-as-Contribution，将回答写回知识库"
     ),
+    rerank: bool = Query(default=False, description="启用 Reranker 重排序"),
 ) -> QueryResponse:
     """查询知识库
 
@@ -74,6 +75,7 @@ async def query_knowledge_base(
             logger=logger,
             contribute=contribute,
             workspace_path=workspace_path,
+            rerank=rerank,
         )
     except Exception as exc:
         logger.exception("查询失败")
@@ -88,6 +90,7 @@ async def query_knowledge_base(
         search_sources=result.get("search_sources", []),
         answer=result.get("answer"),
         time_seconds=result.get("time_seconds", 0.0),
+        reranked="reranker" in result.get("search_sources", []),
     )
 
     return response

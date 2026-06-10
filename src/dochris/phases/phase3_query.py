@@ -78,6 +78,41 @@ search_summaries = query_engine.search_summaries
 read_openclaw_config = query_engine.read_openclaw_config
 print_result = query_engine.print_result
 
+
+# --- Reranker 候选转 dict 辅助函数 ---
+def _candidate_to_concept_dict(c: Any) -> dict[str, Any]:
+    """将 RetrievalCandidate 转回概念搜索结果的 dict 格式。"""
+    return {
+        "definition": c.text,
+        "name": c.metadata.get("name", ""),
+        "title": c.metadata.get("title", ""),
+        "source": c.source,
+        "manifest_id": c.manifest_id,
+        "score": c.rerank_score if c.rerank_score is not None else c.normalized_score,
+    }
+
+
+def _candidate_to_summary_dict(c: Any) -> dict[str, Any]:
+    """将 RetrievalCandidate 转回摘要搜索结果的 dict 格式。"""
+    return {
+        "content": c.text,
+        "title": c.metadata.get("title", ""),
+        "source": c.source,
+        "manifest_id": c.manifest_id,
+        "score": c.rerank_score if c.rerank_score is not None else c.normalized_score,
+    }
+
+
+def _candidate_to_vector_dict(c: Any) -> dict[str, Any]:
+    """将 RetrievalCandidate 转回向量搜索结果的 dict 格式。"""
+    return {
+        "text": c.text,
+        "source": c.source,
+        "manifest_id": c.manifest_id,
+        "score": c.rerank_score if c.rerank_score is not None else c.raw_score,
+        "type": c.metadata.get("type", ""),
+    }
+
 # LLM 相关：指向新的 async 函数
 create_query_provider = query_engine.create_query_provider
 generate_answer_async = query_engine.generate_answer_async
@@ -127,6 +162,7 @@ async def query_async(
     logger: logging.Logger | None = None,
     contribute: bool = False,
     workspace_path: str | Path | None = None,
+    rerank: bool = False,
 ) -> dict[str, Any]:
     """异步查询主入口。FastAPI 应 await 此函数。
 
@@ -140,6 +176,7 @@ async def query_async(
         logger: 日志记录器
         contribute: 启用 Query-as-Contribution
         workspace_path: contribute=True 时需要提供工作区路径
+        rerank: 启用 Reranker 重排序
 
     Returns:
         查询结果字典
@@ -181,6 +218,31 @@ async def query_async(
             result["vector_results"] = vector_search(query_str, top_k, logger)
             if result["vector_results"]:
                 result["search_sources"].append("vector")
+
+    # --- Reranker 重排序阶段（可选） ---
+    if rerank and (result["concepts"] or result["summaries"] or result["vector_results"]):
+        try:
+            from dochris.settings import get_settings
+
+            settings = get_settings()
+            candidate_k = settings.reranker_candidate_k
+            final_k = settings.reranker_top_k
+
+            candidates = query_engine.retrieve_candidates(query_str, top_k=top_k, candidate_k=candidate_k)
+            reranked = query_engine.rerank_candidates(query_str, candidates, top_k=final_k)
+
+            # 将 reranked 候选转回 dict 格式供 build_answer_context 使用
+            result["concepts"] = [_candidate_to_concept_dict(c) for c in reranked if c.channel == "concept"]
+            result["summaries"] = [_candidate_to_summary_dict(c) for c in reranked if c.channel == "summary"]
+            result["vector_results"] = [_candidate_to_vector_dict(c) for c in reranked if c.channel in ("vector", "chunk")]
+            result["reranked_candidates"] = reranked
+            result["search_sources"].append("reranker")
+            logger.info(
+                "Reranker 启用: %d 候选 → %d 精选 (candidate_k=%d, final_k=%d)",
+                len(candidates), len(reranked), candidate_k, final_k,
+            )
+        except Exception as e:
+            logger.warning("Reranker 处理失败，使用原始排序: %s", e)
 
     # --- LLM 生成阶段（异步） ---
     if mode in ("combined", "all") and (
@@ -231,6 +293,7 @@ def query(
     logger: logging.Logger | None = None,
     contribute: bool = False,
     workspace_path: str | Path | None = None,
+    rerank: bool = False,
 ) -> dict[str, Any]:
     """同步查询入口。CLI 使用此函数。
 
@@ -245,6 +308,7 @@ def query(
             logger=logger,
             contribute=contribute,
             workspace_path=workspace_path,
+            rerank=rerank,
         )
     )
 

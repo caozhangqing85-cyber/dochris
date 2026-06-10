@@ -21,8 +21,9 @@ def cmd_query(args: argparse.Namespace) -> int:
     # 单次查询
     mode = args.mode or "combined"
     top_k = args.top_k or 5
+    rerank = getattr(args, "rerank", False)
 
-    result = query(args.query, mode=mode, top_k=top_k, logger=logger)
+    result = query(args.query, mode=mode, top_k=top_k, logger=logger, rerank=rerank)
     print_result(result)
 
     if result.get("answer"):
