@@ -8,6 +8,7 @@ import {
 import { queryKnowledge, queryKnowledgeStream, getManifests } from '@/lib/api'
 import type { QueryResponse, ManifestItem, SearchResult, VectorResult } from '@/types'
 import ErrorBoundary from '@/components/ui/ErrorBoundary'
+import StreamingMarkdown from '@/components/StreamingMarkdown'
 
 // ── 常量 ──────────────────────────────────────────────
 
@@ -657,26 +658,7 @@ export default function QueryPage() {
                 borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
                 border: '1px solid var(--border-default)', background: 'var(--bg-card)',
               }}>
-                <div style={{
-                  fontSize: 'var(--text-base)', lineHeight: 'var(--leading-relaxed)',
-                  whiteSpace: 'pre-wrap', color: 'var(--text-primary)', fontWeight: 400,
-                }}>
-                  {result.answer.split(/(\[\[.*?\]\])/).map((part, i) => {
-                    const wikiMatch = part.match(/^\[\[(.+)\]\]$/)
-                    if (wikiMatch) {
-                      return (
-                        <span key={i} style={{
-                          color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer',
-                          borderBottom: '1px dashed var(--color-primary)',
-                        }}>
-                          {wikiMatch[1]}
-                        </span>
-                      )
-                    }
-                    return part
-                  })}
-                  <span className="animate-pulse" style={{ color: 'var(--color-primary)' }}>▎</span>
-                </div>
+                <StreamingMarkdown content={result.answer} streaming={loading} />
               </div>
             )}
           </>
@@ -769,25 +751,7 @@ export default function QueryPage() {
                   borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
                   border: '1px solid var(--border-default)', background: 'var(--bg-card)',
                 }}>
-                  <div style={{
-                    fontSize: 'var(--text-base)', lineHeight: 'var(--leading-relaxed)',
-                    whiteSpace: 'pre-wrap', color: 'var(--text-primary)', fontWeight: 400,
-                  }}>
-                    {result.answer.split(/(\[\[.*?\]\])/).map((part, i) => {
-                      const wikiMatch = part.match(/^\[\[(.+)\]\]$/)
-                      if (wikiMatch) {
-                        return (
-                          <span key={i} style={{
-                            color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer',
-                            borderBottom: '1px dashed var(--color-primary)',
-                          }}>
-                            {wikiMatch[1]}
-                          </span>
-                        )
-                      }
-                      return part
-                    })}
-                  </div>
+                  <StreamingMarkdown content={result.answer} streaming={false} />
                   {result.search_sources?.length > 0 && (
                     <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-elevated)', borderRadius: '4px' }}>
                       <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-2)' }}>引用来源</div>

@@ -40,8 +40,9 @@ export interface StreamCallbacks {
     summaries: SearchResult[]
     vector_results: SearchResult[]
   }) => void
+  onRerank?: (data: { reranked: boolean }) => void
   onChunk?: (text: string) => void
-  onDone?: (finalTime: number) => void
+  onDone?: (finalTime: number, traceId?: string) => void
   onError?: (error: string) => void
 }
 
@@ -50,8 +51,9 @@ export const queryKnowledgeStream = async (
   mode = 'combined',
   topK = 5,
   callbacks: StreamCallbacks = {},
+  rerank = false,
 ): Promise<void> => {
-  const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}`
+  const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}`
   const res = await fetch(url, { headers: { Accept: 'text/event-stream' } })
   if (!res.ok) {
     if (res.status === 404) throw new Error('STREAM_NOT_AVAILABLE')
@@ -66,33 +68,88 @@ export const queryKnowledgeStream = async (
   const decoder = new TextDecoder()
   let buffer = ''
 
+  // SSE 事件累加器：按空行（事件边界）切分
+  // 每个 SSE 事件由若干行 field:value 组成，以一个空行结束
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
 
-    let currentEvent = ''
-    for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        currentEvent = line.slice(7).trim()
-      } else if (line.startsWith('data: ') && currentEvent) {
-        const data = line.slice(6)
-        try {
-          const parsed = JSON.parse(data)
-          switch (currentEvent) {
-            case 'meta': callbacks.onMeta?.(parsed); break
-            case 'results': callbacks.onResults?.(parsed); break
-            case 'answer': callbacks.onChunk?.(typeof parsed === 'string' ? parsed : String(parsed)); break
-            case 'done': callbacks.onDone?.(parsed?.time_seconds ?? 0); break
-            case 'error': callbacks.onError?.(typeof parsed === 'string' ? parsed : JSON.stringify(parsed)); break
-          }
-        } catch { /* ignore malformed JSON */ }
-        currentEvent = ''
+    // 按空行切分出完整的事件块（兼容 \n\n 和 \r\n\r\n）
+    let sepIndex: number
+    while ((sepIndex = buffer.search(/\r?\n\r?\n/)) !== -1) {
+      const eventBlock = buffer.slice(0, sepIndex)
+      buffer = buffer.slice(sepIndex).replace(/^\r?\n\r?\n/, '')
+
+      // 解析事件块内的 field:value 行
+      const lines = eventBlock.split(/\r?\n/)
+      let eventName = ''
+      const dataLines: string[] = []
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          // SSE 规范：多个 data: 行用 \n 连接还原原文
+          dataLines.push(line.slice(5).replace(/^ /, ''))
+        }
       }
+      if (!eventName || dataLines.length === 0) continue
+
+      dispatchEvent(eventName, dataLines.join('\n'), callbacks)
     }
+  }
+}
+
+/** 按 SSE 事件名分发到对应回调。
+ *
+ * answer_delta 为纯文本（不经 JSON 编码），其余事件为 JSON。
+ * 事件名与后端 src/dochris/api/sse.py QueryStreamEventName 对齐。
+ */
+function dispatchEvent(
+  eventName: string,
+  rawData: string,
+  callbacks: StreamCallbacks,
+): void {
+  try {
+    switch (eventName) {
+      case 'meta': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onMeta?.(parsed)
+        break
+      }
+      case 'retrieval': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onResults?.(parsed)
+        break
+      }
+      case 'rerank': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onRerank?.(parsed)
+        break
+      }
+      case 'answer_delta': {
+        // answer_delta 是纯文本，不 JSON 解析
+        callbacks.onChunk?.(rawData)
+        break
+      }
+      case 'done': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onDone?.(parsed?.time_seconds ?? 0, parsed?.trace_id)
+        break
+      }
+      case 'error': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onError?.(parsed?.message ?? rawData)
+        break
+      }
+      default:
+        // ping 等心跳事件忽略
+        break
+    }
+  } catch {
+    // JSON 解析失败：对非 answer_delta 事件，回退到原文
+    if (eventName === 'error') callbacks.onError?.(rawData)
   }
 }
 

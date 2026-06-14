@@ -89,10 +89,12 @@
   - [x] observability/（tracing + metrics + cost + middleware）
   - [x] Prometheus 5 类指标 + /metrics 端点 + trace_id 中间件
   - [x] LLMProvider usage/latency/cost 自动记录 + 25 个单元测试全通过
-- [ ] P4-4: 流式输出工程化（第 2 周，Day 5-7）⚠️ 后端完成 / 前端待做
+- [x] P4-4: 流式输出工程化（第 2 周，Day 5-7）✅ (2026-06-14)
   - [x] api/sse.py（StrEnum 事件名 + v=1 版本 + 心跳）
   - [x] SSE 流式重构 + done 事件含 trace_id
-  - [ ] 前端 StreamingMarkdown + 集成测试（Day 7 待做）
+  - [x] 前端 StreamingMarkdown 组件（react-markdown + GFM + 代码高亮 + wiki-link）
+  - [x] 修复前端 SSE 解析器对齐后端事件名（retrieval/answer_delta）
+  - [ ] 真实数据集成测试与手动 smoke（待有数据后执行）
 - [x] P4-5: 语义分块策略优化（第 3 周）✅ (2026-06-14)
   - [x] rag/chunking/ 模块（BaseChunker ABC + ChunkMetadata + DocumentChunk）
   - [x] StructureChunker（包装现有 structure_aware_split）
@@ -1353,5 +1355,5 @@ def test_llm_call_latency(benchmark):
 - [x] ~~P4-1: Reranker 重排序（第 1 周 Day 1-2）~~ ✅ (2026-06-10) — `src/dochris/rag/reranker/`
 - [x] ~~P4-2: RAG 评估体系（第 1 周 Day 3-5）~~ ✅ (2026-06-10) — `src/dochris/eval/`
 - [x] ~~P4-3: 可观测性监控（第 2 周 Day 1-4）~~ ✅ (2026-06-10) — `src/dochris/observability/`
-- [ ] P4-4: 流式输出工程化（第 2 周 Day 5-7）⚠️ 后端完成 — 前端 StreamingMarkdown 待做 — `src/dochris/api/sse.py`
+- [x] ~~P4-4: 流式输出工程化（第 2 周 Day 5-7）~~ ✅ (2026-06-14) — `src/dochris/api/sse.py` + `frontend/src/components/StreamingMarkdown.tsx`
 - [x] ~~P4-5: 语义分块策略优化（第 3 周）~~ ✅ (2026-06-14) — `src/dochris/rag/chunking/`

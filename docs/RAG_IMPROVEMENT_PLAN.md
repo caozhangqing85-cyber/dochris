@@ -1817,10 +1817,15 @@ Day 5-6：✅
 - [x] SSE 流式路由重构（使用 sse_* 编码函数替代裸字符串）。
 - [x] done 事件包含 trace_id。
 
-Day 7：
+Day 7：✅
 
-- 前端 StreamingMarkdown。
-- SSE 集成测试与手动 smoke。
+- [x] 前端 StreamingMarkdown 组件（`frontend/src/components/StreamingMarkdown.tsx`）。
+- [x] react-markdown + remark-gfm + rehype-highlight 集成（GFM 语法 + 代码高亮）。
+- [x] wiki-link `[[...]]` 转概念胶囊（可点击）。
+- [x] 流式光标动画。
+- [x] 修复前端 SSE 解析器：事件名对齐 `retrieval`/`answer_delta`、多行 data 合并、纯文本 answer_delta 处理。
+- [x] 新增 `rerank` 事件回调支持。
+- [ ] 真实数据集成测试与手动 smoke（待有数据后执行）。
 
 ### 第 3 周：语义分块 + 整体优化（6-7 天） ✅ 已完成（2026-06-14）
 
