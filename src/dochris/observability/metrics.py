@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # 全局注册锁，防止并发注册
 _registry_lock = threading.Lock()
-_registered = False
+# _registered 定义见下方 _ensure_registered 前的三态声明
 
 
 @dataclass(frozen=True)
@@ -54,26 +54,41 @@ class LLMUsage:
     """错误类型（如 rate_limit / timeout / content_filter）"""
 
 
+# 注册状态三态：None=未尝试，True=成功，False=已失败（不重试，避免每次 record 都尝试）
+_registered: bool | None = None
+
+
 def _ensure_registered() -> bool:
     """确保 Prometheus 指标已注册。返回 True 表示可用。"""
     global _registered
 
-    if _registered:
+    if _registered is True:
         return True
+    if _registered is False:
+        # 已失败过，不再重试（避免每次 record_* 都触发重复注册尝试）
+        return False
 
     try:
         from prometheus_client import Counter  # noqa: F401 — 检测可用性
     except ImportError:
+        _registered = False
         return False
 
     with _registry_lock:
-        if _registered:
+        if _registered is True:
             return True
+        if _registered is False:
+            return False
 
-        # 这些在模块级只注册一次
-        _register_metrics()
-        _registered = True
-        return True
+        # 注册：_register_metrics 全部成功才标记 True
+        try:
+            _register_metrics()
+            _registered = True
+            return True
+        except Exception as e:
+            logger.warning("Prometheus 指标注册失败，可观测性记录将降级为空操作: %s", e)
+            _registered = False
+            return False
 
 
 # 指标实例（延迟初始化）
@@ -165,16 +180,16 @@ def _register_metrics() -> None:
 
 def record_query(mode: str, status: str = "success", latency: float = 0.0) -> None:
     """记录查询指标。"""
-    if not _ensure_registered():
+    if not _ensure_registered() or _query_counter is None:
         return
     _query_counter.labels(mode=mode, status=status).inc()
-    if latency > 0:
+    if latency > 0 and _query_latency is not None:
         _query_latency.labels(mode=mode).observe(latency)
 
 
 def record_llm_usage(usage: LLMUsage) -> None:
     """记录 LLM 调用指标。"""
-    if not _ensure_registered():
+    if not _ensure_registered() or _llm_counter is None:
         return
     status = usage.error_type or "success"
     _llm_counter.labels(
@@ -183,15 +198,15 @@ def record_llm_usage(usage: LLMUsage) -> None:
         operation=usage.operation,
         status=status,
     ).inc()
-    if usage.latency_ms > 0:
+    if usage.latency_ms > 0 and _llm_latency is not None:
         _llm_latency.labels(
             provider=usage.provider, model=usage.model
         ).observe(usage.latency_ms / 1000.0)
-    if usage.prompt_tokens > 0:
+    if usage.prompt_tokens > 0 and _llm_tokens is not None:
         _llm_tokens.labels(
             provider=usage.provider, model=usage.model, type="prompt"
         ).inc(usage.prompt_tokens)
-    if usage.completion_tokens > 0:
+    if usage.completion_tokens > 0 and _llm_tokens is not None:
         _llm_tokens.labels(
             provider=usage.provider, model=usage.model, type="completion"
         ).inc(usage.completion_tokens)
@@ -204,10 +219,10 @@ def record_retrieval(
     status: str = "success",
 ) -> None:
     """记录检索指标。"""
-    if not _ensure_registered():
+    if not _ensure_registered() or _retrieval_counter is None:
         return
     _retrieval_counter.labels(retriever=retriever, status=status).inc()
-    if latency > 0:
+    if latency > 0 and _retrieval_latency is not None:
         _retrieval_latency.labels(retriever=retriever).observe(latency)
 
 
@@ -219,16 +234,16 @@ def record_rerank(
     status: str = "success",
 ) -> None:
     """记录 Rerank 指标。"""
-    if not _ensure_registered():
+    if not _ensure_registered() or _rerank_counter is None:
         return
     _rerank_counter.labels(provider=provider, status=status).inc()
-    if latency > 0:
+    if latency > 0 and _rerank_latency is not None:
         _rerank_latency.labels(provider=provider).observe(latency)
 
 
 def record_cache(result: str) -> None:
     """记录缓存命中/未命中。"""
-    if not _ensure_registered():
+    if not _ensure_registered() or _cache_counter is None:
         return
     _cache_counter.labels(result=result).inc()
 

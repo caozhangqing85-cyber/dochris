@@ -53,6 +53,10 @@ class FAISSStore(BaseVectorStore):
         self._indexes: dict[str, Any] = {}  # collection -> faiss.Index
         self._documents: dict[str, dict[str, str]] = {}  # collection -> {id: document}
         self._metadatas: dict[str, dict[str, dict]] = {}  # collection -> {id: metadata}
+        # 显式的向量物理序 -> doc_id 映射（按 add 顺序记录）。
+        # 不能依赖 dict.keys() 顺序，因为 delete 重建索引后物理序变化，
+        # 且从磁盘恢复时 _documents（JSON dict 序）与 FAISS index（物理序）顺序可能不一致。
+        self._id_order: dict[str, list[str]] = {}
 
     def _get_model(self) -> Any:
         """获取或创建嵌入模型
@@ -101,6 +105,7 @@ class FAISSStore(BaseVectorStore):
             self._indexes[collection] = None
             self._documents[collection] = {}
             self._metadatas[collection] = {}
+            self._id_order[collection] = []
             return
 
         try:
@@ -118,9 +123,23 @@ class FAISSStore(BaseVectorStore):
                     data = json.load(f)
                 self._documents[collection] = data.get("documents", {})
                 self._metadatas[collection] = data.get("metadatas", {})
+                # id_order：新格式显式存储；旧数据缺失时从 documents keys 推导
+                id_order = data.get("id_order")
+                if id_order is not None:
+                    self._id_order[collection] = list(id_order)
+                else:
+                    # 旧数据：dict 顺序可能与 FAISS 物理序不一致，仅作兜底
+                    self._id_order[collection] = list(self._documents[collection].keys())
+                    if self._id_order[collection]:
+                        logger.warning(
+                            "FAISS collection '%s' 缺少 id_order 元数据，"
+                            "查询结果 doc_id 映射可能不准，建议重建索引",
+                            collection,
+                        )
             else:
                 self._documents[collection] = {}
                 self._metadatas[collection] = {}
+                self._id_order[collection] = []
 
             logger.debug(f"Loaded FAISS index for collection '{collection}'")
 
@@ -129,11 +148,13 @@ class FAISSStore(BaseVectorStore):
             self._indexes[collection] = None
             self._documents[collection] = {}
             self._metadatas[collection] = {}
+            self._id_order[collection] = []
         except Exception as e:
             logger.warning(f"Failed to load FAISS index for '{collection}': {e}")
             self._indexes[collection] = None
             self._documents[collection] = {}
             self._metadatas[collection] = {}
+            self._id_order[collection] = []
 
     def _save_collection(self, collection: str) -> None:
         """保存集合数据到磁盘
@@ -154,12 +175,13 @@ class FAISSStore(BaseVectorStore):
         if index is not None and index.ntotal > 0:
             faiss.write_index(index, str(index_dir / "index.faiss"))
 
-        # 保存元数据
+        # 保存元数据（含 id_order，保证查询时 doc_id 映射正确）
         with open(index_dir / "metadata.json", "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "documents": self._documents.get(collection, {}),
                     "metadatas": self._metadatas.get(collection, {}),
+                    "id_order": self._id_order.get(collection, []),
                 },
                 f,
                 ensure_ascii=False,
@@ -219,7 +241,12 @@ class FAISSStore(BaseVectorStore):
                 f"metadatas ({len(metadatas)}) and documents ({len(documents)}) length mismatch"
             )
 
+        # 维护 _id_order（按 add 顺序追加），保证与 FAISS 物理序一致
+        id_order = self._id_order.setdefault(collection, [])
         for i, doc_id in enumerate(ids):
+            # 避免重复 add 同一 id 导致 id_order 比实际向量多（add 重复 id 会新增向量行）
+            if doc_id not in self._documents[collection]:
+                id_order.append(doc_id)
             self._documents[collection][doc_id] = documents[i]
             self._metadatas[collection][doc_id] = metadatas[i]
 
@@ -262,25 +289,31 @@ class FAISSStore(BaseVectorStore):
         # 生成查询向量
         query_embedding = model.encode([query_text]).astype("float32")
 
-        # 搜索
-        k = min(n_results, index.ntotal)
+        # where 过滤是 post-filtering，需放大召回再截断，避免结果数不足
+        # 无 where 时直接取 n_results；有 where 时 oversample 10 倍（上限 ntotal）
+        k = min(n_results * 10, index.ntotal) if where else min(n_results, index.ntotal)
+        if k <= 0:
+            return []
         distances, indices = index.search(query_embedding, k)
 
         # 构建结果
         results: list[dict[str, Any]] = []
         docs = self._documents.get(collection, {})
         metas = self._metadatas.get(collection, {})
+        # 用显式 _id_order 映射 FAISS 物理序 -> doc_id（不依赖 dict 顺序）
+        id_order = self._id_order.get(collection, [])
+        # 兼容回退：id_order 为空但 documents 非空时（如旧数据或测试直接注入），
+        # 用 dict keys 顺序（Python 3.7+ 保序）
+        if not id_order and docs:
+            id_order = list(docs.keys())
 
         for i, idx in enumerate(indices[0]):
             if idx < 0:
                 continue
-
-            # FAISS 返回内部索引，映射到文档 ID
-            doc_keys = list(docs.keys())
-            if idx >= len(doc_keys):
+            if idx >= len(id_order):
                 continue
 
-            doc_id = doc_keys[idx]
+            doc_id = id_order[idx]
 
             # 应用 where 过滤
             if where and doc_id in metas:
@@ -291,11 +324,15 @@ class FAISSStore(BaseVectorStore):
             results.append(
                 {
                     "id": doc_id,
-                    "document": docs[doc_id],
+                    "document": docs.get(doc_id, ""),
                     "metadata": metas.get(doc_id, {}),
                     "distance": float(distances[0][i]),
                 }
             )
+
+            # where 过滤时截断到 n_results
+            if where and len(results) >= n_results:
+                break
 
         return results
 
@@ -330,10 +367,11 @@ class FAISSStore(BaseVectorStore):
                 remaining_ids.append(doc_id)
                 remaining_metas.append(metas.get(doc_id, {}))
 
-        # 重建索引
+        # 重建索引（_id_order 由 add_documents 重新按序追加）
         self._documents[collection] = {}
         self._metadatas[collection] = {}
         self._indexes[collection] = None
+        self._id_order[collection] = []
 
         if remaining_docs:
             self.add_documents(collection, remaining_docs, remaining_ids, remaining_metas)

@@ -3,7 +3,6 @@
 kb clean 命令：清理知识库工作区中的缓存、日志和失败记录
 """
 
-import json
 import logging
 import shutil
 import sys
@@ -79,6 +78,17 @@ def _clean_cache(workspace: Path) -> int:
         print("   .cache/ 不存在，跳过")
         return 0
 
+    # 安全校验：cache_dir 必须在 workspace 内，且 workspace 必须是合法工作区
+    # （含 manifests/ 子目录），防止 WORKSPACE 误配为 / 或 ~ 时 rmtree 删关键目录
+    try:
+        cache_dir.resolve().relative_to(workspace.resolve())
+    except ValueError:
+        print(f"   ❌ .cache/ 不在 workspace 内，拒绝清理（路径异常）")
+        return 0
+    if not (workspace / "manifests").exists():
+        print(f"   ❌ workspace 非法（无 manifests/ 目录），拒绝清理")
+        return 0
+
     count = sum(1 for _ in cache_dir.rglob("*") if _.is_file())
     try:
         shutil.rmtree(cache_dir)
@@ -115,23 +125,21 @@ def _clean_logs(workspace: Path) -> int:
 
 
 def _clean_failed_manifests(workspace: Path) -> int:
-    """删除 status=failed 的 manifest"""
+    """删除 status=failed 的 manifest（JSON + 索引一并清理）"""
+    from dochris.manifest import delete_manifest, get_all_manifests
+
     manifests_dir = workspace / "manifests" / "sources"
     if not manifests_dir.exists():
         print("   manifests/sources/ 不存在，跳过")
         return 0
 
     removed = 0
-
-    for f in manifests_dir.glob("*.json"):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if data.get("status") == "failed":
-                f.unlink()
-                removed += 1
-                logger.debug(f"已删除失败 manifest: {f.name}")
-        except (OSError, json.JSONDecodeError):
-            continue
+    # 通过 delete_manifest 统一删除，保证索引一致
+    for m in get_all_manifests(workspace, status="failed"):
+        src_id = m.get("id", "")
+        if src_id and delete_manifest(workspace, src_id):
+            removed += 1
+            logger.debug(f"已删除失败 manifest: {src_id}")
 
     print(f"   🗑️  清理失败 manifest ({removed} 个文件)")
     return removed

@@ -71,9 +71,22 @@ def cleanup_all_clients() -> None:
         _client_instances.clear()
 
     try:
-        # 尝试在现有事件循环中调度清理
-        loop = asyncio.get_running_loop()
-        loop.create_task(_close_all())
+        # 检测是否有运行中的事件循环
+        asyncio.get_running_loop()
+        # 有运行中的 loop：create_task 调度的清理在退出时可能不执行，
+        # 但此处是 atexit（程序退出），loop 通常已停止，回退到新建 loop 运行
+        try:
+            asyncio.run(_close_all())
+        except RuntimeError:
+            # loop 仍在运行无法 asyncio.run，调度后台 task 作为兜底
+            try:
+                loop = asyncio.get_event_loop()
+                loop.create_task(_close_all())
+            except RuntimeError:
+                _client_instances.clear()
+        except Exception as e:
+            logger.debug(f"清理 LLMClient 时出错: {e}")
+            _client_instances.clear()
     except RuntimeError:
         # 没有运行中的事件循环，安全使用 asyncio.run()
         try:
@@ -160,6 +173,8 @@ class LLMClient:
         self.request_delay = request_delay
         self.no_think = model and "qwen3" in model.lower()
         self.last_request_time = 0.0
+        # 速率限制锁：保证并发请求间隔的读-等-写原子性，避免突破 API 速率限制
+        self._rate_lock = asyncio.Lock()
 
         # 注册实例以便程序退出时清理资源
         register_client(self)
@@ -178,14 +193,16 @@ class LLMClient:
         """
         import time
 
-        current_time = time.time()
-        time_since_last = current_time - self.last_request_time
+        # 锁保证读-等-写的原子性，避免并发请求同时判断"间隔已到"而突破速率限制
+        async with self._rate_lock:
+            current_time = time.time()
+            time_since_last = current_time - self.last_request_time
 
-        if time_since_last < self.request_delay:
-            wait_time = self.request_delay - time_since_last
-            await asyncio.sleep(wait_time)
+            if time_since_last < self.request_delay:
+                wait_time = self.request_delay - time_since_last
+                await asyncio.sleep(wait_time)
 
-        self.last_request_time = time.time()
+            self.last_request_time = time.time()
 
     async def close(self) -> None:
         """关闭 LLM 客户端并释放资源

@@ -197,9 +197,9 @@ class SummaryGenerator:
             points_count = "5-10"
             concepts_count = "5-10"
         else:
-            summary_min = "1000"  # noqa: F841
-            points_count = "至少5"  # noqa: F841
-            concepts_count = "至少3"  # noqa: F841
+            summary_min = "1000"
+            points_count = "至少5"
+            concepts_count = "至少3"
 
         system_prompt = f"""你是一位资深知识工程师，擅长从复杂文本中提取结构化知识。
 
@@ -215,7 +215,7 @@ class SummaryGenerator:
 不要在 JSON 前后添加任何说明文字。
 
 JSON 结构如下：
-{
+{{
             "one_line": "用一句话精准概括全文核心内容（20-50字）",
   "key_points": [
     "要点1：独立完整的句子，20-40字",
@@ -224,21 +224,21 @@ JSON 结构如下：
     "要点4",
     "要点5"
   ],
-  "detailed_summary": "''' + summary_min + '''字以上的详细摘要。要求：\\n- 字数不少于''' + summary_min + '''字，充分展开论述\\n- 按逻辑顺序组织，每个论点都要有充分的分析和解释\\n- 包含核心论点、支撑证据、关键结论\\n- 保留原文的论证逻辑和因果关系\\n- 结尾总结核心学习收获和实践启示",
+  "detailed_summary": "{summary_min}字以上的详细摘要。要求：\\n- 字数不少于{summary_min}字，充分展开论述\\n- 按逻辑顺序组织，每个论点都要有充分的分析和解释\\n- 包含核心论点、支撑证据、关键结论\\n- 保留原文的论证逻辑和因果关系\\n- 结尾总结核心学习收获和实践启示",
   "concepts": [
-    {"name": "概念名称", "explanation": "50-100字的详细解释，包含定义、作用和上下文关系"},
-    {"name": "概念2", "explanation": "..."},
-    {"name": "概念3", "explanation": "..."},
-    {"name": "概念4", "explanation": "..."},
-    {"name": "概念5", "explanation": "..."}
+    {{"name": "概念名称", "explanation": "50-100字的详细解释，包含定义、作用和上下文关系"}},
+    {{"name": "概念2", "explanation": "..."}},
+    {{"name": "概念3", "explanation": "..."}},
+    {{"name": "概念4", "explanation": "..."}},
+    {{"name": "概念5", "explanation": "..."}}
   ]
-}
+}}
 
 ## 质量标准（严格）
 - one_line：20-50字，信息密度高，不能是泛泛而谈
-- key_points：''' + points_count + '''个独立要点，每个20-40字
-- detailed_summary：不少于''' + summary_min + '''字，这是硬性要求。要充分展开分析，不要惜字如金
-- concepts：''' + concepts_count + '''个概念，每个explanation要详细实用
+- key_points：{points_count}个独立要点，每个20-40字
+- detailed_summary：不少于{summary_min}字，这是硬性要求。要充分展开分析，不要惜字如金
+- concepts：{concepts_count}个概念，每个explanation要详细实用
 - 禁止使用"作为AI""作为语言模型"等套话，直接以知识工程师身份输出"""
 
         user_prompt = f"""请为以下文档生成高质量的结构化知识摘要。

@@ -292,15 +292,11 @@ def semantic_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> lis
                 )
                 chunk_index += 1
 
-                # 处理 overlap
+                # 处理 overlap：按段落级别保留上一块尾部若干段落（保持句子完整）
                 if overlap > 0 and current_chunk:
-                    # 从上一个块的末尾提取 overlap 内容
-                    last_content = "\n\n".join(current_chunk)
-                    overlap_text = (
-                        last_content[-overlap:] if len(last_content) > overlap else last_content
-                    )
-                    current_chunk = [overlap_text, para]
-                    current_length = len(overlap_text) + para_length
+                    overlap_paras = _get_overlap_paragraphs(current_chunk, overlap)
+                    current_chunk = [*overlap_paras, para]
+                    current_length = sum(len(p) for p in overlap_paras) + para_length
                 else:
                     current_chunk = [para]
                     current_length = para_length
@@ -363,6 +359,26 @@ def _get_overlap_sentences(sentences: list[str], current_index: int, overlap: in
                 break
 
     return overlap_sentences
+
+
+def _get_overlap_paragraphs(paragraphs: list[str], overlap: int) -> list[str]:
+    """从段落列表尾部倒序累积，返回不超过 overlap 字符的尾部段落。
+
+    保证 overlap 内容是紧邻当前 chunk 的尾部（而非从头随机选取），
+    避免上下文断裂。
+    """
+    if overlap <= 0 or not paragraphs:
+        return []
+
+    result: list[str] = []
+    total = 0
+    # 倒序遍历，保证连续性
+    for para in reversed(paragraphs):
+        if total + len(para) > overlap:
+            break
+        result.insert(0, para)
+        total += len(para)
+    return result
 
 
 def fixed_size_chunk(text: str, chunk_size: int = 4000, overlap: int = 200) -> list[TextChunk]:

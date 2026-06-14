@@ -8,6 +8,7 @@ SHA256 缓存管理
 import hashlib
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -90,8 +91,8 @@ def save_cached(cache_dir: Path, file_hash: str, result: dict[str, Any]) -> bool
                 indent=2,
             )
 
-        # 原子写入
-        tmp.rename(entry)
+        # 原子写入：os.replace 跨平台原子（Path.rename 在跨设备时会失败）
+        os.replace(tmp, entry)
         return True
     except (OSError, TypeError) as e:
         logger.warning(f"Failed to save cache: {e}")
@@ -157,7 +158,7 @@ def save_query_cache(workspace_cache_dir: Path, key: str, answer: str) -> bool |
                 ensure_ascii=False,
                 indent=2,
             )
-        tmp.rename(entry)
+        os.replace(tmp, entry)
         return True
     except (OSError, TypeError) as e:
         logger.warning(f"Failed to save query cache: {e}")
@@ -167,6 +168,10 @@ def save_query_cache(workspace_cache_dir: Path, key: str, answer: str) -> bool |
 def clear_cache(cache_dir: Path, older_than_days: int = 30) -> int:
     """
     清理旧缓存文件
+
+    Args:
+        cache_dir: 缓存目录（应仅含缓存 .json；调用方需确保路径正确）
+        older_than_days: 清理多少天前的文件
 
     Returns:
         清理的文件数量

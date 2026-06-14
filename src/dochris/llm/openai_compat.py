@@ -36,6 +36,10 @@ class OpenAICompatProvider(BaseLLMProvider):
         """
         super().__init__(**kwargs)
         self._client: Any = None
+        # 客户端创建锁（_get_client 是同步方法，用 threading.Lock 双重检查）
+        import threading
+
+        self._client_lock = threading.Lock()
 
     def _get_client(self) -> Any:
         """获取或创建 AsyncOpenAI 客户端
@@ -47,25 +51,27 @@ class OpenAICompatProvider(BaseLLMProvider):
             ImportError: openai 包未安装时抛出
         """
         if self._client is None:
-            try:
-                from openai import AsyncOpenAI
-            except ImportError as e:
-                raise ImportError("openai package not installed. Run: pip install openai") from e
+            with self._client_lock:
+                if self._client is not None:
+                    return self._client
+                try:
+                    from openai import AsyncOpenAI
+                except ImportError as e:
+                    raise ImportError("openai package not installed. Run: pip install openai") from e
 
-            import httpx
+                import httpx
 
-            self._client = AsyncOpenAI(
-                api_key=self.api_key,
-                base_url=self.api_base,
-                max_retries=0,
-                timeout=self.timeout,
-                http_client=httpx.AsyncClient(
-                    # 连接池扩大：max_concurrency=3 配置需要匹配的连接池上限
-                    # 原先 max_connections=1 导致所有请求串行（性能评审）
-                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                self._client = AsyncOpenAI(
+                    api_key=self.api_key,
+                    base_url=self.api_base,
+                    max_retries=0,
                     timeout=self.timeout,
-                ),
-            )
+                    http_client=httpx.AsyncClient(
+                        # 连接池扩大：max_concurrency=3 配置需要匹配的连接池上限
+                        limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+                        timeout=self.timeout,
+                    ),
+                )
         return self._client
 
     async def generate(
@@ -223,12 +229,23 @@ class OpenAICompatProvider(BaseLLMProvider):
             stream=True,
             **kwargs,
         )
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if delta.content:
-                yield delta.content
+        try:
+            async for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    yield delta.content
+        finally:
+            # 显式关闭 stream 释放底层 HTTP 连接（异常或提前退出时尤为重要）
+            close = getattr(stream, "close", None)
+            if close is not None:
+                try:
+                    result = close()
+                    if hasattr(result, "__await__"):
+                        await result
+                except Exception:
+                    pass
 
     async def close(self) -> None:
         """关闭客户端连接"""

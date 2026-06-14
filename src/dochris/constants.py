@@ -11,9 +11,21 @@ from pathlib import Path
 # ============================================================
 
 PROJECT_NAME = "dochris"
-PROJECT_VERSION = "1.3.1"
 PROJECT_AUTHOR = "caozhangqing85-cyber"
 REPO_URL = "https://github.com/caozhangqing85-cyber/dochris"
+
+
+def _get_project_version() -> str:
+    """从包元数据读取版本号（单一来源：pyproject.toml），避免硬编码漂移。"""
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        return version(PROJECT_NAME)
+    except (ImportError, PackageNotFoundError, Exception):
+        return "0.0.0"
+
+
+PROJECT_VERSION = _get_project_version()
 
 # ============================================================
 # 默认配置
@@ -39,7 +51,7 @@ DEFAULT_LOG_LEVEL = "INFO"
 # 文件处理
 # ============================================================
 
-# 文件大小限制
+# 文件大小限制（MB，仅供参考；运行时实际限制以 settings.MAX_FILE_SIZE 字节数为准）
 MAX_FILE_SIZE_MB = 500  # 500MB
 MAX_CONTENT_CHARS = 20000
 

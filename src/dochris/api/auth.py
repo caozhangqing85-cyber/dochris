@@ -42,9 +42,8 @@ async def verify_api_key(request: Request) -> None:
         logger.debug(f"无认证模式访问: {path} from {client_host}")
         return
 
-    client_key = request.headers.get("X-API-Key") or request.query_params.get("api_key", "")
-    # 长度不同可直接返回，无需常数时间比较
-    if len(client_key) != len(api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    if not hmac.compare_digest(client_key, api_key):
+    # API Key 仅通过请求头传递（避免进入 URL/access log/Referer 等）
+    # 不再从 query_params 读取，移除长度短路（compare_digest 本身常数时间）
+    client_key = request.headers.get("X-API-Key", "")
+    if not hmac.compare_digest(client_key.encode("utf-8"), api_key.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Invalid API key")

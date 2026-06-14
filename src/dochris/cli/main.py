@@ -256,10 +256,19 @@ def main() -> int:
     parser_query.add_argument(
         "--rerank", action="store_true", default=False, help="启用 Reranker 重排序"
     )
+    parser_query.add_argument(
+        "--contribute",
+        action="store_true",
+        default=False,
+        help="启用 Query-as-Contribution，将高质量回答写回知识库",
+    )
 
     # status 命令
-    subparsers.add_parser(
+    parser_status = subparsers.add_parser(
         "status", help="显示系统状态", description="显示工作区、manifest、API 配置等状态概览"
+    )
+    parser_status.add_argument(
+        "--workspace", help="指定工作区路径（默认使用环境变量或默认路径）"
     )
 
     # promote 命令
@@ -288,8 +297,10 @@ def main() -> int:
     parser_vault_seed = vault_subparsers.add_parser("seed", help="从 Obsidian 拉取笔记")
     parser_vault_seed.add_argument("topic", help="主题关键词")
     parser_vault_seed.add_argument("--limit", type=int, default=5, help="拉取数量")
-    vault_subparsers.add_parser("push", help="推送知识到 Obsidian")
-    vault_subparsers.add_parser("status", help="显示同步状态")
+    parser_vault_promote = vault_subparsers.add_parser("promote", help="推送知识到 Obsidian")
+    parser_vault_promote.add_argument("src_id", help="manifest ID (如 SRC-0001)")
+    parser_vault_list = vault_subparsers.add_parser("list", help="列出关联笔记")
+    parser_vault_list.add_argument("src_id", help="manifest ID (如 SRC-0001)")
 
     # config 命令（子命令组）
     parser_config = subparsers.add_parser("config", help="配置管理", description="查看和修改配置")

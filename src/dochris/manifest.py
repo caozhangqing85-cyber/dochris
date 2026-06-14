@@ -27,6 +27,8 @@ Manifest 格式：
 import csv
 import json
 import logging
+import os
+import tempfile
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -36,7 +38,30 @@ from dochris.log_utils import append_log_to_file
 logger = logging.getLogger(__name__)
 
 # Manifest 写入锁（防止并发写入同一个 JSON 文件导致数据损坏）
+# 注意：仅进程内有效，多进程部署（多 worker）需配合文件锁
 _manifest_lock = threading.Lock()
+
+
+def _atomic_write_json(path: Path, data: dict) -> None:
+    """原子写入 JSON 文件。
+
+    使用临时文件 + os.replace，保证：写入中途崩溃不会损坏目标文件
+    （os.replace 在同设备下是原子操作）。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # 临时文件与目标同目录，确保 os.replace 在同设备（原子）
+    fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
+    except Exception:
+        # 清理临时文件（os.replace 成功后 tmp_path 已不存在）
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 # 保留向后兼容的别名
 append_log = append_log_to_file
@@ -126,14 +151,12 @@ def create_manifest(
         "tags": tags or [],
     }
 
-    # 写入 manifest 文件
+    # 写入 manifest 文件（原子写，append_to_index 纳入同一临界区防并发交错）
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
     with _manifest_lock:
-        with open(manifest_path, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, ensure_ascii=False, indent=2)
-
-    # 同步到索引
-    append_to_index(workspace_path, manifest)
+        _atomic_write_json(manifest_path, manifest)
+        # 同步到索引（在同一锁内，避免并发 create 时 CSV 行交错）
+        append_to_index(workspace_path, manifest)
 
     return manifest
 
@@ -183,6 +206,35 @@ def get_manifest(workspace_path: Path, src_id: str) -> dict | None:
     return data
 
 
+def delete_manifest(workspace_path: Path, src_id: str) -> bool:
+    """删除 manifest JSON 文件并重建索引。
+
+    统一 manifest 删除入口，确保 JSON 文件与 source_index.csv 一致。
+
+    Args:
+        workspace_path: 工作区路径
+        src_id: 来源 ID
+
+    Returns:
+        True 表示文件已删除，False 表示文件不存在
+    """
+    manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
+    with _manifest_lock:
+        if not manifest_path.exists():
+            return False
+        try:
+            manifest_path.unlink()
+        except OSError as e:
+            logger.warning(f"删除 manifest 失败 {src_id}: {e}")
+            return False
+        # 重建索引以移除该条目（索引为 CSV，无单行删除 API，重建最简单可靠）
+        try:
+            rebuild_index(workspace_path)
+        except Exception as e:
+            logger.warning(f"删除后重建索引失败 {src_id}: {e}")
+    return True
+
+
 def update_manifest_status(
     workspace_path: Path,
     src_id: str,
@@ -228,8 +280,9 @@ def update_manifest_status(
         if compiled_summary is not None:
             manifest["compiled_summary"] = compiled_summary
 
+        # promoted_to 用哨兵值 "" 表示显式清空（None 表示不修改）
         if promoted_to is not None:
-            manifest["promoted_to"] = promoted_to
+            manifest["promoted_to"] = None if promoted_to == "" else promoted_to
 
         if trust_level is not None:
             manifest["trust_level"] = trust_level
@@ -240,13 +293,12 @@ def update_manifest_status(
         elif status == "failed":
             manifest["date_failed"] = datetime.now().isoformat()
 
-        # 写回文件
+        # 原子写回文件
         manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-        with open(manifest_path, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        _atomic_write_json(manifest_path, manifest)
 
-    # 同步更新 source_index.csv
-    update_index_entry(workspace_path, src_id, status, quality_score)
+        # 同步更新 source_index.csv（在同一锁内）
+        update_index_entry(workspace_path, src_id, status, quality_score)
 
     return manifest
 

@@ -45,6 +45,10 @@ class FileProcessingError(KnowledgeBaseError):
         super().__init__(message)
         self.file_path = file_path
 
+    def __str__(self) -> str:
+        base = super().__str__()
+        return f"{base} (file={self.file_path})" if self.file_path else base
+
 
 class IngestionError(FileProcessingError):
     """文件摄入异常"""
@@ -52,8 +56,13 @@ class IngestionError(FileProcessingError):
     pass
 
 
-class FileNotFoundError(FileProcessingError):
-    """文件不存在"""
+class SourceNotFoundError(FileProcessingError):
+    """源文件不存在
+
+    注意：故意不命名为 FileNotFoundError，避免遮蔽 Python 内置的
+    FileNotFoundError（OSError 子类）。代码中 except FileNotFoundError
+    捕获的是内置异常，本类用于业务层显式抛出。
+    """
 
     pass
 
@@ -180,6 +189,10 @@ class APIError(KnowledgeBaseError):
         super().__init__(message)
         self.status_code = status_code
 
+    def __str__(self) -> str:
+        base = super().__str__()
+        return f"{base} (status={self.status_code})" if self.status_code else base
+
 
 # ============================================================
 # 验证异常
@@ -192,3 +205,7 @@ class ValidationError(KnowledgeBaseError):
     def __init__(self, message: str = "", field: str | None = None) -> None:
         super().__init__(message)
         self.field = field
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        return f"{base} (field={self.field})" if self.field else base

@@ -30,7 +30,14 @@ class FileType(StrEnum):
 
 @dataclass
 class ManifestEntry:
-    """源文件 manifest 条目"""
+    """源文件 manifest 条目（类型表示）。
+
+    注意：实际 manifest 以 JSON dict 存储（见 manifest.py:create_manifest），
+    字段名为 id/title/type/file_path/status/size_bytes/date_ingested/
+    date_compiled/quality_score/content_hash/error_message/promoted_to 等。
+    本 dataclass 为概念模型，尚未与 dict 建立自动转换。如需强类型，
+    应迁移 manifest 读写到本类。
+    """
 
     id: str
     title: str
@@ -38,10 +45,12 @@ class ManifestEntry:
     file_path: str
     status: FileStatus = FileStatus.PENDING
     quality_score: float | None = None
-    word_count: int | None = None
+    size_bytes: int | None = None
+    date_ingested: str | None = None
+    date_compiled: str | None = None
+    content_hash: str | None = None
     error_message: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    promoted_to: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

@@ -153,7 +153,7 @@ def cmd_init(args: Any) -> int:
 
     # 5. 写入 .env 文件
     try:
-        _create_env_file(env_file, api_key, base_url=chosen_base_url)
+        _create_env_file(env_file, api_key, workspace=workspace, base_url=chosen_base_url)
         print(f"✅ 配置已保存: {env_file}")
     except OSError as e:
         print(f"❌ 写入配置文件失败: {e}")
@@ -241,8 +241,20 @@ def _prompt_api_plan() -> str:
     return DEFAULT_LLM_API_BASE
 
 
-def _create_env_file(env_file: Path, api_key: str, base_url: str | None = None) -> None:
-    """创建 .env 文件"""
+def _create_env_file(
+    env_file: Path,
+    api_key: str,
+    workspace: Path | None = None,
+    base_url: str | None = None,
+) -> None:
+    """创建 .env 文件。
+
+    Args:
+        env_file: .env 文件路径
+        api_key: OpenAI API Key
+        workspace: 实际工作区路径（写入 .env 的 WORKSPACE 字段）；为 None 时回退默认
+        base_url: API 端点
+    """
     # 检测是否使用 OpenRouter
     is_openrouter = api_key.startswith("sk-or-v1")
 
@@ -270,7 +282,7 @@ MODEL={model}
 # ============================================================
 # 工作区配置
 # ============================================================
-WORKSPACE=~/.knowledge-base
+WORKSPACE={workspace or "~/.knowledge-base"}
 
 # ============================================================
 # Phase 1: 数据摄入配置
@@ -298,3 +310,9 @@ LOG_LEVEL=INFO
 """
 
     env_file.write_text(content, encoding="utf-8")
+    # .env 含 API Key，限制为仅属主可读写（0o600），防止同机其他用户读取
+    try:
+        env_file.chmod(0o600)
+    except OSError:
+        # Windows/某些文件系统不支持 chmod，忽略（写入已成功）
+        pass

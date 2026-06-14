@@ -152,7 +152,12 @@ class ChromaDBStore(BaseVectorStore):
             ef = self.embedding_function
             col = client.get_collection(name=collection, embedding_function=ef)
         except Exception as e:
-            logger.debug(f"Collection '{collection}' not found: {e}")
+            # 区分集合不存在（正常，debug）和真实错误（warning，便于运维发现）
+            err_name = type(e).__name__
+            if "collection" in str(e).lower() and "not" in str(e).lower():
+                logger.debug(f"Collection '{collection}' not found: {e}")
+            else:
+                logger.warning(f"Failed to get collection '{collection}' ({err_name}): {e}")
             return []
 
         # 执行查询

@@ -678,7 +678,7 @@ def build_answer_context(
                 manifest_id=c.get("manifest_id"),
                 source=c.get("source", ""),
                 channel="concept",
-                text_hash=hashlib.md5(definition.encode()).hexdigest()[:12],
+                text_hash=hashlib.sha256(definition.encode()).hexdigest()[:12],
                 score=float(c.get("score", 0)),
             )
 
@@ -695,7 +695,7 @@ def build_answer_context(
                 manifest_id=s.get("manifest_id"),
                 source=s.get("source", ""),
                 channel="summary",
-                text_hash=hashlib.md5((one_line + title).encode()).hexdigest()[:12],
+                text_hash=hashlib.sha256((one_line + title).encode()).hexdigest()[:12],
                 score=float(s.get("score", 0)),
             )
 
@@ -709,7 +709,7 @@ def build_answer_context(
                 manifest_id=v.get("manifest_id"),
                 source=v.get("source", ""),
                 channel="vector",
-                text_hash=hashlib.md5(text.encode()).hexdigest()[:12],
+                text_hash=hashlib.sha256(text.encode()).hexdigest()[:12],
                 score=float(v.get("score", 0)),
             )
 

@@ -104,13 +104,23 @@ class CrossEncoderReranker(BaseReranker):
         # 批量推理
         scores = self._model.predict(pairs, batch_size=32, show_progress_bar=False)
 
-        # 按分数降序排序
+        # 按分数降序排序（NaN 防护：模型对超长输入可能返回 NaN）
         scored_candidates = list(zip(candidates, scores, strict=True))
+        # 过滤掉分数为 NaN 的候选（避免污染排序和归一化）
+        scored_candidates = [(c, s) for c, s in scored_candidates if s == s]  # s != NaN
         scored_candidates.sort(key=lambda x: x[1], reverse=True)
 
+        if not scored_candidates:
+            return []
+
+        # 单候选直接给最高分 1.0（min-max 归一化在单候选时会得 0.0，语义反直觉）
+        if len(scored_candidates) == 1:
+            candidate, _ = scored_candidates[0]
+            return [_copy_with_rerank(candidate, 1.0)] if top_k >= 1 else []
+
         # 归一化 rerank score 到 [0, 1]
-        max_score = scored_candidates[0][1] if scored_candidates else 1.0
-        min_score = scored_candidates[-1][1] if scored_candidates else 0.0
+        max_score = scored_candidates[0][1]
+        min_score = scored_candidates[-1][1]
         score_range = max_score - min_score if max_score != min_score else 1.0
 
         results: list[RetrievalCandidate] = []

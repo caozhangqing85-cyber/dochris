@@ -51,6 +51,12 @@ class SemanticChunker(BaseChunker):
             raise ValueError(
                 f"breakpoint_percentile 必须在 (0, 100]，得到 {breakpoint_percentile}"
             )
+        if chunk_size <= 0:
+            raise ValueError(f"chunk_size 必须为正数，得到 {chunk_size}")
+        if overlap < 0 or overlap >= chunk_size:
+            raise ValueError(
+                f"overlap 必须满足 0 <= overlap < chunk_size，得到 overlap={overlap}, chunk_size={chunk_size}"
+            )
         self._chunk_size = chunk_size
         self._overlap = overlap
         self._embedding_model = embedding_model
@@ -82,7 +88,9 @@ class SemanticChunker(BaseChunker):
 
             self._embedder = _embed
             return self._embedder
-        except (ImportError, OSError, Exception) as e:
+        except (ImportError, OSError, RuntimeError) as e:
+            # 精确捕获加载失败（缺依赖/模型文件缺失/运行时错误），
+            # 不捕获其他异常（如 KeyboardInterrupt、真实 bug），便于排查
             logger.warning(
                 "semantic chunker 无法加载 embedding 模型 (%s)，将降级为按句子合并",
                 e,

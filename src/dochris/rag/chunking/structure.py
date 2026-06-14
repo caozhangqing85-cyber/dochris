@@ -44,9 +44,10 @@ class StructureChunker(BaseChunker):
                 # 容错：find 失败时从头查一次（罕见，如内容被规范化）
                 pos = text.find(content)
             if pos == -1:
-                # 仍找不到：退化为区间不重叠
+                # 仍找不到：退化为从当前 search_start 估算区间，并推进避免后续 chunk 全指向同一位置
                 start_char = search_start
-                end_char = search_start + len(content)
+                end_char = min(search_start + len(content), len(text))
+                search_start = end_char
             else:
                 start_char = pos
                 end_char = pos + len(content)

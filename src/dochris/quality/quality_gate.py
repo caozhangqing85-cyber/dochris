@@ -335,7 +335,8 @@ def auto_downgrade(
         src_id,
         status=new_status,
         error_message=f"downgraded: {reason}",
-        promoted_to=None if new_status == "compiled" else manifest.get("promoted_to"),
+        # 空字符串哨兵表示显式清空 promoted_to（降级回 compiled 时）
+        promoted_to="" if new_status == "compiled" else manifest.get("promoted_to"),
     )
 
     # 记录日志

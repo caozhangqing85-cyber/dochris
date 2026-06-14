@@ -456,7 +456,7 @@ class CompilerWorker:
             quality_score=quality_score,
             summary=result,
             compiled_summary=result,
-            promoted_to=None,
+            promoted_to="",  # 空字符串哨兵：重新编译时清空旧的晋升标记
             trust_level=trust_level,
         )
 

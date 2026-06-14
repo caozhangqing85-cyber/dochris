@@ -59,7 +59,7 @@ def cmd_compile(args: argparse.Namespace) -> int:
         # 编译完成摘要统计
         elapsed_str = _format_duration(elapsed)
         compiled = get_all_manifests(workspace, status="compiled")
-        failed = get_all_manifests(workspace, status="compile_failed")
+        failed = get_all_manifests(workspace, status="failed")
 
         # 本次编译统计：比较编译前后的 manifest 数量差异
         total_compiled = len(compiled)

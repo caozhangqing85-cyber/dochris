@@ -14,7 +14,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
     # 按类型过滤
     if args.type:
-        manifests = [m for m in manifests if m.get("file_type", "") == args.type]
+        manifests = [m for m in manifests if m.get("type", "") == args.type]
 
     # 排序
     sort_key = args.sort
@@ -23,7 +23,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     elif sort_key == "size":
         manifests.sort(key=lambda m: m.get("size_bytes", 0), reverse=True)
     elif sort_key == "time":
-        manifests.sort(key=lambda m: m.get("ingested_at", ""), reverse=True)
+        manifests.sort(key=lambda m: m.get("date_ingested", ""), reverse=True)
     # 默认按 id 排序（已经是 sorted 的）
 
     # 限制数量
@@ -59,7 +59,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     for m in manifests:
         src_id = m.get("id", "")
         status = m.get("status", "unknown")
-        file_type = m.get("file_type", "")
+        file_type = m.get("type", "")
         title = m.get("title", "")[:28]
         quality = m.get("quality_score", 0)
         size = m.get("size_bytes", 0)
@@ -69,7 +69,7 @@ def cmd_list(args: argparse.Namespace) -> int:
             status_str = success(status)
         elif status in ("promoted", "promoted_to_wiki"):
             status_str = info(status)
-        elif status == "compile_failed":
+        elif status == "failed":
             status_str = error(status)
         else:
             status_str = dim(status)

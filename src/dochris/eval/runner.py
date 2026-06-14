@@ -134,9 +134,11 @@ class RAGEvaluator:
         将 concepts、summaries、vector_results 转为统一的 QueryEvidence 列表。
         """
         evidence: list[QueryEvidence] = []
-        rank = 0
+        # 每个通道独立从 1 计数 rank，保证通道内排名语义正确
+        # （MRR/NDCG 指标依赖 rank，跨通道累加会人为放大通道间差距）
 
         # Concepts
+        rank = 0
         for item in query_result.get("concepts", []):
             rank += 1
             evidence.append(
@@ -151,6 +153,7 @@ class RAGEvaluator:
             )
 
         # Summaries
+        rank = 0
         for item in query_result.get("summaries", []):
             rank += 1
             evidence.append(
@@ -165,6 +168,7 @@ class RAGEvaluator:
             )
 
         # Vector results
+        rank = 0
         for item in query_result.get("vector_results", []):
             rank += 1
             evidence.append(

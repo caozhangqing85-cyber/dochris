@@ -211,6 +211,8 @@ async def query_stream(
         except Exception as exc:
             logger.exception("流式查询失败")
             yield sse_error_event(str(exc))
+            # 补发 done 事件，让客户端正常关闭流（避免永久 loading）
+            yield sse_done_event(time.time() - start, trace_id=get_current_trace_id())
 
     return StreamingResponse(
         _async_generate(),

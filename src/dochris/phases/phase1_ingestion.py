@@ -222,7 +222,22 @@ def scan_source_dir(source_path: Path, logger: logging.Logger) -> list[dict]:
         logger.warning(f"Source path does not exist: {source_path}")
         return files
 
+    # 解析源目录绝对路径，用于符号链接边界检查（防路径遍历）
+    source_resolved = source_path.resolve()
+
     for filepath in source_path.rglob("*"):
+        # 防御路径遍历：跳过指向源目录外的符号链接
+        if filepath.is_symlink():
+            try:
+                target = filepath.resolve()
+                # 检查解析后的目标是否仍在源目录内
+                if source_resolved not in target.parents and target != source_resolved:
+                    logger.warning(f"跳过指向源目录外的符号链接: {filepath} -> {target}")
+                    continue
+            except OSError:
+                logger.warning(f"无法解析符号链接，跳过: {filepath}")
+                continue
+
         if not filepath.is_file():
             continue
 
@@ -319,6 +334,13 @@ def ingest_file(entry: dict, progress: dict, logger: logging.Logger) -> bool:
     hash_val = file_hash(src)
 
     phase1 = progress["phase1"]
+
+    # hash 计算失败时必须跳过该文件，否则 None 进入 hash_index 会把后续
+    # 所有 hash 失败的文件误判为重复而静默丢弃
+    if hash_val is None:
+        logger.warning(f"无法计算文件哈希（读取失败）: {src}，跳过")
+        phase1["stats"]["failed"] += 1
+        return False
 
     # 去重检查
     if hash_val in phase1["hash_index"]:

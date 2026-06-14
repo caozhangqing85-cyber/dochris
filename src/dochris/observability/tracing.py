@@ -66,13 +66,14 @@ def trace_request(trace_id: str | None = None) -> Generator[SpanContext, None, N
         SpanContext 包含 trace_id 和根 span_id
     """
     tid = trace_id or generate_trace_id()
-    token = _current_trace_id.set(tid)
-    _current_span_stack.set([])
+    token_trace = _current_trace_id.set(tid)
+    # span_stack 用 token 记录，退出时 reset（而非 set(None) 污染父上下文）
+    token_stack = _current_span_stack.set([])
     try:
-        yield SpanContext(span_id=tid[:16], trace_id=tid)
+        yield SpanContext(span_id=generate_span_id(), trace_id=tid)
     finally:
-        _current_trace_id.reset(token)
-        _current_span_stack.set(None)
+        _current_trace_id.reset(token_trace)
+        _current_span_stack.reset(token_stack)
 
 
 @contextmanager

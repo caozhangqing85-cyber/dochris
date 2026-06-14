@@ -47,22 +47,38 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]: 
         try:
             original_name = sanitize_filename(upload.filename or "unknown")
 
+            # Content-Length 预检：写盘前拒绝超大文件（防 OOM/磁盘耗尽）
+            declared_size = upload.size if hasattr(upload, "size") else None
+            if declared_size is not None and declared_size > MAX_FILE_SIZE:
+                failed.append(f"{original_name}: 文件过大（{declared_size} 字节）")
+                continue
+
             # 读取上传文件到临时位置
             inbox_dst = resolve_path_conflict(inbox_dir, original_name, logger)
             if inbox_dst is None:
                 failed.append(f"{original_name}: 文件名冲突过多")
                 continue
 
+            # 分块流式写入，边写边累计大小，超限即中止删除（防大文件 OOM）
+            too_large = False
+            written = 0
             with open(inbox_dst, "wb") as f:
-                content = await upload.read()
-                f.write(content)
+                while True:
+                    chunk = await upload.read(1024 * 1024)  # 1MB 分块
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > MAX_FILE_SIZE:
+                        too_large = True
+                        break
+                    f.write(chunk)
 
-            file_size = inbox_dst.stat().st_size
-            if file_size > MAX_FILE_SIZE:
+            if too_large:
                 failed.append(f"{original_name}: 文件过大")
                 inbox_dst.unlink(missing_ok=True)
                 continue
 
+            file_size = written
             if file_size == 0:
                 failed.append(f"{original_name}: 空文件")
                 inbox_dst.unlink(missing_ok=True)

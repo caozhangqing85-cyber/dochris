@@ -135,8 +135,10 @@ def normalize_vector_score(raw_distance: float) -> float:
       d=0.1 → 0.91, d=0.5 → 0.67, d=1.0 → 0.50
     """
     if raw_distance < 0:
+        # 负距离数学上不可能（L2≥0, cosine∈[0,2]），属上游数据错误。
+        # 返回 0.0（最低分）让错误数据沉底，而非 1.0 获最高排名污染结果。
         logger.warning("向量距离为负数 (%.4f)，可能是上游数据错误", raw_distance)
-        return 1.0
+        return 0.0
     return round(1.0 / (1.0 + raw_distance), 3)
 
 

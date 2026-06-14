@@ -69,9 +69,14 @@ def sse_encode(
     if isinstance(data, (dict, list)):
         payload = json.dumps(data, ensure_ascii=False)
         parts.append(f"data: {payload}")
-    elif isinstance(data, str) and "\n" in data:
-        # SSE 协议要求：多行内容拆分为多个 data: 行
-        parts.extend(f"data: {line}" for line in data.split("\n"))
+    elif isinstance(data, str):
+        # SSE 协议：多行内容必须拆为多个 data: 行。
+        # splitlines 处理 \n / \r\n / \r 三种换行符，避免 \r 破坏事件帧
+        lines = data.splitlines()
+        if lines:
+            parts.extend(f"data: {line}" for line in lines)
+        else:
+            parts.append("data: ")
     elif data is not None:
         parts.append(f"data: {data}")
     else:

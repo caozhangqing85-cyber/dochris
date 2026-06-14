@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -17,6 +18,23 @@ class LLMProvider(Protocol):
         temperature: float = 0.7,
         **kwargs: Any,
     ) -> str: ...
+
+    async def generate_with_messages(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int = 4000,
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> str: ...
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int = 4000,
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]: ...
 
     async def close(self) -> None: ...
 
