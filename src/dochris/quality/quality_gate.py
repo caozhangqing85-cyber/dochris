@@ -42,14 +42,17 @@ from dochris.settings import get_settings
 # 常量
 # ============================================================
 
-# promote 最低质量分数（从 settings 获取，支持环境变量 MIN_QUALITY_SCORE）
-MIN_QUALITY_SCORE = get_settings().min_quality_score
 TRUST_LAYERS = {
     "outputs": 0,
     "wiki": 1,
     "curated": 2,
     "locked": 3,
 }
+
+
+def _get_min_quality_score() -> int:
+    """动态读取 promote 最低质量分数（避免模块级固化，支持测试重置 settings）。"""
+    return get_settings().min_quality_score
 
 
 # ============================================================
@@ -78,19 +81,18 @@ def check_pollution(workspace_path: Path) -> dict:
     wiki_concepts = workspace_path / "wiki" / "concepts"
 
     # 收集所有已 promote 的文件名（通过 manifest）
-    promoted_summaries = set()
-    promoted_concepts = set()
-
     manifests = get_all_manifests(workspace_path)
+    # 同时记录每个 title 对应的合法文件名模式（支持任意位数的 _N 重名后缀）
+    promoted_title_patterns: list[re.Pattern[str]] = []
+    promoted_concept_names: set[str] = set()
+
     for m in manifests:
         if m["status"] in ("promoted_to_wiki", "promoted"):
             title = m.get("title", "")
-            # 使用 sanitize_filename 确保跨平台兼容（包括 Unicode 文件名）
             safe_title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", title)[:80]
-            promoted_summaries.add(f"{safe_title}.md")
-            # 也添加 _N 变体
-            for n in range(1, 10):
-                promoted_summaries.add(f"{safe_title}_{n}.md")
+            # 匹配 {title}.md 或 {title}_N.md（N 为任意数字，覆盖 promote 的重名冲突）
+            escaped = re.escape(safe_title)
+            promoted_title_patterns.append(re.compile(rf"^{escaped}(_\d+)?\.md$"))
 
             compiled_summary = m.get("compiled_summary")
             if compiled_summary and isinstance(compiled_summary, dict):
@@ -100,7 +102,10 @@ def check_pollution(workspace_path: Path) -> dict:
                         name = c.get("name", "") if isinstance(c, dict) else c
                         if name:
                             safe_c = re.sub(r'[<>:"/\\|?*]', "", str(name)).strip()[:50]
-                            promoted_concepts.add(f"{safe_c}.md")
+                            promoted_concept_names.add(f"{safe_c}.md")
+
+    def _is_promoted_summary(filename: str) -> bool:
+        return any(p.match(filename) for p in promoted_title_patterns)
 
     # 扫描 wiki/ 中的文件
     polluted_files = []
@@ -109,13 +114,13 @@ def check_pollution(workspace_path: Path) -> dict:
 
     if wiki_summaries.exists():
         for f in wiki_summaries.glob("*.md"):
-            if f.name not in promoted_summaries:
+            if not _is_promoted_summary(f.name):
                 polluted_files.append(f)
                 orphan_summaries.append(f)
 
     if wiki_concepts.exists():
         for f in wiki_concepts.glob("*.md"):
-            if f.name not in promoted_concepts:
+            if f.name not in promoted_concept_names:
                 polluted_files.append(f)
                 orphan_concepts.append(f)
 
@@ -153,7 +158,7 @@ def check_pollution(workspace_path: Path) -> dict:
 def quality_gate(
     workspace_path: Path,
     src_id: str,
-    min_score: int = MIN_QUALITY_SCORE,
+    min_score: int | None = None,
 ) -> dict[str, Any]:
     """质量门禁检查
 
@@ -175,6 +180,9 @@ def quality_gate(
             "checks": { "status": bool, "error": bool, "summary": bool, "lint": bool },
         }
     """
+    # 延迟读取 settings，支持运行时/测试重置（min_score 默认 None 表示动态读）
+    if min_score is None:
+        min_score = _get_min_quality_score()
     workspace_path = Path(workspace_path)
     manifest = get_manifest(workspace_path, src_id)
 
@@ -324,10 +332,13 @@ def auto_downgrade(
             target_path = workspace_path / target_dir
             if not target_path.exists():
                 continue
-            # 精确匹配
-            for f in target_path.glob(f"{safe_title}*.md"):
-                f.unlink()
-                removed_files.append(str(f.relative_to(workspace_path)))
+            # 精确匹配 {title}.md 和重名变体 {title}_N.md，
+            # 避免前缀匹配误删（如 "AI" 误删 "AI 应用.md"）
+            for f in target_path.glob("*.md"):
+                stem = f.stem
+                if stem == safe_title or re.match(rf"^{re.escape(safe_title)}_\d+$", stem):
+                    f.unlink()
+                    removed_files.append(str(f.relative_to(workspace_path)))
 
     # 更新 manifest
     update_manifest_status(
@@ -430,10 +441,11 @@ def generate_report(workspace_path: Path) -> dict:
             score_distribution["85-100"] += 1
 
     # 满足 promote 条件的 manifest
+    min_score = _get_min_quality_score()
     promotable = [
         m
         for m in manifests
-        if m["status"] == "compiled" and m.get("quality_score", 0) >= MIN_QUALITY_SCORE
+        if m["status"] == "compiled" and m.get("quality_score", 0) >= min_score
     ]
 
     report = {
@@ -451,7 +463,7 @@ def generate_report(workspace_path: Path) -> dict:
         "manifest_statuses": wiki_scan["manifest_status_counts"],
         "score_distribution": score_distribution,
         "promotable_count": len(promotable),
-        "min_quality_score": MIN_QUALITY_SCORE,
+        "min_quality_score": min_score,
         "scan_time": datetime.now().isoformat(),
     }
 

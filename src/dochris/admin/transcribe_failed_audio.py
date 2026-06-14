@@ -337,13 +337,23 @@ def update_manifest_with_transcript(src_id: str, transcript_text: str) -> bool:
     manifest = get_manifest(workspace, src_id)
 
     if manifest:
-        # 更新 manifest，添加转录信息
-        manifest["has_transcript"] = True
-        manifest["transcript_length"] = len(transcript_text)
-        manifest["transcript_language"] = "auto"
-
+        # 更新 manifest，添加转录信息（先更新状态，再补充 transcript 字段并原子写回）
         # 重置状态为 ingested，以便重新编译
         update_manifest_status(workspace, src_id, "ingested", error_message=None)
+
+        # update_manifest_status 不持久化自定义字段，需重新读取后原子写入
+        from dochris.manifest import _atomic_write_json
+
+        manifest = get_manifest(workspace, src_id)
+        if manifest:
+            manifest["has_transcript"] = True
+            manifest["transcript_length"] = len(transcript_text)
+            manifest["transcript_language"] = "auto"
+            manifest_path = workspace / "manifests" / "sources" / f"{src_id}.json"
+            try:
+                _atomic_write_json(manifest_path, manifest)
+            except OSError as e:
+                logger.warning(f"写入 transcript 字段失败 {src_id}: {e}")
 
         logger.info(f"✓ Manifest 已更新: {src_id} (has_transcript=True)")
         return True

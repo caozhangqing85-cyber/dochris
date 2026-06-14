@@ -35,6 +35,7 @@ interface HistoryEntry {
 
 interface FavoriteEntry {
   query: string
+  mode?: string
   answer: string
   timestamp: number
 }
@@ -262,9 +263,12 @@ export default function QueryPage() {
                 query: queryText, mode: useMode, timestamp: Date.now(),
                 answerPreview: fullAnswer.slice(0, 80),
               }
-              const newHistory = [entry, ...history.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
-              setHistory(newHistory)
-              saveHistory(newHistory)
+              // 函数式更新：避免依赖 history 闭包（防快速连查时旧闭包覆盖新历史）
+              setHistory(prev => {
+                const newHistory = [entry, ...prev.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
+                saveHistory(newHistory)
+                return newHistory
+              })
             }
             setLoading(false)
           },
@@ -285,9 +289,11 @@ export default function QueryPage() {
               query: queryText, mode: useMode, timestamp: Date.now(),
               answerPreview: res.answer?.slice(0, 80) || '',
             }
-            const newHistory = [entry, ...history.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
-            setHistory(newHistory)
-            saveHistory(newHistory)
+            setHistory(prev => {
+              const newHistory = [entry, ...prev.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
+              saveHistory(newHistory)
+              return newHistory
+            })
           } catch (fallbackErr) { setError((fallbackErr as Error).message) }
           finally { setLoading(false) }
         } else {
@@ -306,27 +312,31 @@ export default function QueryPage() {
           query: queryText, mode: useMode, timestamp: Date.now(),
           answerPreview: res.answer?.slice(0, 80) || '',
         }
-        const newHistory = [entry, ...history.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
-        setHistory(newHistory)
-        saveHistory(newHistory)
+        setHistory(prev => {
+          const newHistory = [entry, ...prev.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
+          saveHistory(newHistory)
+          return newHistory
+        })
       } catch (e) { setError((e as Error).message) }
       finally { setLoading(false) }
     }
-  }, [query, mode, topK, contribute, history])
+  }, [query, mode, topK, contribute])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery() }
   }
 
   // Favorites
-  const isFavorited = result ? favorites.some(f => f.query === result.query) : false
+  // 收藏键用 query+mode 组合，允许同一查询在不同模式下分别收藏
+  const favKey = (q: string, m: string) => `${q}@@${m}`
+  const isFavorited = result ? favorites.some(f => favKey(f.query, f.mode || '') === favKey(result.query, result.mode)) : false
   const toggleFavorite = () => {
     if (!result?.answer) return
     if (isFavorited) {
-      const newFavs = favorites.filter(f => f.query !== result.query)
+      const newFavs = favorites.filter(f => favKey(f.query, f.mode || '') !== favKey(result.query, result.mode))
       setFavorites(newFavs); saveFavorites(newFavs)
     } else {
-      const newFavs = [{ query: result.query, answer: result.answer, timestamp: Date.now() }, ...favorites]
+      const newFavs = [{ query: result.query, mode: result.mode, answer: result.answer, timestamp: Date.now() }, ...favorites]
       setFavorites(newFavs); saveFavorites(newFavs)
     }
   }

@@ -46,27 +46,35 @@ function StreamingMarkdownImpl({
 }: StreamingMarkdownProps) {
   // 预处理 wiki-link（仅在 content 变化时重算）
   const processed = useMemo(() => preprocessWikiLinks(content), [content])
+  // 流式过程中跳过代码高亮（避免每个 chunk 重跑 highlight.js），结束后启用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rehypePlugins: any[] = streaming ? [] : [[rehypeHighlight, { detect: true, ignoreMissing: true }]]
 
   return (
     <div className="streaming-markdown" style={markdownContainerStyle}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+        rehypePlugins={rehypePlugins}
         components={{
-          // 拦截 <a> 渲染：dochris-wiki: 前缀的链接渲染为概念胶囊
+          // 拦截 <a> 渲染：dochris-wiki: 前缀的链接渲染为可访问的概念胶囊
           a({ href, children }) {
             if (href?.startsWith('dochris-wiki:')) {
               const conceptName = decodeURIComponent(href.slice('dochris-wiki:'.length))
+              const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+                e.preventDefault()
+                onWikiLinkClick?.(conceptName)
+              }
               return (
-                <span
+                <a
+                  href={`#concept-${encodeURIComponent(conceptName)}`}
                   style={wikiLinkStyle}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    onWikiLinkClick?.(conceptName)
-                  }}
+                  role="link"
+                  tabIndex={0}
+                  onClick={handleClick}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(e) }}
                 >
                   {children}
-                </span>
+                </a>
               )
             }
             // 普通外链：新标签打开

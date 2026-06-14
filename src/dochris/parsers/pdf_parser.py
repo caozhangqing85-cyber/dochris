@@ -28,13 +28,17 @@ def parse_with_markitdown(file_path: Path) -> str | None:
             return None
 
         result = subprocess.run(
-            ["markitdown", str(file_path)], capture_output=True, text=True, timeout=10
+            # timeout 调大到 60s（10s 对大 PDF 过短几乎总是超时）
+            ["markitdown", str(file_path)], capture_output=True, text=True, timeout=60
         )
 
         if result.returncode == 0:
             return result.stdout
         return None
     except FileNotFoundError:
+        return None
+    except subprocess.TimeoutExpired:
+        logger.debug(f"markitdown 解析 PDF 超时: {file_path}")
         return None
 
 
@@ -93,10 +97,13 @@ def parse_with_pymupdf(file_path: Path) -> str | None:
         import fitz  # PyMuPDF
 
         doc = fitz.open(str(file_path))
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        doc.close()
+        try:
+            text = ""
+            for page in doc:
+                text += page.get_text()
+        finally:
+            # 确保异常时也释放 native 句柄（避免文件描述符累积）
+            doc.close()
 
         return text if len(text) > 100 else None
     except ImportError:

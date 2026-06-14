@@ -174,10 +174,12 @@ export function createForceGraph(opts: GraphRendererOptions) {
       .attr('stroke-width', 3.5)
       .style('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,0.18))')
 
+    // tooltip 坐标基于 container（offsetX/Y 相对 event.target，对 SVG 内部元素不可靠）
+    const rect = container.getBoundingClientRect()
     tooltip.style('display', 'block')
       .html(`<b>${d.label}</b><br><span style="color:#615d59">${NODE_STYLES[d.node_type]?.label || d.node_type}</span>${d.provenance ? ` · <span style="color:${PROVENANCE_STYLES[d.provenance]?.color || '#999'}">${PROVENANCE_STYLES[d.provenance]?.label || d.provenance}</span>` : ''}${d.degree ? ` · ${d.degree} 连接` : ''}${d.conceptData?.sourceCount ? ` · ${d.conceptData.sourceCount} 文档` : ''}`)
-      .style('left', (event.offsetX + 14) + 'px')
-      .style('top', (event.offsetY - 10) + 'px')
+      .style('left', (event.clientX - rect.left + 14) + 'px')
+      .style('top', (event.clientY - rect.top - 10) + 'px')
   })
 
   node.on('mouseout', function (_event, d) {
@@ -282,6 +284,9 @@ export function createForceGraph(opts: GraphRendererOptions) {
   // ── Cleanup ──
   function destroy() {
     simulation.stop()
+    // 移除 svg 元素自身的事件监听（zoom/click），避免重建时累积
+    svg.on('.zoom', null)
+    svg.on('click', null)
     svg.selectAll('*').remove()
     tooltip.remove()
   }

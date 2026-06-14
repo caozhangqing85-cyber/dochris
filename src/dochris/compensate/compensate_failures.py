@@ -384,14 +384,12 @@ def find_failed_manifests(compensate_type: str, logger: Any) -> list[dict]:
             if file_type == "other" and ext in (".mhtml", ".pptx", ".ppt") and "no_text" in error:
                 filtered.append(m)
         elif compensate_type == "all":
-            # 所有可补偿的
+            # 所有可补偿的（显式加括号明确 and/or 优先级）
             if "no_text" in error:
                 if (
-                    file_type == "ebook"
-                    and ext in (".mobi", ".azw3")
-                    or file_type == "pdf"
-                    or file_type == "other"
-                    and ext in (".mhtml", ".pptx", ".ppt")
+                    (file_type == "ebook" and ext in (".mobi", ".azw3"))
+                    or (file_type == "pdf")
+                    or (file_type == "other" and ext in (".mhtml", ".pptx", ".ppt"))
                 ):
                     filtered.append(m)
             elif "llm_failed" in error:
@@ -496,6 +494,12 @@ async def run_compensate(
 
         for future in asyncio.as_completed(tasks):
             if shutdown_event.is_set():
+                # 中断时取消所有未完成的 task，避免孤儿协程继续消耗 LLM API 配额
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                # 等待取消完成（忽略 CancelledError）
+                await asyncio.gather(*tasks, return_exceptions=True)
                 break
             src_id, ok, status, method = await future
 

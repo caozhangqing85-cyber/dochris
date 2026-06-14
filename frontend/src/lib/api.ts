@@ -56,10 +56,10 @@ export const queryKnowledgeStream = async (
   const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}`
   const res = await fetch(url, { headers: { Accept: 'text/event-stream' } })
   if (!res.ok) {
+    // 404 触发降级；其他错误也统一 throw（让 catch 走降级或显示错误）
     if (res.status === 404) throw new Error('STREAM_NOT_AVAILABLE')
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    callbacks.onError?.(err.detail || `Request failed: ${res.status}`)
-    return
+    throw new Error(err.detail || `Request failed: ${res.status}`)
   }
 
   const reader = res.body?.getReader()
@@ -96,6 +96,24 @@ export const queryKnowledgeStream = async (
       }
       if (!eventName || dataLines.length === 0) continue
 
+      dispatchEvent(eventName, dataLines.join('\n'), callbacks)
+    }
+  }
+
+  // 处理残余 buffer：连接关闭时最后事件可能无结尾空行，避免 done 事件丢失
+  const trailing = buffer.trim()
+  if (trailing) {
+    const lines = trailing.split(/\r?\n/)
+    let eventName = ''
+    const dataLines: string[] = []
+    for (const line of lines) {
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim()
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''))
+      }
+    }
+    if (eventName && dataLines.length > 0) {
       dispatchEvent(eventName, dataLines.join('\n'), callbacks)
     }
   }

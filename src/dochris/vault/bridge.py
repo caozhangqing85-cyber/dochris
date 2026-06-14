@@ -65,12 +65,13 @@ def clean_internal_references(content: str) -> str:
         content,
     )
 
-    # 移除内部 markdown 元数据块
+    # 移除内部 markdown 元数据块（YAML frontmatter：--- 包裹的多字段块）
+    # 用 DOTALL 匹配整个 frontmatter 块，支持 created/status/quality 等多字段共存
     content = re.sub(
-        r"---\n(?:created|status|quality|promoted|hash|path)[^:]*:[^\n]*\n---",
+        r"^---\n.*?\n---\n",
         "",
         content,
-        flags=re.MULTILINE,
+        flags=re.DOTALL,
     )
 
     # 移除编译时间元数据行
@@ -203,6 +204,13 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
         logger.info(f"  [{n['match_type']}] {n['rel_path']}")
 
     seeded = []
+    # 循环外预加载已有 content_hash 集合（避免每个笔记全量扫描 manifest，O(n²)→O(n)）
+    existing_hashes = {
+        m.get("content_hash")
+        for m in get_all_manifests(workspace_path)
+        if m.get("content_hash") is not None
+    }
+
     for note in notes:
         src_path = note["path"]
         title = note["title"]
@@ -216,13 +224,8 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
         content_hash = _compute_hash(content)
         size_bytes = len(content.encode("utf-8"))
 
-        # 检查是否已经存在（通过内容哈希）
-        existing = get_all_manifests(workspace_path)
-        already_exists = any(
-            m.get("content_hash") is not None and m.get("content_hash") == content_hash
-            for m in existing
-        )
-        if already_exists:
+        # 检查是否已经存在（通过内容哈希，复用预加载的 hash 集合）
+        if content_hash in existing_hashes:
             logger.info(f"  跳过（已存在）: {title}")
             continue
 
@@ -351,12 +354,19 @@ def promote_to_obsidian(workspace_path: Path, src_id: str) -> bool:
     obsidian_target = obsidian_vault / "06-知识库" / source_file.name
     obsidian_target.parent.mkdir(parents=True, exist_ok=True)
 
-    # 处理重名
+    # 处理重名（限制最大重试，避免只读 mount 等场景下无限循环）
     counter = 1
+    max_retries = 100
+    stem = source_file.stem
     while obsidian_target.exists():
-        stem = source_file.stem
         obsidian_target = obsidian_vault / "06-知识库" / f"{stem}_{counter}.md"
         counter += 1
+        if counter > max_retries:
+            # 兜底：用纳秒时间戳保证唯一，避免极端情况挂死
+            import time
+
+            obsidian_target = obsidian_vault / "06-知识库" / f"{stem}_{time.time_ns()}.md"
+            break
 
     obsidian_target.write_text(content, encoding="utf-8")
 

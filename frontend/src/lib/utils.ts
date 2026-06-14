@@ -5,14 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Ensure an async operation takes at least `ms` milliseconds, so loading spinners are visible */
-export async function withMinDelay<T>(promise: Promise<T>, ms = 400): Promise<T> {
+/** Ensure an async operation takes at least `ms` milliseconds, so loading spinners are visible.
+ * 默认 150ms（防闪烁），生产环境后端快时不拖慢体验。 */
+export async function withMinDelay<T>(promise: Promise<T>, ms = 150): Promise<T> {
   const [result] = await Promise.all([promise, new Promise((r) => setTimeout(r, ms))])
   return result
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
+  // 负数/0/非有限值统一兜底，避免 Math.log 产生 NaN
+  if (!bytes || !Number.isFinite(bytes) || bytes < 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))

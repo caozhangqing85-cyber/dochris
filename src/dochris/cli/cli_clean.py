@@ -83,10 +83,10 @@ def _clean_cache(workspace: Path) -> int:
     try:
         cache_dir.resolve().relative_to(workspace.resolve())
     except ValueError:
-        print(f"   ❌ .cache/ 不在 workspace 内，拒绝清理（路径异常）")
+        print("   ❌ .cache/ 不在 workspace 内，拒绝清理（路径异常）")
         return 0
     if not (workspace / "manifests").exists():
-        print(f"   ❌ workspace 非法（无 manifests/ 目录），拒绝清理")
+        print("   ❌ workspace 非法（无 manifests/ 目录），拒绝清理")
         return 0
 
     count = sum(1 for _ in cache_dir.rglob("*") if _.is_file())

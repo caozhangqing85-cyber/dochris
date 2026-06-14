@@ -420,8 +420,9 @@ class CompilerWorker:
             if title_file != summary_file and not title_file.exists():
                 try:
                     title_file.symlink_to(summary_file)
-                except OSError:
-                    pass
+                except OSError as e:
+                    # symlink 失败会导致按标题查询找不到文件，记录 warning 便于排查
+                    logger.warning(f"创建标题符号链接失败 {title_file.name}: {e}")
 
         # 保存概念文件（始终写入，不受质量门槛限制）
         concepts_dir = self.workspace / "outputs/concepts"

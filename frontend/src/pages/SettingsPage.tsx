@@ -42,10 +42,11 @@ export default function SettingsPage() {
     }
     try {
       const u: Record<string, string | number> = {}
-      if (form.api_base) u.api_base = form.api_base
-      if (form.api_key && !form.api_key.includes('...')) u.api_key = form.api_key
-      if (form.model) u.model = form.model
-      if (form.query_model) u.query_model = form.query_model
+      // trim 字段避免前后空格导致请求失败
+      if (form.api_base.trim()) u.api_base = form.api_base.trim()
+      if (form.api_key && !form.api_key.includes('...')) u.api_key = form.api_key.trim()
+      if (form.model.trim()) u.model = form.model.trim()
+      if (form.query_model.trim()) u.query_model = form.query_model.trim()
       u.llm_provider = form.llm_provider; u.temperature = form.temperature
       if (form.vector_store) u.vector_store = form.vector_store
       if (form.workspace) u.workspace = form.workspace

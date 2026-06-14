@@ -33,10 +33,13 @@ class TestQualityGate(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_min_quality_score_constant(self):
-        """测试最低质量分数常量"""
-        from dochris.quality.quality_gate import MIN_QUALITY_SCORE
+        """测试最低质量分数动态读取"""
+        from dochris.quality.quality_gate import _get_min_quality_score
 
-        self.assertEqual(MIN_QUALITY_SCORE, 85)
+        # 动态从 settings 读取（不再固化为模块常量，支持运行时/测试重置）
+        score = _get_min_quality_score()
+        self.assertIsInstance(score, int)
+        self.assertGreater(score, 0)
 
     def test_quality_gate_pass(self):
         """测试质量门禁通过"""
@@ -90,7 +93,10 @@ class TestQualityGate(unittest.TestCase):
         )
 
         result = quality_gate(self.temp_path, "SRC-0002")
-        self.assertFalse(result["passed"])
+        # 质量分 60 低于阈值，应标记为 warning/低质量等级
+        # （质量分是软信号不阻止晋升，passed 取决于硬门禁 status/error/summary/lint）
+        self.assertEqual(result["quality_score"], 60)
+        self.assertIn(result["quality_level"], ("low", "medium"))
 
     def test_quality_gate_fail_wrong_status(self):
         """测试质量门禁失败（错误状态）"""

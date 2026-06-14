@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from dochris.log import append_log
-from dochris.quality.quality_gate import MIN_QUALITY_SCORE
+from dochris.quality.quality_gate import _get_min_quality_score
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +211,7 @@ def contribute_query_result(
         "content_hash": content_hash,
         "quality_score": quality_score,
         "status": "candidate",
-        "needs_review": quality_score < MIN_QUALITY_SCORE or contradiction["has_contradiction"],
+        "needs_review": quality_score < _get_min_quality_score() or contradiction["has_contradiction"],
         "contradiction": contradiction,
         "source_manifest_ids": source_manifest_ids or [],
         "concepts_extracted": concepts or [],
@@ -400,10 +400,11 @@ def promote_candidate(
         return {"success": False, "reason": f"状态不是 candidate: {meta['status']}"}
 
     # 质量门禁
-    if meta["quality_score"] < MIN_QUALITY_SCORE:
+    min_score = _get_min_quality_score()
+    if meta["quality_score"] < min_score:
         return {
             "success": False,
-            "reason": f"质量分数 {meta['quality_score']} < {MIN_QUALITY_SCORE}，需要人工审核",
+            "reason": f"质量分数 {meta['quality_score']} < {min_score}，需要人工审核",
         }
 
     # 读取候选内容

@@ -115,14 +115,18 @@ def _find_concept_file(base_dir: Path, src_id: str, concept_name: str) -> Path |
             for path in sorted(search_dir.glob(f"*_{name}.md")):
                 if path.is_file():
                     return path
-            # 尝试在所有 .md 文件中搜索标题包含概念名的
+            # 尝试在所有 .md 文件中精确匹配标题行 `# {concept_name}`
+            # （避免 "AI" 模糊匹配到 "AIGC"、"AI 应用" 等无关概念文件）
+            import re
+
+            title_pattern = re.compile(rf"^#\s+{re.escape(concept_name.strip())}\s*$")
             for path in sorted(search_dir.glob("*.md")):
                 if path.is_file():
                     try:
                         first_line = path.read_text(encoding="utf-8", errors="ignore").split(
                             "\n", 1
                         )[0]
-                        if concept_name.strip() in first_line:
+                        if title_pattern.match(first_line):
                             return path
                     except OSError:
                         continue
@@ -178,7 +182,9 @@ def promote_to_wiki(workspace_path: Path, src_id: str) -> bool:
         dst = _copy_file(summary_src, wiki_summaries)
         promoted_files.append(f"  wiki/summaries/{dst.name}")
     else:
-        print(f"警告：未找到摘要文件 outputs/summaries/{safe_title}.md")
+        # 摘要是最核心产物，缺失应阻断晋升（避免 manifest 标记 promoted 但 wiki/ 无摘要）
+        print(f"错误：未找到摘要文件 outputs/summaries/{safe_title}.md，晋升中止")
+        return False
 
     # 晋升相关概念文件
     compiled_summary = manifest.get("compiled_summary")

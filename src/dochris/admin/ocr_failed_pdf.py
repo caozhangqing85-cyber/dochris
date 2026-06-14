@@ -124,15 +124,15 @@ def process_pdf(manifest: dict) -> bool:
     transcript_file = TRANSCRIPTS_DIR / f"{src_id}.txt"
     transcript_file.write_text(full_text, encoding="utf-8")
 
-    # Update manifest
+    # Update manifest（转录成功，error_message 留空；长度信息记入日志而非污染 error_message）
     try:
         update_manifest_status(
             get_default_workspace(),
             src_id,
             "transcribed",
-            error_message=str({"text_length": len(full_text)}),
+            error_message=None,
         )
-        logger.info(f"✓ Manifest已更新: {src_id}")
+        logger.info(f"✓ Manifest已更新: {src_id} (转录 {len(full_text)} 字符)")
     except (OSError, json.JSONDecodeError, ValueError) as e:
         logger.warning(f"Manifest更新失败: {e}")
 

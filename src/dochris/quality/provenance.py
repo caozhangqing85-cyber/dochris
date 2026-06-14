@@ -234,8 +234,8 @@ def _classify_concept(
                     source_match=match,
                 )
 
-    # 模糊匹配：概念名中的关键词
-    keywords = re.split(r"[的与和及/\\s]+", concept_name)
+    # 模糊匹配：概念名中的关键词（按 的/与/和/及/斜杠/空白 拆分）
+    keywords = re.split(r"[的与和及/\s]+", concept_name)
     keywords = [kw for kw in keywords if len(kw) >= 2]
     if keywords:
         matched_keywords = sum(1 for kw in keywords if _find_in_source(kw, source_text))
