@@ -100,6 +100,11 @@ class Settings:
         "prometheus_enabled": ("PROMETHEUS_ENABLED", "false", _parse_bool),
         "chunk_strategy": ("CHUNK_STRATEGY", "structure", None),
         "index_raw_chunks": ("INDEX_RAW_CHUNKS", "false", _parse_bool),
+        "chunk_size_chars": ("CHUNK_SIZE_CHARS", "4000", int),
+        "chunk_overlap_chars": ("CHUNK_OVERLAP_CHARS", "200", int),
+        "chunk_size_tokens": ("CHUNK_SIZE_TOKENS", "800", int),
+        "chunk_overlap_tokens": ("CHUNK_OVERLAP_TOKENS", "120", int),
+        "semantic_breakpoint_percentile": ("SEMANTIC_BREAKPOINT_PERCENTILE", "95", float),
     }
 
     @classmethod
@@ -315,6 +320,21 @@ class Settings:
 
     index_raw_chunks: str = "false"
     """是否索引原始文本块（true/false）"""
+
+    chunk_size_chars: int = 4000
+    """structure/semantic 策略的目标块大小（字符数）"""
+
+    chunk_overlap_chars: int = 200
+    """structure/semantic 策略的重叠字符数"""
+
+    chunk_size_tokens: int = 800
+    """recursive 策略的目标块大小（token 数，默认按字符近似）"""
+
+    chunk_overlap_tokens: int = 120
+    """recursive 策略的重叠 token 数"""
+
+    semantic_breakpoint_percentile: float = 95.0
+    """semantic 策略的断点距离百分位阈值（取距离前 5% 位置为断点）"""
 
     # ============================================================
     # 工厂方法

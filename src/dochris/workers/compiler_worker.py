@@ -115,6 +115,9 @@ class CompilerWorker:
         self.workspace = workspace if workspace is not None else get_default_workspace()
         self.cache_dir = cache_dir(self.workspace)
 
+        # 向量存储实例缓存（避免每个文档重复初始化 embedding 模型）
+        self._vector_store: Any | None = None
+
         # 插件管理器
         self.plugin_manager = get_plugin_manager()
         self._init_plugins_from_settings(settings)
@@ -269,6 +272,9 @@ class CompilerWorker:
 
             # 7. 保存结果
             await self._save_result(src_id, compile_result, quality_score)
+
+            # 7.1 原文 chunk 索引（可选，INDEX_RAW_CHUNKS 控制开关）
+            self._index_raw_chunks(src_id, text, manifest)
 
             # 7.5 编译后处理（插件 hook）
             self.plugin_manager.call_hook(
@@ -482,6 +488,112 @@ class CompilerWorker:
             return "high"
         return "medium"
 
+    def _get_vector_store(self) -> Any:
+        """获取向量存储实例（缓存复用，避免重复初始化 embedding 模型）。"""
+        if self._vector_store is not None:
+            return self._vector_store
+        try:
+            from dochris.vector import get_store
+
+            settings = get_settings()
+            data_dir = self.workspace / "data"
+            store_cls = get_store(settings.vector_store)
+            self._vector_store = store_cls(persist_directory=str(data_dir))
+            return self._vector_store
+        except ImportError:
+            logger.debug("向量存储依赖未安装")
+            return None
+        except Exception as e:
+            logger.warning(f"向量存储初始化失败: {e}")
+            return None
+
+    def _index_raw_chunks(
+        self, src_id: str, text: str, manifest: dict[str, Any]
+    ) -> None:
+        """将原文切分为 chunk 并索引到向量库的 chunks collection。
+
+        由 INDEX_RAW_CHUNKS 配置控制开关，默认关闭。
+        切分策略由 CHUNK_STRATEGY 配置（structure/recursive/semantic）。
+
+        Args:
+            src_id: manifest ID
+            text: 原文全文
+            manifest: manifest 数据
+        """
+        try:
+            settings = get_settings()
+            # 开关：默认关闭，避免影响现有行为
+            if settings.index_raw_chunks != "true":
+                return
+            if not text or not text.strip():
+                return
+
+            from dochris.rag.chunking import (
+                ChunkMetadata,
+                create_chunker,
+            )
+
+            strategy = getattr(settings, "chunk_strategy", "structure")
+            # recursive 用 token 维度，其他用字符维度
+            if strategy == "recursive":
+                chunk_size = getattr(settings, "chunk_size_tokens", 800)
+                overlap = getattr(settings, "chunk_overlap_tokens", 120)
+            else:
+                chunk_size = getattr(settings, "chunk_size_chars", 4000)
+                overlap = getattr(settings, "chunk_overlap_chars", 200)
+
+            chunker_kwargs: dict[str, Any] = {"chunk_size": chunk_size, "overlap": overlap}
+            if strategy == "semantic":
+                chunker_kwargs["breakpoint_percentile"] = getattr(
+                    settings, "semantic_breakpoint_percentile", 95.0
+                )
+                chunker_kwargs["embedding_model"] = getattr(
+                    settings, "embedding_model", "BAAI/bge-small-zh-v1.5"
+                )
+
+            chunker = create_chunker(strategy, **chunker_kwargs)
+            metadata = ChunkMetadata(
+                src_id=src_id,
+                title=manifest.get("title", src_id),
+                strategy=strategy,
+            )
+            chunks = chunker.split(text, metadata)
+            if not chunks:
+                return
+
+            store = self._get_vector_store()
+            if store is None:
+                return
+
+            documents = [c.content for c in chunks]
+            ids = [c.id for c in chunks]
+            metadatas = [
+                {
+                    "source": src_id,
+                    "title": manifest.get("title", src_id),
+                    "type": manifest.get("type", "unknown"),
+                    "section": c.metadata.section,
+                    "start_char": c.metadata.start_char,
+                    "end_char": c.metadata.end_char,
+                    "strategy": c.metadata.strategy,
+                    "chunk_index": idx,
+                    "trust_level": "outputs",
+                }
+                for idx, c in enumerate(chunks)
+            ]
+
+            store.add_documents(
+                collection="chunks",
+                documents=documents,
+                ids=ids,
+                metadatas=metadatas,
+            )
+            logger.info(f"索引 {len(chunks)} 个原文 chunk: {src_id} (strategy={strategy})")
+        except ImportError:
+            logger.debug("chunking 依赖未安装，跳过原文索引")
+        except Exception as e:
+            logger.warning(f"原文 chunk 索引失败（不影响编译结果）: {e}")
+
     def _embed_to_vector_store(
         self, src_id: str, result: dict[str, Any], manifest: dict[str, Any]
     ) -> None:
@@ -496,13 +608,9 @@ class CompilerWorker:
             manifest: manifest 数据
         """
         try:
-            settings = get_settings()
-            data_dir = self.workspace / "data"
-
-            from dochris.vector import get_store
-
-            store_cls = get_store(settings.vector_store)
-            store = store_cls(persist_directory=str(data_dir))
+            store = self._get_vector_store()
+            if store is None:
+                return
 
             title = manifest.get("title", src_id)
 

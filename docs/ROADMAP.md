@@ -75,11 +75,34 @@
   - [x] Day 0b: VectorStore Protocol 对齐 BaseVectorStore ABC
   - [x] Day 0c: 查询链路统一到 BaseLLMProvider + async-first + build_answer_context()
   - [x] Day 0d: Settings _env_mapping 自动映射 + 7 个 RAG 配置项
-- [ ] P4-1: Reranker 重排序（第 1 周，Day 1-2）
-- [ ] P4-2: RAG 评估体系（第 1 周，Day 3-5）
-- [ ] P4-3: 可观测性监控（第 2 周，Day 1-4）
-- [ ] P4-4: 流式输出工程化（第 2 周，Day 5-7）
-- [ ] P4-5: 语义分块策略优化（第 3 周）
+- [x] P4-1: Reranker 重排序（第 1 周，Day 1-2）✅ (2026-06-10)
+  - [x] BaseReranker ABC + CrossEncoderReranker + IdentityReranker + factory
+  - [x] rerank_candidates() 集成 + API/CLI rerank 参数
+  - [x] 15 个单元测试全通过
+  - [ ] Day 5 baseline 对比（待有数据后执行）
+- [x] P4-2: RAG 评估体系（第 1 周，Day 3-5）✅ (2026-06-10)
+  - [x] eval/ 模块（schemas + datasets + rag_metrics + runner）
+  - [x] JSONL golden set 支持 + recall@k/precision@k/MRR/NDCG 指标
+  - [x] JSON + Markdown 报告生成 + 25 个单元测试全通过
+  - [ ] generation 指标（faithfulness/relevancy）后续迭代
+- [x] P4-3: 可观测性监控（第 2 周，Day 1-4）✅ (2026-06-10)
+  - [x] observability/（tracing + metrics + cost + middleware）
+  - [x] Prometheus 5 类指标 + /metrics 端点 + trace_id 中间件
+  - [x] LLMProvider usage/latency/cost 自动记录 + 25 个单元测试全通过
+- [ ] P4-4: 流式输出工程化（第 2 周，Day 5-7）⚠️ 后端完成 / 前端待做
+  - [x] api/sse.py（StrEnum 事件名 + v=1 版本 + 心跳）
+  - [x] SSE 流式重构 + done 事件含 trace_id
+  - [ ] 前端 StreamingMarkdown + 集成测试（Day 7 待做）
+- [x] P4-5: 语义分块策略优化（第 3 周）✅ (2026-06-14)
+  - [x] rag/chunking/ 模块（BaseChunker ABC + ChunkMetadata + DocumentChunk）
+  - [x] StructureChunker（包装现有 structure_aware_split）
+  - [x] RecursiveChunker（token-aware 递归分块，借鉴 LangChain）
+  - [x] SemanticChunker（embedding 相邻距离断点 + 降级）
+  - [x] factory create_chunker（三策略注册）
+  - [x] raw chunks indexing 集成（INDEX_RAW_CHUNKS 开关 + chunks collection）
+  - [x] store 实例缓存复用（CompilerWorker._vector_store）
+  - [x] chunking 配置项（chunk_size_chars/tokens、overlap、breakpoint_percentile）
+  - [x] 26 个单元测试全通过
 
 ---
 
@@ -1327,8 +1350,8 @@ def test_llm_call_latency(benchmark):
 > 进度详见 TODO 总览 P4 节，完整方案详见 `docs/RAG_IMPROVEMENT_PLAN.md`
 
 - [x] ~~P4-0: 前置任务（第 0 周）~~ ✅ (2026-06-09)
-- [ ] P4-1: Reranker 重排序（第 1 周 Day 1-2）— `src/dochris/rag/reranker/`
-- [ ] P4-2: RAG 评估体系（第 1 周 Day 3-5）— `src/dochris/eval/`
-- [ ] P4-3: 可观测性监控（第 2 周 Day 1-4）— `src/dochris/observability/`
-- [ ] P4-4: 流式输出工程化（第 2 周 Day 5-7）— `src/dochris/api/sse.py`
-- [ ] P4-5: 语义分块策略优化（第 3 周）— `src/dochris/rag/chunking/`
+- [x] ~~P4-1: Reranker 重排序（第 1 周 Day 1-2）~~ ✅ (2026-06-10) — `src/dochris/rag/reranker/`
+- [x] ~~P4-2: RAG 评估体系（第 1 周 Day 3-5）~~ ✅ (2026-06-10) — `src/dochris/eval/`
+- [x] ~~P4-3: 可观测性监控（第 2 周 Day 1-4）~~ ✅ (2026-06-10) — `src/dochris/observability/`
+- [ ] P4-4: 流式输出工程化（第 2 周 Day 5-7）⚠️ 后端完成 — 前端 StreamingMarkdown 待做 — `src/dochris/api/sse.py`
+- [x] ~~P4-5: 语义分块策略优化（第 3 周）~~ ✅ (2026-06-14) — `src/dochris/rag/chunking/`
