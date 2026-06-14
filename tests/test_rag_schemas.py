@@ -73,9 +73,9 @@ class TestNormalizeVectorScore(unittest.TestCase):
         self.assertAlmostEqual(result, 1.0, places=2)
 
     def test_negative_distance(self) -> None:
-        """负距离（异常值）返回 1.0"""
+        """负距离（异常值）返回 0.0（让错误数据沉底，而非获最高分污染结果）"""
         result = normalize_vector_score(-0.5)
-        self.assertEqual(result, 1.0)
+        self.assertEqual(result, 0.0)
 
     def test_small_distance(self) -> None:
         """小距离（d=0.1）映射到约 0.91"""
