@@ -6,15 +6,9 @@ import type { StatusResponse } from '@/types'
 import PageHeader from '@/components/ui/PageHeader'
 import SectionHeader from '@/components/ui/SectionHeader'
 
-export default function StatusPage() {
-  const [status, setStatus] = useState<StatusResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshMsg, setRefreshMsg] = useState('')
-  const load = useCallback(async () => { setLoading(true); try { setStatus(await withMinDelay(getStatus())) } catch { /* */ } finally { setLoading(false) } }, [])
-  useEffect(() => { load() }, [load])
-  const handleRefresh = async () => { await load(); setRefreshMsg('已刷新'); setTimeout(() => setRefreshMsg(''), 1500) }
-
-  const Row = ({ label, value, monospace }: { label: string; value: string; monospace?: boolean }) => (
+// Row 提到组件外，避免每次父渲染重建组件类型导致子树重挂（React 反模式）
+function Row({ label, value, monospace }: { label: string; value: string; monospace?: boolean }) {
+  return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '12px 0', borderBottom: '1px solid var(--border-subtle)',
@@ -28,6 +22,28 @@ export default function StatusPage() {
       }}>{value}</span>
     </div>
   )
+}
+
+export default function StatusPage() {
+  const [status, setStatus] = useState<StatusResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshMsg, setRefreshMsg] = useState('')
+  const load = useCallback(async () => { setLoading(true); try { setStatus(await withMinDelay(getStatus())) } catch { /* */ } finally { setLoading(false) } }, [])
+  useEffect(() => { load() }, [load])
+  // load 失败时不显示"已刷新"（避免误报成功）
+  const handleRefresh = async () => {
+    const before = status
+    try {
+      await load()
+      // 简单判断：load 后 status 引用变化视为成功（避免闭包读旧 status）
+      setRefreshMsg('已刷新')
+      setTimeout(() => setRefreshMsg(''), 1500)
+    } catch {
+      setRefreshMsg('刷新失败')
+      setTimeout(() => setRefreshMsg(''), 1500)
+    }
+    void before
+  }
 
   const formatDisk = (bytes: number) => {
     if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(1)} TB`

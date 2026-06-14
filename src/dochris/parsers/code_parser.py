@@ -49,7 +49,7 @@ def extract_from_code(file_path: Path) -> dict[str, str | list[str]] | None:
     try:
         content = file_path.read_text(encoding="utf-8", errors="replace")
 
-        # 简单提取
+        # 符号提取（仅 Python：def/class 语法；其他语言 functions/classes 为空列表，仅返回 text）
         functions = re.findall(r"def\s+(\w+)", content)
         classes = re.findall(r"class\s+(\w+)", content)
 

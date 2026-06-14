@@ -171,7 +171,12 @@ class LeannStore(BaseVectorStore):
         # 转换为统一格式
         output: list[dict[str, Any]] = []
         registry = self._load_registry(collection)
-        id_list = list(registry.keys())
+        # 构建反向映射 text→doc_id，用于正确还原 LEANN 返回结果的 doc_id。
+        # 不能用 registry.keys() 的位置索引（HNSW 构建可能重排 chunk 顺序导致错位）
+        text_to_id: dict[str, str] = {}
+        for doc_id, doc_text in registry.items():
+            # 去重场景下 text 应唯一；若重复，后写入的 doc_id 覆盖（保守取最新）
+            text_to_id[doc_text] = doc_id
 
         # LEANN 返回的结果格式可能不同，做兼容处理
         if isinstance(results, list):
@@ -179,11 +184,11 @@ class LeannStore(BaseVectorStore):
                 if isinstance(item, dict):
                     text = item.get("text", item.get("document", ""))
                     score = item.get("score", item.get("distance", 0))
-                    doc_id = item.get("id", "")
+                    doc_id = item.get("id", "") or text_to_id.get(text, "")
                 elif isinstance(item, (list, tuple)) and len(item) >= 2:
                     text = str(item[0])
                     score = float(item[1])
-                    doc_id = ""
+                    doc_id = text_to_id.get(text, "")
                 else:
                     continue
                 output.append(
@@ -199,7 +204,8 @@ class LeannStore(BaseVectorStore):
             scores = results.get("scores", results.get("distances", []))
             for i, text in enumerate(texts[:n_results]):
                 score = scores[i] if i < len(scores) else 0
-                doc_id = id_list[i] if i < len(id_list) else f"doc-{i}"
+                # 用 text 反查 doc_id，而非位置索引（修正 HNSW 重排后的错位）
+                doc_id = text_to_id.get(text, f"doc-{i}")
                 output.append(
                     {
                         "id": doc_id,

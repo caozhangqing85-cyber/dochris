@@ -201,7 +201,11 @@ export default function QueryPage() {
   }, [])
   useEffect(() => { loadFiles() }, [loadFiles])
 
-  const compiledFiles = files.filter(f => f.status === 'compiled' || f.status === 'promoted' || f.status === 'promoted_to_wiki')
+  // filter 包进 useMemo（compiledFiles 每次渲染新引用会破坏下游 memo）
+  const compiledFiles = useMemo(
+    () => files.filter(f => f.status === 'compiled' || f.status === 'promoted' || f.status === 'promoted_to_wiki'),
+    [files]
+  )
   const quickQuestions = useMemo(() => generateQuickQuestions(compiledFiles), [compiledFiles])
 
   // Click outside to close mode dropdown
@@ -437,8 +441,8 @@ export default function QueryPage() {
               <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
                 {history.length === 0 ? (
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', textAlign: 'center', padding: 'var(--space-4)' }}>暂无查询历史</p>
-                ) : history.map((h, i) => (
-                  <div key={i} onClick={() => { setQuery(h.query); setMode(h.mode); handleQuery(h.query, h.mode) }}
+                ) : history.map((h) => (
+                  <div key={h.timestamp} onClick={() => { setQuery(h.query); setMode(h.mode); handleQuery(h.query, h.mode) }}
                     style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', cursor: 'pointer', marginBottom: '1px' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
@@ -464,8 +468,8 @@ export default function QueryPage() {
                   </span>
                 </div>
                 <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
-                  {favorites.map((f, i) => (
-                    <div key={i} onClick={() => { setQuery(f.query); handleQuery(f.query) }}
+                  {favorites.map((f) => (
+                    <div key={`${f.query}-${f.mode || ''}-${f.timestamp}`} onClick={() => { setQuery(f.query); handleQuery(f.query, f.mode) }}
                       style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', cursor: 'pointer', marginBottom: '1px' }}
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}

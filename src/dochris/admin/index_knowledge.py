@@ -51,29 +51,49 @@ PRIORITY_FILES = [
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# 初始化 ChromaDB
-try:
-    client = chromadb.PersistentClient(path=str(CHROMA_PATH))
-except Exception as e:
-    logger.error(f"初始化 ChromaDB 失败: {e}")
-    logger.error(f"请确保数据目录存在: {CHROMA_PATH}")
-    sys.exit(1)
+# ChromaDB 客户端和 collection 改为 lazy 初始化（避免 import 即触发副作用：
+# 连接数据库/下载 embedding 模型/创建 collection）。
+# 模块级 import 只保留 None 占位，首次调用 get_collection() 时才真正初始化。
+_collection: Any = None
 
-# 使用 HuggingFace embeddings
-try:
-    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="BAAI/bge-small-zh-v1.5"  # 中文语义模型
+
+def get_collection() -> Any:
+    """延迟初始化并返回 ChromaDB collection。
+
+    首次调用时连接数据库、加载 embedding 模型、创建 collection。
+    失败时抛 RuntimeError（而非 sys.exit，便于作为库被调用）。
+    """
+    global _collection
+    if _collection is not None:
+        return _collection
+
+    try:
+        client = chromadb.PersistentClient(path=str(CHROMA_PATH))
+    except Exception as e:
+        raise RuntimeError(f"初始化 ChromaDB 失败: {e}（数据目录: {CHROMA_PATH}）") from e
+
+    try:
+        sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="BAAI/bge-small-zh-v1.5"  # 中文语义模型
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"初始化 embedding 函数失败: {e}（请安装: pip install sentence-transformers）"
+        ) from e
+
+    _collection = client.get_or_create_collection(
+        name="knowledge_base",
+        embedding_function=cast(Any, sentence_transformer_ef),
     )
-except Exception as e:
-    logger.error(f"初始化 embedding 函数失败: {e}")
-    logger.error("请确保已安装: pip install sentence-transformers")
-    sys.exit(1)
+    return _collection
 
-# 创建或获取 collection
-collection = client.get_or_create_collection(
-    name="knowledge_base",
-    embedding_function=cast(Any, sentence_transformer_ef),
-)
+
+# 向后兼容：暴露 collection 为模块属性（首次访问触发 lazy 初始化）
+# 通过 __getattr__ (PEP 562) 延迟解析，避免 import 时副作用
+def __getattr__(name: str) -> Any:
+    if name == "collection":
+        return get_collection()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def clean_text(text: str) -> str:
@@ -104,11 +124,9 @@ def extract_markdown_summary(md_file: str | Path) -> str:
         if line.strip():
             summary_lines.append(line)
 
-    # 提取所有 ## 标题下的内容
-    for line in lines:
+    # 提取所有 ## 标题下的内容（用 enumerate 获取真实索引，避免重复标题 lines.index 错位）
+    for idx, line in enumerate(lines):
         if line.startswith("## "):
-            line.strip()
-            idx = lines.index(line)
             # 提取该标题下的 20 行
             content = "\n".join(lines[idx : idx + 20])
             summary_lines.append(content)
@@ -172,8 +190,8 @@ def index_file(file_path: str | Path, source_type: str = "obsidian") -> None:
 
         doc_id = f"{source_type}_{rel_path}".replace("/", "_")
 
-        # 添加到 collection
-        collection.add(
+        # 添加到 collection（lazy 初始化）
+        get_collection().add(
             documents=[content],
             metadatas=[
                 {
@@ -242,7 +260,7 @@ def search_knowledge(query: str, n_results: int = 5) -> None:
     logger.info(f"搜索: '{query}'")
     logger.info("=" * 60)
 
-    results = collection.query(query_texts=[query], n_results=n_results)
+    results = get_collection().query(query_texts=[query], n_results=n_results)
 
     documents = results.get("documents")
     if not documents or not documents[0]:
@@ -269,12 +287,13 @@ def show_stats() -> None:
     logger.info("向量数据库统计")
     logger.info("=" * 60)
 
-    count = collection.count()
+    col = get_collection()
+    count = col.count()
     logger.info(f"总文档数: {count}")
 
     # 按来源分组
     sources: dict[str, int] = {}
-    collection_data = collection.get()
+    collection_data = col.get()
     metadatas = collection_data.get("metadatas")
     if metadatas:
         for doc in metadatas:

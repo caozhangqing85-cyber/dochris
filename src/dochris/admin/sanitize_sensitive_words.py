@@ -11,6 +11,7 @@
 - 文件名预处理
 """
 
+import os
 import re
 from pathlib import Path
 
@@ -180,7 +181,18 @@ def sanitize_filename(filename: str) -> str:
 
 
 def sanitize_pdf_content(content: str) -> str:
-    """清洗 PDF 文件内容，移除或替换敏感词"""
+    """清洗 PDF 文件内容，移除或替换敏感词。
+
+    ⚠️ 默认关闭（SANITIZE_CONTENT_ENABLED 非 true 时直接返回原文）。
+    内容清洗会把"政治""政府""性""爱"等日常词强制替换，
+    破坏知识库内容准确性（对政治学/法学等文档是灾难）。
+    如需启用，设置环境变量 SANITIZE_CONTENT_ENABLED=true。
+    建议优先用 sanitize_prompt（仅清洗发给 LLM 的 prompt，保留原文）。
+    """
+    # 默认关闭：内容清洗破坏知识库准确性，需显式启用
+    if os.environ.get("SANITIZE_CONTENT_ENABLED", "false").lower() not in ("true", "1", "yes"):
+        return content
+
     # 按顺序替换敏感词（先替换长词，再替换短词）
     for sensitive_word, replacement in SENSITIVE_WORDS_ORDERED:
         # 跳过单字符替换，避免误伤复合词

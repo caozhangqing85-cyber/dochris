@@ -104,19 +104,30 @@ def append_log_to_file(workspace: Path | None, message: str, log_type: str = "sy
 
     log_file = log_dir / f"{log_type}_{datetime.now().strftime('%Y%m%d')}.json"
 
-    logs = []
-    if log_file.exists():
-        with open(log_file, encoding="utf-8") as f:
+    # 用文件锁保证读-改-写的原子性，避免并发写丢失日志条目（fcntl 为 Unix 专有，Windows 回退无锁）
+    try:
+        import fcntl
+        _has_fcntl = True
+    except ImportError:
+        _has_fcntl = False
+
+    with open(log_file, "a+", encoding="utf-8") as f:
+        if _has_fcntl:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.seek(0)
+            logs = []
             try:
                 logs = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                logger.warning(f"Failed to load log file {log_file}: {e}")
+            except (json.JSONDecodeError, OSError):
                 logs = []
-
-    logs.append(log_entry)
-
-    with open(log_file, "w", encoding="utf-8") as f:
-        json.dump(logs, f, ensure_ascii=False, indent=2)
+            logs.append(log_entry)
+            f.seek(0)
+            f.truncate()
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+        finally:
+            if _has_fcntl:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
 
 def append_log_to_markdown(workspace_path: Path | None, operation: str, detail: str) -> None:
