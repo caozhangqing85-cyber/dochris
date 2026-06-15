@@ -11,8 +11,8 @@
 import hashlib
 from unittest import TestCase
 
-from dochris.rag.schemas import SourceRef
 from dochris.phases.query_engine import build_answer_context, build_answer_prompt
+from dochris.rag.schemas import SourceRef
 
 
 class TestBuildAnswerContextEmpty(TestCase):

@@ -81,10 +81,14 @@ def load_plugin_module(module_path: Path, module_name: str) -> Any:
 
 
 def load_plugin_from_code(code: str, module_name: str) -> Any:
-    """从代码字符串加载插件模块
+    """从代码字符串加载插件模块。
+
+    ⚠️ 安全警告：此函数执行任意 Python 代码。提供的 safe_builtins 沙箱并不可靠
+    （可通过 `().__class__.__bases__[0].__subclasses__()` 等方式逃逸）。
+    仅用于加载可信来源的插件代码，切勿用于不可信输入。
 
     Args:
-        code: Python 代码字符串
+        code: Python 代码字符串（必须来自可信来源）
         module_name: 模块名称
 
     Returns:
@@ -93,7 +97,12 @@ def load_plugin_from_code(code: str, module_name: str) -> Any:
     Raises:
         ImportError: 加载失败
     """
+    import logging
     import types
+
+    logging.getLogger(__name__).warning(
+        "load_plugin_from_code 执行任意代码（模块 %s），请确保代码来源可信", module_name
+    )
 
     module = types.ModuleType(module_name)
     sys.modules[module_name] = module
