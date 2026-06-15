@@ -13,6 +13,7 @@ const QualityPage = lazy(() => import('@/pages/QualityPage'))
 const GraphPage = lazy(() => import('@/pages/GraphPage'))
 const StatusPage = lazy(() => import('@/pages/StatusPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const CandidatesPage = lazy(() => import('@/pages/CandidatesPage'))
 
 function PageLoader() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="compile" element={<CompilePage />} />
               <Route path="query" element={<QueryPage />} />
               <Route path="quality" element={<QualityPage />} />
+              <Route path="candidates" element={<CandidatesPage />} />
               <Route path="graph" element={<GraphPage />} />
               <Route path="status" element={<StatusPage />} />
               <Route path="settings" element={<SettingsPage />} />

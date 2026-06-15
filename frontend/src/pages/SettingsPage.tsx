@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Save, RefreshCw, Plug, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { getConfig, updateConfig, getStatus } from '@/lib/api'
+import { Save, RefreshCw, Plug, Loader2, CheckCircle2, XCircle, Tag, AlertTriangle } from 'lucide-react'
+import { getConfig, updateConfig, getStatus, enrichSchemaFromGraph, autoTagSchema, checkStaleSchema } from '@/lib/api'
 import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
 import SectionHeader from '@/components/ui/SectionHeader'
@@ -74,9 +74,85 @@ export default function SettingsPage() {
     color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
   }
 
+  // Schema 维护
+  const [schemaLoading, setSchemaLoading] = useState(false)
+  const [schemaMsg, setSchemaMsg] = useState('')
+  const handleSchemaEnrich = async () => {
+    setSchemaLoading(true); setSchemaMsg('')
+    try {
+      const res = await enrichSchemaFromGraph()
+      setSchemaMsg(`元数据丰富完成: ${JSON.stringify(res)}`)
+    } catch (e) { setSchemaMsg((e as Error).message) }
+    finally { setSchemaLoading(false) }
+  }
+  const handleAutoTag = async () => {
+    setSchemaLoading(true); setSchemaMsg('')
+    try {
+      const res = await autoTagSchema()
+      setSchemaMsg(`自动打标签完成: ${JSON.stringify(res)}`)
+    } catch (e) { setSchemaMsg((e as Error).message) }
+    finally { setSchemaLoading(false) }
+  }
+  const handleCheckStale = async () => {
+    setSchemaLoading(true); setSchemaMsg('')
+    try {
+      const res = await checkStaleSchema()
+      setSchemaMsg(`过时检查: ${JSON.stringify(res)}`)
+    } catch (e) { setSchemaMsg((e as Error).message) }
+    finally { setSchemaLoading(false) }
+  }
+
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
       <PageHeader title="系统设置" description="配置 LLM 模型、API 端点和工作区" />
+
+      <SectionHeader title="可观测性" />
+      <div style={{
+        borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+        border: '1px solid var(--border-default)', marginBottom: 'var(--space-10)',
+        background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)',
+      }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+          Prometheus 指标端点（仅限本地访问）：
+          <a href="/api/v1/metrics" target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--color-primary)', marginLeft: '6px' }}>
+            /api/v1/metrics
+          </a>
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
+          启用 PROMETHEUS_ENABLED=true 后，此端点暴露查询/LLM/检索指标。生产环境请通过反向代理加认证暴露。
+        </div>
+      </div>
+
+      <SectionHeader title="知识库维护（Schema Evolution）" />
+      <div style={{
+        borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+        border: '1px solid var(--border-default)', marginBottom: 'var(--space-10)',
+        background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)',
+      }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+          <button onClick={handleSchemaEnrich} disabled={schemaLoading}
+            style={{ padding: '8px 16px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--bg-card)', background: 'var(--color-primary)', border: 'none', cursor: 'pointer', opacity: schemaLoading ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {schemaLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            从图谱丰富元数据
+          </button>
+          <button onClick={handleAutoTag} disabled={schemaLoading}
+            style={{ padding: '8px 16px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', cursor: 'pointer', opacity: schemaLoading ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {schemaLoading ? <Loader2 size={14} className="animate-spin" /> : <Tag size={14} />}
+            自动打标签
+          </button>
+          <button onClick={handleCheckStale} disabled={schemaLoading}
+            style={{ padding: '8px 16px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', cursor: 'pointer', opacity: schemaLoading ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {schemaLoading ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+            检查过时编译
+          </button>
+        </div>
+        {schemaMsg && (
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--space-2)', maxHeight: '120px', overflow: 'auto' }}>
+            {schemaMsg}
+          </div>
+        )}
+      </div>
 
       <SectionHeader title="API 配置" />
       {/* Notion card: 12px radius, shadow */}

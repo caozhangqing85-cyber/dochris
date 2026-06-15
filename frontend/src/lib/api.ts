@@ -232,3 +232,41 @@ export const recompileStale = (limit: number = 10, model?: string) =>
 // ── Promote ─────────────────────────────────────────────
 export const promoteFile = (srcId: string, target: 'wiki' | 'curated' = 'wiki') =>
   request<PromoteResponse>(`/promote/${srcId}`, { method: 'POST', body: JSON.stringify({ target }) })
+
+// ── Contribution（Query-as-Contribution）──────────────────
+export interface CandidateMeta {
+  id: string
+  title: string
+  source_type?: string
+  query?: string
+  query_mode?: string
+  content_hash?: string
+  quality_score: number
+  status: 'candidate' | 'promoted' | 'discarded'
+  needs_review?: boolean
+  contradiction?: Record<string, unknown>
+  source_manifest_ids?: string[]
+  concepts_extracted?: unknown[]
+  concepts_referenced?: unknown[]
+  created_at?: string
+  answer?: string
+}
+export const getCandidates = (status?: 'candidate' | 'promoted' | 'discarded', needsReviewOnly: boolean = false) =>
+  request<{ candidates: CandidateMeta[]; total: number }>('/candidates' + (status ? `?status=${status}${needsReviewOnly ? '&needs_review_only=true' : ''}` : ''))
+export const promoteCandidate = (candidateId: string) =>
+  request<{ success: boolean; reason?: string }>(`/candidates/${candidateId}/promote`, { method: 'POST' })
+export const discardCandidate = (candidateId: string, reason: string = 'manual_discard') =>
+  request<{ success: boolean; reason?: string }>(`/candidates/${candidateId}/discard?reason=${encodeURIComponent(reason)}`, { method: 'POST' })
+
+// ── Schema Evolution ─────────────────────────────────
+export const enrichSchemaFromGraph = () =>
+  request<Record<string, unknown>>('/schema/enrich', { method: 'POST' })
+export const autoTagSchema = () =>
+  request<Record<string, unknown>>('/schema/auto-tag', { method: 'POST' })
+export const checkStaleSchema = () =>
+  request<Record<string, unknown>>('/schema/stale')
+
+// ── Metrics ──────────────────────────────────────────
+// /metrics 返回 Prometheus 文本格式，不用 JSON
+export const getMetrics = () =>
+  fetch('/api/v1/metrics', { headers: { Accept: 'text/plain' } }).then(r => r.text())

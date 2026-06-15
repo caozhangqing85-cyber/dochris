@@ -311,9 +311,12 @@ def retrieve_candidates(
     """
     from dochris.rag.schemas import RetrievalCandidate, normalize_score
 
+    # rerank 模式下用 candidate_k 扩大召回，让 reranker 有足够候选精排
+    fetch_k = candidate_k if candidate_k and candidate_k > top_k else top_k
+
     # 可观测性：记录检索操作
     _obs_start = _obs_time()
-    raw_results = search_all(query, top_k)
+    raw_results = search_all(query, fetch_k)
 
     _record_retrieval_obs(
         retriever="search_all",

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FolderOpen, PlayCircle, Search,
-  Target, Activity, Share2, Settings, Menu, X,
+  Target, Activity, Share2, Settings, Menu, X, FileEdit,
 } from 'lucide-react'
 
 const mainNav = [
@@ -10,6 +10,7 @@ const mainNav = [
   { to: '/files', icon: FolderOpen, label: '文件管理' },
   { to: '/compile', icon: PlayCircle, label: '编译控制' },
   { to: '/query', icon: Search, label: '知识查询' },
+  { to: '/candidates', icon: FileEdit, label: '候选知识' },
 ]
 
 const toolNav = [
