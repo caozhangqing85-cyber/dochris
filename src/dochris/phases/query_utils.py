@@ -106,6 +106,15 @@ def _build_manifest_index() -> dict[str, str]:
                 safe_title = re.sub(r'[<>:"/\\|?*]', "", title).strip()[:80]
                 index[f"wiki/summaries/{safe_title}.md"] = src_id
                 index[f"outputs/summaries/{safe_title}.md"] = src_id
+            # 按 concept 名索引（匹配 concepts/{name}.md，从 compiled_summary.concepts 反向建立）
+            compiled = m.get("compiled_summary") or {}
+            if isinstance(compiled, dict):
+                for c in compiled.get("concepts", []):
+                    cname = c.get("name", "") if isinstance(c, dict) else (c if isinstance(c, str) else "")
+                    if cname:
+                        safe_cname = re.sub(r'[<>:"/\\|?*]', "", str(cname)).strip()[:60]
+                        index[f"wiki/concepts/{safe_cname}.md"] = src_id
+                        index[f"outputs/concepts/{safe_cname}.md"] = src_id
         except (json.JSONDecodeError, OSError, KeyError, UnicodeDecodeError):
             continue
     return index
