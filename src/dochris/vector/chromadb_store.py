@@ -208,6 +208,31 @@ class ChromaDBStore(BaseVectorStore):
         except Exception as e:
             logger.debug(f"Collection '{collection}' not found for deletion: {e}")
 
+    def update_metadata(
+        self,
+        collection: str,
+        ids: list[str],
+        metadatas: list[dict[str, Any]],
+    ) -> None:
+        """批量更新文档元数据（ChromaDB 原生支持 update）。
+
+        Args:
+            collection: 集合名称
+            ids: 要更新的文档 ID 列表
+            metadatas: 对应的新元数据列表（长度须与 ids 一致）
+        """
+        if len(ids) != len(metadatas):
+            raise ValueError(
+                f"ids ({len(ids)}) 和 metadatas ({len(metadatas)}) 长度不匹配"
+            )
+        client = self._get_client()
+        try:
+            col = client.get_collection(name=collection)
+            col.update(ids=ids, metadatas=metadatas)
+            logger.debug(f"Updated metadata for {len(ids)} docs in collection '{collection}'")
+        except Exception as e:
+            logger.warning(f"更新 collection '{collection}' 元数据失败: {e}")
+
     def list_collections(self) -> list[str]:
         """列出所有集合
 

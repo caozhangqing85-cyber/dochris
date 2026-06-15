@@ -105,6 +105,8 @@ class Settings:
         "chunk_size_tokens": ("CHUNK_SIZE_TOKENS", "800", int),
         "chunk_overlap_tokens": ("CHUNK_OVERLAP_TOKENS", "120", int),
         "semantic_breakpoint_percentile": ("SEMANTIC_BREAKPOINT_PERCENTILE", "95", float),
+        # 查询时按 trust_level 过滤 chunks（默认关闭；启用后仅检索 wiki 及以上信任层的 chunk）
+        "query_min_trust_level": ("QUERY_MIN_TRUST_LEVEL", "", None),
     }
 
     @classmethod
@@ -335,6 +337,9 @@ class Settings:
 
     semantic_breakpoint_percentile: float = 95.0
     """semantic 策略的断点距离百分位阈值（取距离前 5% 位置为断点）"""
+
+    query_min_trust_level: str = ""
+    """查询 chunks 时的最低信任层过滤（空=不过滤；outputs/wiki/curated/locked）"""
 
     # ============================================================
     # 工厂方法

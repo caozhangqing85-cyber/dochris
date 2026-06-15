@@ -582,13 +582,21 @@ def _vector_search_with_store(
                 logger.debug("No vector store collections found")
             return []
 
+        # 读取 trust_level 过滤配置（仅 chunks collection 受影响）
+        from dochris.settings import get_settings
+
+        min_trust = get_settings().query_min_trust_level or ""
+
         all_results: list[dict] = []
         for collection in collections:
             try:
+                # chunks collection 按 trust_level 过滤（启用时仅检索 wiki 及以上信任层）
+                where = {"trust_level": min_trust} if collection == "chunks" and min_trust else None
                 results = store.query(  # type: ignore[attr-defined]
                     collection=collection,
                     query_text=query,
                     n_results=top_k,
+                    where=where,
                 )
                 for r in results:
                     metadata = r.get("metadata", {})

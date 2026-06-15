@@ -1859,7 +1859,7 @@ Day 5：✅
 
 - [ ] chunk benchmark 对比 structure / recursive / semantic 的 chunk 数、索引耗时、查询耗时。
 - [ ] RAG eval 对比三策略的 Recall@k 和 Faithfulness，根据结果决定默认策略。
-- [ ] promote 适配 chunks collection metadata 的 trust_level 更新。
+- [x] promote 适配 chunks collection metadata 的 trust_level 更新 ✅ (2026-06-15)
 - [ ] late chunking 实验策略（高级可选，需 RAG eval 验证收益）。
 
 ## 11. 风险与回滚

@@ -12,16 +12,20 @@ Promote 脚本 — 将编译产物从 outputs/ 晋升到 wiki/ 或 curated/
   python scripts/promote_artifact.py <workspace> status <src-id>
 """
 
+import logging
 import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 # 确保 scripts 包可导入
 from dochris.core.utils import sanitize_filename
 from dochris.log import append_log
 from dochris.manifest import get_manifest, update_manifest_status
+
+logger = logging.getLogger(__name__)
 
 # 文件复制重名冲突最大重试次数
 MAX_COPY_RETRIES = 999
@@ -217,6 +221,9 @@ def promote_to_wiki(workspace_path: Path, src_id: str) -> bool:
         promoted_to="wiki",
     )
 
+    # 同步更新该文档所有 chunks 的 trust_level（使信任层过滤生效）
+    _update_chunks_trust_level(workspace_path, src_id, "wiki")
+
     # 记录日志
     append_log(
         workspace_path,
@@ -301,6 +308,9 @@ def promote_to_curated(workspace_path: Path, src_id: str) -> bool:
         promoted_to="curated",
     )
 
+    # 同步更新该文档所有 chunks 的 trust_level
+    _update_chunks_trust_level(workspace_path, src_id, "curated")
+
     # 记录日志
     append_log(
         workspace_path,
@@ -361,6 +371,60 @@ def main() -> None:
     else:
         print(f"未知操作: {action}，支持: wiki / curated / status")
         sys.exit(1)
+
+
+def _update_chunks_trust_level(workspace_path: Path, src_id: str, trust_level: str) -> None:
+    """更新某文档所有 chunks 的 trust_level 元数据。
+
+    chunks 的 id 格式为 {src_id}_chunk_NNNN，按前缀匹配查找并批量更新。
+    若 chunks collection 不存在或后端不支持 update_metadata，静默跳过。
+
+    Args:
+        workspace_path: 工作区路径
+        src_id: 文档 manifest ID
+        trust_level: 新的信任层（wiki/curated/locked）
+    """
+    try:
+        from dochris.settings import get_settings
+        from dochris.vector import get_store
+
+        settings = get_settings()
+        # 只有启用了 chunk indexing 才尝试更新（否则无 chunks collection）
+        if settings.index_raw_chunks == "true":
+            store_cls = get_store(settings.vector_store)
+            store = store_cls(persist_directory=str(workspace_path / "data"))
+            if "chunks" not in store.list_collections():
+                return
+            # 查找该 src_id 的所有 chunk id
+            # 通过 metadata.source == src_id 过滤（chunks metadata 含 source 字段）
+            # 这里用 get 风格查询获取所有 chunk 再过滤（chunks 量级通常不大）
+            try:
+                col_client = store._get_client() if hasattr(store, "_get_client") else None
+            except Exception:
+                col_client = None
+
+            chunk_ids: list[str] = []
+            chunk_metas: list[dict[str, Any]] = []
+            if col_client is not None:
+                try:
+                    col = col_client.get_collection(name="chunks")
+                    existing = col.get()
+                    for i, mid in enumerate(existing.get("ids", [])):
+                        meta = existing.get("metadatas", [{}] * len(existing.get("ids", [])))
+                        m = meta[i] if i < len(meta) else {}
+                        if m.get("source") == src_id:
+                            new_meta = dict(m)
+                            new_meta["trust_level"] = trust_level
+                            chunk_ids.append(mid)
+                            chunk_metas.append(new_meta)
+                except Exception:
+                    pass
+            if chunk_ids:
+                store.update_metadata("chunks", chunk_ids, chunk_metas)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning(f"更新 chunks trust_level 失败 {src_id}: {e}")
 
 
 if __name__ == "__main__":

@@ -378,6 +378,35 @@ class FAISSStore(BaseVectorStore):
 
         logger.debug(f"Deleted {len(ids)} documents from FAISS collection '{collection}'")
 
+    def update_metadata(
+        self,
+        collection: str,
+        ids: list[str],
+        metadatas: list[dict[str, Any]],
+    ) -> None:
+        """更新文档元数据。
+
+        FAISS 的 metadata 与向量分离存储（_documents/_metadatas），
+        可直接更新 dict 并保存 metadata.json，无需重建向量索引。
+
+        Args:
+            collection: 集合名称
+            ids: 要更新的文档 ID 列表
+            metadatas: 对应的新元数据列表（长度须与 ids 一致）
+        """
+        if len(ids) != len(metadatas):
+            raise ValueError(
+                f"ids ({len(ids)}) 和 metadatas ({len(metadatas)}) 长度不匹配"
+            )
+        self._load_collection(collection)
+        metas = self._metadatas.get(collection, {})
+        for doc_id, new_meta in zip(ids, metadatas, strict=True):
+            if doc_id in metas:
+                # 合并：新元数据覆盖旧元数据的同名字段
+                metas[doc_id].update(new_meta)
+        self._save_collection(collection)
+        logger.debug(f"Updated metadata for {len(ids)} docs in FAISS collection '{collection}'")
+
     def list_collections(self) -> list[str]:
         """列出所有集合
 

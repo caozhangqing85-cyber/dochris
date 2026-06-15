@@ -118,5 +118,25 @@ class BaseVectorStore(ABC):
         """
         return collection in self.list_collections()
 
+    def update_metadata(
+        self,
+        collection: str,
+        ids: list[str],
+        metadatas: list[dict[str, Any]],
+    ) -> None:
+        """批量更新文档的元数据。
+
+        默认实现抛 NotImplementedError；支持高效更新的后端（如 ChromaDB）应覆盖。
+        不支持的后端（如 FAISS）可退化为 delete + re-add。
+
+        Args:
+            collection: 集合名称
+            ids: 要更新的文档 ID 列表
+            metadatas: 对应的新元数据列表（长度须与 ids 一致）
+        """
+        raise NotImplementedError(
+            f"{self.name} 后端不支持 update_metadata，请在子类实现"
+        )
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"
