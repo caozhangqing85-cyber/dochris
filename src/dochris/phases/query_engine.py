@@ -532,13 +532,22 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
                 if results and results["documents"]:
                     for i, doc in enumerate(results["documents"][0]):
                         metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+                        raw_id = results["ids"][0][i] if results.get("ids") else ""
+                        # 适配多后端 metadata schema（source/name/file）+ 从 id 提取 manifest_id
+                        source = (
+                            metadata.get("source")
+                            or metadata.get("name")
+                            or metadata.get("file")
+                            or "unknown"
+                        )
+                        manifest_id = metadata.get("manifest_id") or _extract_manifest_id(raw_id)
                         all_results.append(
                             {
                                 "text": doc[:500],
-                                "source": metadata.get("source", metadata.get("file", "unknown")),
+                                "source": source,
                                 "score": results["distances"][0][i] if results["distances"] else 0,
                                 "type": "vector",
-                                "manifest_id": None,
+                                "manifest_id": manifest_id,
                             }
                         )
             except Exception as e:
@@ -556,6 +565,22 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
         if logger:
             logger.error(f"Vector search failed: {e}")
         return []
+
+
+def _extract_manifest_id(raw_id: str) -> str | None:
+    """从向量库的文档 id 提取 manifest_id。
+
+    适配不同 collection 的 id 格式：
+    - summaries/concepts: "summary:SRC-0001" / "concept:名称" → "SRC-0001"
+    - chunks: "SRC-0001_chunk_0001" → "SRC-0001"
+    """
+    if not raw_id:
+        return None
+    # 优先匹配 SRC-NNNN 模式
+    import re
+
+    m = re.search(r"(SRC-\d+)", raw_id)
+    return m.group(1) if m else None
 
 
 def _vector_search_with_store(
@@ -600,13 +625,24 @@ def _vector_search_with_store(
                 )
                 for r in results:
                     metadata = r.get("metadata", {})
+                    raw_id = r.get("id", "")
+                    # 适配多后端的 metadata schema：
+                    # - summaries/concepts: metadata.name + id 含 "summary:SRC-NNNN" 前缀
+                    # - chunks: metadata.source + metadata.manifest_id
+                    source = (
+                        metadata.get("source")
+                        or metadata.get("name")
+                        or metadata.get("file")
+                        or "unknown"
+                    )
+                    manifest_id = metadata.get("manifest_id") or _extract_manifest_id(raw_id)
                     all_results.append(
                         {
                             "text": r.get("document", "")[:500],
-                            "source": metadata.get("source", metadata.get("file", "unknown")),
+                            "source": source,
                             "score": r.get("distance", 0),
                             "type": "vector",
-                            "manifest_id": metadata.get("manifest_id"),
+                            "manifest_id": manifest_id,
                         }
                     )
             except Exception as e:
