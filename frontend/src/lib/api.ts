@@ -213,6 +213,22 @@ export const resetLowQuality = () =>
 export const resetFailedFiles = () =>
   request<{ reset_count: number }>('/manifests/reset-failed', { method: 'POST' })
 
+// ── Recompile ──────────────────────────────────────────
+export interface RecompileStatus {
+  running: boolean
+  total?: number
+  processed?: number
+  success?: number
+  failed?: number
+}
+export const getRecompileStatus = () =>
+  request<RecompileStatus>('/recompile/status')
+export const recompileStale = (limit: number = 10, model?: string) =>
+  request<{ queued: number }>('/recompile/stale', {
+    method: 'POST',
+    body: JSON.stringify({ limit, ...(model ? { model } : {}) }),
+  })
+
 // ── Promote ─────────────────────────────────────────────
 export const promoteFile = (srcId: string, target: 'wiki' | 'curated' = 'wiki') =>
   request<PromoteResponse>(`/promote/${srcId}`, { method: 'POST', body: JSON.stringify({ target }) })

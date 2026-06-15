@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronLeft, RotateCcw, ArrowUpRight, FileText, Tag,
   Shield, ShieldAlert, ShieldCheck, ShieldQuestion,
 } from 'lucide-react'
-import { getStatus, startCompile, getManifests, promoteFile } from '@/lib/api'
+import { getStatus, startCompile, getManifests, promoteFile, recompileStale } from '@/lib/api'
 import { withMinDelay, formatBytes, statusLabel } from '@/lib/utils'
 import type { StatusResponse, CompileResponse, ManifestItem } from '@/types'
 import StatCard from '@/components/ui/StatCard'
@@ -31,6 +31,7 @@ export default function CompilePage() {
   const [concurrency, setConcurrency] = useState(1)
   const [dryRun, setDryRun] = useState(false)
   const [compiling, setCompiling] = useState(false)
+  const [recompiling, setRecompiling] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [result, setResult] = useState<CompileResponse | null>(null)
   const [error, setError] = useState('')
@@ -123,6 +124,21 @@ export default function CompilePage() {
     if (pollRef.current) {
       clearInterval(pollRef.current)
       pollRef.current = null
+    }
+  }
+
+  // 重编译过时/失败文档（recompile stale）
+  const handleRecompileStale = async () => {
+    setRecompiling(true); setError('')
+    try {
+      const res = await recompileStale(limit)
+      setRefreshMsg(`已提交 ${res.queued} 个过时文档重编译`)
+      await loadData()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setRecompiling(false)
+      setTimeout(() => setRefreshMsg(''), 2000)
     }
   }
 
@@ -222,6 +238,20 @@ export default function CompilePage() {
           {!compiling && !compileProgress.isRunning && ingestedFiles.length > 0 && (
             <span style={{ fontSize: '12px', opacity: 0.8 }}>({ingestedFiles.length} 待编译)</span>
           )}
+        </button>
+
+        {/* 重编译过时文档 */}
+        <button onClick={handleRecompileStale} disabled={recompiling}
+          title="重新编译质量分过低或失败的文档（recompile stale）"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '8px 20px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
+            color: 'var(--text-primary)', background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-default)', cursor: 'pointer',
+            opacity: recompiling ? 0.4 : 1, whiteSpace: 'nowrap',
+          }}>
+          {recompiling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {recompiling ? '提交中...' : '重编译过时'}
         </button>
       </div>
 

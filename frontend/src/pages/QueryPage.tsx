@@ -180,6 +180,7 @@ export default function QueryPage() {
   const [mode, setMode] = useState('combined')
   const [topK, setTopK] = useState(5)
   const [contribute, setContribute] = useState(false)
+  const [rerank, setRerank] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [error, setError] = useState('')
@@ -280,7 +281,7 @@ export default function QueryPage() {
             setError(error)
             setLoading(false)
           },
-        })
+        }, rerank)
       } catch (e) {
         // stream 端点不可用（404），自动降级到传统查询
         if ((e as Error).message === 'STREAM_NOT_AVAILABLE') {
@@ -324,7 +325,7 @@ export default function QueryPage() {
       } catch (e) { setError((e as Error).message) }
       finally { setLoading(false) }
     }
-  }, [query, mode, topK, contribute])
+  }, [query, mode, topK, contribute, rerank])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery() }
@@ -564,6 +565,19 @@ export default function QueryPage() {
                 }}>
                 {contribute ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
                 贡献模式
+              </button>
+
+              {/* Reranker toggle */}
+              <button onClick={() => setRerank(!rerank)} title="启用 Reranker 重排序（CrossEncoder 精排）"
+                style={{
+                  padding: '4px 10px', borderRadius: '4px', fontSize: 'var(--text-xs)', fontWeight: 500,
+                  border: '1px solid', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                  borderColor: rerank ? 'var(--color-primary)' : 'var(--border-default)',
+                  background: rerank ? 'var(--color-primary-bg)' : 'transparent',
+                  color: rerank ? 'var(--color-primary)' : 'var(--text-dimmed)',
+                }}>
+                {rerank ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+                重排序
               </button>
             </div>
 
