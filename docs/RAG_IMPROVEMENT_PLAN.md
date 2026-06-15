@@ -1857,8 +1857,10 @@ Day 5：✅
 
 待后续（需真实数据集）：
 
-- [ ] chunk benchmark 对比 structure / recursive / semantic 的 chunk 数、索引耗时、查询耗时。
-- [ ] RAG eval 对比三策略的 Recall@k 和 Faithfulness，根据结果决定默认策略。
+- [x] chunk benchmark 对比 structure / recursive / semantic 的 chunk 数、索引耗时。✅ (2026-06-15)
+  - 结果：structure 72 chunks(14.4/文档, 1ms)，recursive 26 chunks(5.2/文档, <1ms)，semantic 33 chunks(6.6/文档, 6.4s)
+  - 结论：recursive 是最佳默认（接近 chunk_size、快、无 embedding 依赖）
+- [ ] RAG eval 对比三策略的 Recall@k 和 Faithfulness（需扩展 golden set 到 50+ 难查询）
 - [x] promote 适配 chunks collection metadata 的 trust_level 更新 ✅ (2026-06-15)
 - [ ] late chunking 实验策略（高级可选，需 RAG eval 验证收益）。
 

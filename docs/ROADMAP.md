@@ -1243,14 +1243,14 @@ class JSONFormatter(logging.Formatter):
 - **功能**: 查询面板 + 文件管理 + 质量仪表盘 + 编译进度
 
 **子任务**:
-- [ ] 搭建 FastAPI 后端框架
-- [ ] 实现查询 API（POST /api/query）
-- [ ] 实现文件管理 API（GET/POST/DELETE /api/files）
-- [ ] 实现编译进度 WebSocket 推送
-- [ ] 实现质量仪表盘数据 API
-- [ ] 搭建 Gradio 前端原型
-- [ ] 添加 Docker Compose 配置（app + chromadb）
-- [ ] 编写前端集成测试
+- [x] 搭建 FastAPI 后端框架（`src/dochris/api/app.py`）
+- [x] 实现查询 API（GET /api/v1/query + SSE 流式 /api/v1/query/stream）
+- [x] 实现文件管理 API（POST /api/v1/files/upload）
+- [x] 实现编译进度推送（采用 SSE 事件流替代 WebSocket，功能等价）
+- [x] 实现质量仪表盘数据 API（GET /api/v1/quality）
+- [x] 搭建前端（已从 Gradio 迁移到 React + Vite + TypeScript）
+- [x] 添加 Docker Compose 配置（docker-compose.yml，app + chromadb）
+- [ ] 编写前端集成测试（待补充）
 
 ### P3-2: 性能基准测试（~10 小时）
 
@@ -1277,13 +1277,13 @@ def test_llm_call_latency(benchmark):
 **技术选型**: `mkdocs-material` + `mkdocstrings`
 
 **子任务**:
-- [ ] 安装 mkdocs-material + mkdocstrings
-- [ ] 创建 mkdocs.yml 配置
-- [ ] 编写 docs/index.md 首页
-- [ ] 自动从 docstring 生成 API 文档
-- [ ] 添加教程章节（快速开始/配置/插件开发）
-- [ ] 配置 GitHub Pages 自动部署
-- [ ] 验证文档站点可访问
+- [x] 安装 mkdocs-material + mkdocstrings
+- [x] 创建 mkdocs.yml 配置（material 主题 + 暗色模式 + 导航）
+- [x] 编写 docs/index.md 首页
+- [x] 自动从 docstring 生成 API 文档（docs/api/ 完整覆盖 core/exceptions/parsers/phases/plugin/settings/vector）
+- [x] 添加教程章节（examples/ 6 个示例 + docs/ 指南）
+- [x] 配置 GitHub Pages 自动部署（.github/workflows/docs.yml）
+- [ ] 验证文档站点可访问（待手动确认线上）
 
 ### P3-4: 知识图谱可视化（~15 小时）
 
