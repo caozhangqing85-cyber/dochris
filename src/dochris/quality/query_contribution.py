@@ -201,7 +201,7 @@ def contribute_query_result(
         candidate_file = candidates_dir / f"{safe_title}_{content_hash[:4]}.md"
     candidate_file.write_text(md_content, encoding="utf-8")
 
-    # 8. 写入元数据
+    # 8. 写入元数据（含 answer 截断，供候选列表预览）
     meta = {
         "id": candidate_id,
         "title": title,
@@ -213,6 +213,7 @@ def contribute_query_result(
         "status": "candidate",
         "needs_review": quality_score < _get_min_quality_score() or contradiction["has_contradiction"],
         "contradiction": contradiction,
+        "answer_preview": (answer[:500] if len(answer) > 500 else answer),
         "source_manifest_ids": source_manifest_ids or [],
         "concepts_extracted": concepts or [],
         "concepts_referenced": referenced_concepts,

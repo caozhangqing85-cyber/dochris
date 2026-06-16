@@ -235,9 +235,8 @@ export interface RecompileStatus {
 export const getRecompileStatus = () =>
   request<RecompileStatus>('/recompile/status')
 export const recompileStale = (limit: number = 10, model?: string) =>
-  request<{ queued: number }>('/recompile/stale', {
+  request<{ queued: number }>(`/recompile/stale?limit=${limit}${model ? `&model=${model}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify({ limit, ...(model ? { model } : {}) }),
   })
 
 // ── Promote ─────────────────────────────────────────────
