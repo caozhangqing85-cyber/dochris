@@ -150,12 +150,6 @@ export default function GraphPage() {
       }
     }
 
-    // Cleanup previous renderer
-    if (rendererRef.current) {
-      rendererRef.current.destroy()
-      rendererRef.current = null
-    }
-
     if (filtered.nodes.length === 0) return
 
     const renderer = createForceGraph({
@@ -176,7 +170,7 @@ export default function GraphPage() {
     rendererRef.current = renderer
 
     // Auto-fit after simulation stabilizes
-    setTimeout(() => renderer.fitToView(), 800)
+    const fitTimer = setTimeout(() => renderer.fitToView(), 800)
 
     // Re-apply current highlight state after re-render
     if (highlightedIds.size > 0) {
@@ -184,6 +178,7 @@ export default function GraphPage() {
     }
 
     return () => {
+      clearTimeout(fitTimer)
       renderer.destroy()
     }
   }, [graph, viewMode, filterTypes, handleNodeClick, handleNodeDoubleClick])
@@ -323,7 +318,7 @@ export default function GraphPage() {
                   style={{
                     width: '100%', padding: '6px 10px 6px 30px', borderRadius: '4px',
                     fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
-                    background: 'rgba(255,255,255,0.95)', color: 'var(--text-primary)',
+                    background: 'var(--bg-card)', color: 'var(--text-primary)',
                     outline: 'none', lineHeight: 1.5,
                     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                   }} />
@@ -351,7 +346,7 @@ export default function GraphPage() {
             <div style={{
               position: 'absolute', top: '12px', right: '12px', zIndex: 10,
               display: 'flex', alignItems: 'center', gap: '2px',
-              background: 'rgba(255,255,255,0.95)', borderRadius: '4px',
+              background: 'var(--bg-card)', borderRadius: '4px',
               padding: '2px', border: '1px solid var(--border-subtle)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}>
@@ -374,7 +369,7 @@ export default function GraphPage() {
             {showFilter && (
               <div style={{
                 position: 'absolute', top: '52px', left: '12px', zIndex: 10,
-                background: 'rgba(255,255,255,0.96)', borderRadius: '4px',
+                background: 'var(--bg-elevated)', borderRadius: '4px',
                 padding: 'var(--space-3)', border: '1px solid var(--border-subtle)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                 minWidth: '160px',
@@ -406,7 +401,7 @@ export default function GraphPage() {
             {showLegend && (
               <div style={{
                 position: 'absolute', bottom: '12px', left: '12px', zIndex: 10,
-                background: 'rgba(255,255,255,0.96)', borderRadius: '4px',
+                background: 'var(--bg-elevated)', borderRadius: '4px',
                 padding: 'var(--space-3) var(--space-4)',
                 border: '1px solid var(--border-subtle)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -457,7 +452,7 @@ export default function GraphPage() {
             <div style={{
               position: 'absolute', bottom: '12px', right: '12px', zIndex: 10,
               display: 'flex', gap: 'var(--space-3)',
-              background: 'rgba(255,255,255,0.96)', borderRadius: '4px',
+              background: 'var(--bg-elevated)', borderRadius: '4px',
               padding: '4px 12px', border: '1px solid var(--border-subtle)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}>
@@ -634,7 +629,7 @@ function primaryBtnStyle(disabled: boolean): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     padding: '8px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 600,
-    color: '#fff', background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
+    color: 'var(--bg-card)', background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
     opacity: disabled ? 0.5 : 1,
   }
 }
