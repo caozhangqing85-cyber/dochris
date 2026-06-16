@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, MessageSquare } from 'lucide-react'
 import { getCandidates, promoteCandidate, discardCandidate } from '@/lib/api'
 import type { CandidateMeta } from '@/lib/api'
-import { withMinDelay, qualityColor } from '@/lib/utils'
+import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
 
@@ -17,7 +17,6 @@ export default function CandidatesPage() {
   const [filter, setFilter] = useState<'candidate' | 'promoted' | 'discarded' | 'all'>('candidate')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
-  const [, setSelected] = useState<CandidateMeta | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -59,7 +58,7 @@ export default function CandidatesPage() {
       <PageHeader
         title="候选知识管理"
         description="管理 Query-as-Contribution 生成的候选知识（查看 / 确认 / 丢弃）"
-        actions={
+        actions={(
           <button onClick={load} disabled={loading}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
               borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
@@ -67,7 +66,7 @@ export default function CandidatesPage() {
               opacity: loading ? 0.5 : 1 }}>
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
           </button>
-        }
+        )}
       />
 
       {msg && (
@@ -95,7 +94,7 @@ export default function CandidatesPage() {
 
       {candidates.length === 0 ? (
         <EmptyState
-          icon="📝"
+          icon={<MessageSquare size={28} />}
           title="暂无候选知识"
           description="启用查询页的'贡献模式'后，高质量回答会写入候选区"
         />
@@ -103,10 +102,9 @@ export default function CandidatesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {candidates.map(c => (
             <div key={c.id}
-              onClick={() => setSelected(c)}
               style={{
                 padding: '14px 16px', borderRadius: '8px', border: '1px solid var(--border-default)',
-                background: 'var(--bg-card)', cursor: 'pointer',
+                background: 'var(--bg-card)',
               }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
@@ -125,7 +123,7 @@ export default function CandidatesPage() {
                     )}
                   </div>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', marginBottom: '4px' }}>
-                    {c.id} · 质量 <span className={qualityColor(c.quality_score)}>{c.quality_score}</span>
+                    {c.id} · 质量 <span style={{ color: c.quality_score >= 80 ? 'var(--status-success)' : c.quality_score >= 60 ? 'var(--status-warning)' : 'var(--status-error)' }}>{c.quality_score}</span>
                     {c.source_manifest_ids?.length ? ` · 来源 ${c.source_manifest_ids.join(', ')}` : ''}
                   </div>
                   {c.answer && (
