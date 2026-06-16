@@ -17,15 +17,16 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    try { setData(await withMinDelay(getStatus())) }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    try { setData(await withMinDelay(getStatus())); return true }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); return false }
     finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
 
   const handleRefresh = async () => {
-    await load()
-    if (!error) { setRefreshMsg('已刷新'); setTimeout(() => setRefreshMsg(''), 2000) }
+    const ok = await load()
+    setRefreshMsg(ok ? '已刷新' : '刷新失败')
+    setTimeout(() => setRefreshMsg(''), 2000)
   }
 
   if (error && !data) {

@@ -183,6 +183,8 @@ export default function QueryPage() {
   const [rerank, setRerank] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<QueryResponse | null>(null)
+  // AbortController：新查询取消上一次流式请求，防竞态
+  const abortRef = useRef<AbortController | null>(null)
   const [error, setError] = useState('')
   const [files, setFiles] = useState<ManifestItem[]>([])
   const [elapsed, setElapsed] = useState(0)
@@ -235,6 +237,10 @@ export default function QueryPage() {
       let streamResult: QueryResponse | null = null
 
       try {
+        // 取消上一次流式请求，防竞态
+        abortRef.current?.abort()
+        const ctrl = new AbortController()
+        abortRef.current = ctrl
         await queryKnowledgeStream(queryText, useMode, topK, {
           onMeta: (meta) => {
             streamResult = {
@@ -680,13 +686,37 @@ export default function QueryPage() {
                 </button>
               ))}
             </div>
-            {/* Show streaming answer */}
+            {/* Tab content */}
             {activeTab === 'answer' && result.answer && (
               <div style={{
                 borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
                 border: '1px solid var(--border-default)', background: 'var(--bg-card)',
               }}>
                 <StreamingMarkdown content={result.answer} streaming={loading} />
+              </div>
+            )}
+            {activeTab === 'documents' && result.summaries && result.summaries.length > 0 && (
+              <div style={{
+                borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+                border: '1px solid var(--border-default)', background: 'var(--bg-card)',
+              }}>
+                {result.summaries.map(r => <ResultCard key={r.source} result={r} query={result.query} />)}
+              </div>
+            )}
+            {activeTab === 'concepts' && result.concepts && result.concepts.length > 0 && (
+              <div style={{
+                borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+                border: '1px solid var(--border-default)', background: 'var(--bg-card)',
+              }}>
+                {result.concepts.map(c => <ResultCard key={c.source} result={c} query={result.query} />)}
+              </div>
+            )}
+            {activeTab === 'vector' && result.vector_results && result.vector_results.length > 0 && (
+              <div style={{
+                borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+                border: '1px solid var(--border-default)', background: 'var(--bg-card)',
+              }}>
+                {result.vector_results.map((r, i) => <ResultCard key={i} result={r} query={result.query} />)}
               </div>
             )}
           </>

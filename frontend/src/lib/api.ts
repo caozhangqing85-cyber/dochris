@@ -18,10 +18,19 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    signal: options?.signal,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || err.error || `Request failed: ${res.status}`)
+    let msg: string
+    try {
+      const err = await res.json()
+      msg = typeof err.detail === 'string' ? err.detail
+        : Array.isArray(err.detail) ? err.detail.map((d: any) => d.msg ?? '').join('; ')
+        : err.error || `Request failed: ${res.status}`
+    } catch {
+      msg = `Request failed: ${res.status}`
+    }
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -52,8 +61,9 @@ export const queryKnowledgeStream = async (
   topK = 5,
   callbacks: StreamCallbacks = {},
   rerank = false,
+  contribute = false,
 ): Promise<void> => {
-  const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}`
+  const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}${contribute ? '&contribute=true' : ''}`
   const res = await fetch(url, { headers: { Accept: 'text/event-stream' } })
   if (!res.ok) {
     // 404 触发降级；其他错误也统一 throw（让 catch 走降级或显示错误）

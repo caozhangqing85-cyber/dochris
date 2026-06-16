@@ -168,7 +168,8 @@ select option {
 }
 
 input:focus, textarea:focus, select:focus {
-  outline: var(--shadow-focus);
+  outline: 2px solid #097fe8;
+  outline-offset: -1px;
   border-color: #097fe8;
 }
 

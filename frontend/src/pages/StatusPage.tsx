@@ -28,21 +28,22 @@ export default function StatusPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshMsg, setRefreshMsg] = useState('')
-  const load = useCallback(async () => { setLoading(true); try { setStatus(await withMinDelay(getStatus())) } catch { /* */ } finally { setLoading(false) } }, [])
-  useEffect(() => { load() }, [load])
-  // load 失败时不显示"已刷新"（避免误报成功）
-  const handleRefresh = async () => {
-    const before = status
+  const load = useCallback(async () => {
+    setLoading(true)
     try {
-      await load()
-      // 简单判断：load 后 status 引用变化视为成功（避免闭包读旧 status）
-      setRefreshMsg('已刷新')
-      setTimeout(() => setRefreshMsg(''), 1500)
+      setStatus(await withMinDelay(getStatus()))
+      return true
     } catch {
-      setRefreshMsg('刷新失败')
-      setTimeout(() => setRefreshMsg(''), 1500)
+      return false
+    } finally {
+      setLoading(false)
     }
-    void before
+  }, [])
+  useEffect(() => { load() }, [load])
+  const handleRefresh = async () => {
+    const ok = await load()
+    setRefreshMsg(ok ? '已刷新' : '刷新失败')
+    setTimeout(() => setRefreshMsg(''), 1500)
   }
 
   const formatDisk = (bytes: number) => {
