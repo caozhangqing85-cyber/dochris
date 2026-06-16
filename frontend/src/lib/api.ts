@@ -64,7 +64,7 @@ export const queryKnowledgeStream = async (
   contribute = false,
 ): Promise<void> => {
   const url = `${BASE}/query/stream?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}${contribute ? '&contribute=true' : ''}`
-  const res = await fetch(url, { headers: { Accept: 'text/event-stream' } })
+  const res = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal: AbortSignal.timeout(120000) })
   if (!res.ok) {
     // 404 触发降级；其他错误也统一 throw（让 catch 走降级或显示错误）
     if (res.status === 404) throw new Error('STREAM_NOT_AVAILABLE')

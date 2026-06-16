@@ -19,7 +19,7 @@ export default function StatCard({ label, value, color = 'var(--color-primary)',
           width: '32px', height: '32px', borderRadius: 'var(--radius-md)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: 'var(--space-3)',
-          background: `${color}0d`, color,
+          background: `color-mix(in srgb, ${color} 8%, transparent)`, color,
         }}>
           {icon}
         </div>

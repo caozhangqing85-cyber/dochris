@@ -23,14 +23,14 @@ export function formatBytes(bytes: number): string {
 
 export function statusColor(status: string): string {
   const map: Record<string, string> = {
-    compiled: 'text-emerald-400',
-    ingested: 'text-sky-400',
-    failed: 'text-red-400',
-    compile_failed: 'text-red-400',
-    promoted_to_wiki: 'text-violet-400',
-    promoted: 'text-amber-400',
+    compiled: 'var(--status-success)',
+    ingested: 'var(--status-info)',
+    failed: 'var(--status-error)',
+    compile_failed: 'var(--status-error)',
+    promoted_to_wiki: 'var(--color-primary)',
+    promoted: 'var(--color-primary)',
   }
-  return map[status] || 'text-zinc-400'
+  return map[status] || 'var(--text-dimmed)'
 }
 
 export function statusBg(status: string): string {
@@ -59,7 +59,7 @@ export function statusLabel(status: string): string {
 }
 
 export function qualityColor(score: number): string {
-  if (score >= 80) return 'text-emerald-400'
-  if (score >= 60) return 'text-amber-400'
-  return 'text-red-400'
+  if (score >= 80) return 'var(--status-success)'
+  if (score >= 60) return 'var(--status-warning)'
+  return 'var(--status-error)'
 }
