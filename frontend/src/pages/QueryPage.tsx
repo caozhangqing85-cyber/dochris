@@ -287,7 +287,7 @@ export default function QueryPage() {
             setError(error)
             setLoading(false)
           },
-        }, rerank)
+        }, rerank, contribute, ctrl.signal)
       } catch (e) {
         // stream 端点不可用（404），自动降级到传统查询
         if ((e as Error).message === 'STREAM_NOT_AVAILABLE') {
