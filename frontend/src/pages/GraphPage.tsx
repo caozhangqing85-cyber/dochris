@@ -6,6 +6,7 @@ import {
 import { getGraph, getManifests, getGraphNode } from '@/lib/api'
 import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
+import { formatMetadataValue } from '@/types'
 import type {
   SemanticNode, ViewMode,
 } from '@/types'
@@ -594,10 +595,10 @@ export default function GraphPage() {
                     {Object.entries(selectedNode.metadata).slice(0, 8).map(([k, v]) => (
                       <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>{k}</span>
-                        <span style={{
+                        <span title={formatMetadataValue(v)} style={{
                           fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--text-primary)',
                           maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right',
-                        }}>{v}</span>
+                        }}>{formatMetadataValue(v)}</span>
                       </div>
                     ))}
                   </div>

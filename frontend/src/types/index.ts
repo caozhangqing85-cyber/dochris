@@ -112,7 +112,20 @@ export interface GraphNode {
   id: string
   label: string
   node_type: GraphNodeType
-  metadata?: Record<string, string>
+  /** 后端 metadata 为任意 JSON 值（string/number/bool/list/object），渲染前必须格式化 */
+  metadata?: Record<string, unknown>
+}
+
+/** 将任意 JSON metadata 值格式化为可安全渲染的字符串 */
+export function formatMetadataValue(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
 }
 
 /** Semantic relation types from backend */

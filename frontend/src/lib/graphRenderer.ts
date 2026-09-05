@@ -174,6 +174,7 @@ export function createForceGraph(opts: GraphRendererOptions) {
     .style('box-shadow', '0 4px 18px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)')
 
   // ── Interactions ──
+  // Tooltip 内容一律通过 textContent 构建：label 来自用户文档，禁止 HTML 注入（XSS）
   node.on('mouseover', function (event, d) {
     d3.select(this).select('circle')
       .transition().duration(150)
@@ -181,10 +182,29 @@ export function createForceGraph(opts: GraphRendererOptions) {
       .attr('stroke-width', 3.5)
       .style('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,0.18))')
 
+    const content = document.createElement('div')
+    const title = document.createElement('b')
+    title.textContent = d.label
+    content.appendChild(title)
+
+    const meta = document.createElement('div')
+    meta.style.color = '#615d59'
+    const segments: string[] = [NODE_STYLES[d.node_type]?.label || d.node_type]
+    if (d.provenance) segments.push(PROVENANCE_STYLES[d.provenance]?.label || d.provenance)
+    if (d.degree) segments.push(`${d.degree} 连接`)
+    if (d.conceptData?.sourceCount) segments.push(`${d.conceptData.sourceCount} 文档`)
+    meta.textContent = segments.join(' · ')
+    content.appendChild(meta)
+    if (d.provenance) {
+      meta.style.borderLeft = `3px solid ${PROVENANCE_STYLES[d.provenance]?.color || '#999'}`
+      meta.style.paddingLeft = '6px'
+    }
+
     // tooltip 坐标基于 container（offsetX/Y 相对 event.target，对 SVG 内部元素不可靠）
     const rect = container.getBoundingClientRect()
+    const tipNode = tooltip.node()
+    if (tipNode) tipNode.replaceChildren(content)
     tooltip.style('display', 'block')
-      .html(`<b>${d.label}</b><br><span style="color:#615d59">${NODE_STYLES[d.node_type]?.label || d.node_type}</span>${d.provenance ? ` · <span style="color:${PROVENANCE_STYLES[d.provenance]?.color || '#999'}">${PROVENANCE_STYLES[d.provenance]?.label || d.provenance}</span>` : ''}${d.degree ? ` · ${d.degree} 连接` : ''}${d.conceptData?.sourceCount ? ` · ${d.conceptData.sourceCount} 文档` : ''}`)
       .style('left', (event.clientX - rect.left + 14) + 'px')
       .style('top', (event.clientY - rect.top - 10) + 'px')
   })
