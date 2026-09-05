@@ -51,6 +51,8 @@ def test_write_requests_are_audited(tmp_path: Path) -> None:
     with (
         patch("dochris.api.audit._audit_log_path", return_value=audit_log),
         patch("dochris.api.app.get_settings", return_value=settings, create=True),
+        # 后台 runner 钉住为空，避免测试触碰真实工作区
+        patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=[]),
         TestClient(app) as client,
     ):
         resp = client.post("/api/v1/compile", json={"limit": 1, "concurrency": 1})
@@ -77,6 +79,7 @@ def test_idempotency_key_is_recorded(tmp_path: Path) -> None:
     with (
         patch("dochris.api.audit._audit_log_path", return_value=audit_log),
         patch("dochris.api.app.get_settings", return_value=settings, create=True),
+        patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=[]),
         TestClient(app) as client,
     ):
         client.post(

@@ -6,11 +6,11 @@ import asyncio
 import logging
 import os
 from collections.abc import Callable
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from dochris.api.compile_jobs import CompileJobManager
+from dochris.api.job_repository import build_repository
 from dochris.api.schemas import (
     CompileJobFailuresResponse,
     CompileRequest,
@@ -61,6 +61,7 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
     if active_job is not None:
         return active_job.as_response()
 
+    idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
     job = manager.start(
         total_to_compile,
         lambda **kwargs: _run_compile_task(
@@ -71,6 +72,7 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
         concurrency=req.concurrency,
         limit=req.limit,
         timeout_seconds=_compile_timeout_seconds(),
+        idempotency_key=idempotency_key,
     )
     await asyncio.sleep(0)
 
@@ -227,12 +229,9 @@ def _get_compile_job_manager(request: Request) -> CompileJobManager:
     manager = getattr(request.app.state, "compile_jobs", None)
     if manager is None:
         workspace = get_default_workspace()
-        store_path = (
-            Path(workspace) / "data" / "compile-jobs.json"
-            if isinstance(workspace, (str, Path))
-            else None
-        )
-        manager = CompileJobManager(store_path=store_path)
+        # JOB-03/04：仓库抽象 + SQLite WAL 默认（DOCHRIS_JOB_STORE=json 可回退）
+        repository, _kind = build_repository(workspace)
+        manager = CompileJobManager(repository=repository)
         request.app.state.compile_jobs = manager
     return manager
 

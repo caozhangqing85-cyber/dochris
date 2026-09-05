@@ -1,12 +1,14 @@
-"""Process-local lifecycle tracking for background compile jobs."""
+"""Compile job lifecycle management.
+
+任务运行态（进程内 dict）+ 持久化仓库（JobRepository）。
+默认仓库由 API 装配层选择（SQLite WAL，见 job_repository.build_repository）；
+``store_path=`` 参数保留为旧 JSON 用法的兼容入口。
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
@@ -14,16 +16,30 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from dochris.api.job_repository import (
+    ACTIVE_STATUSES,
+    JobRepository,
+    JsonJobRepository,
+)
 from dochris.api.schemas import CompileResponse
+from dochris.core.error_sanitizer import error_summary as _error_summary
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "ACTIVE_STATUSES",
+    "CompileJob",
+    "CompileJobManager",
+    "DEFAULT_LEASE_TTL_SECONDS",
+    "DEFAULT_MAX_HISTORY",
+    "RETRYABLE_STATUSES",
+]
+
 ProgressCallback = Callable[..., None]
 CompileRunner = Callable[..., Awaitable[None]]
-ACTIVE_STATUSES = frozenset({"queued", "running", "cancelling"})
 RETRYABLE_STATUSES = frozenset({"failed", "cancelled", "interrupted", "completed_with_errors"})
-PARTIAL_STATUSES = frozenset({"completed_with_errors"})
 DEFAULT_MAX_HISTORY = 200
+DEFAULT_LEASE_TTL_SECONDS = 300.0
 
 
 def _utc_now() -> str:
@@ -53,6 +69,13 @@ class CompileJob:
     created_at: str = field(default_factory=_utc_now)
     started_at: str | None = None
     finished_at: str | None = None
+    # JOB-05：幂等键与租约（由仓库持久化，跨重启恢复使用）
+    idempotency_key: str | None = None
+    lease_owner: str | None = None
+    lease_expires_at: str | None = None
+    heartbeat_at: str | None = None
+    # 进程内控制位：心跳循环退出标记（不持久化）
+    heartbeat_stop: bool = False
 
     @property
     def retryable(self) -> bool:
@@ -60,7 +83,9 @@ class CompileJob:
 
     def to_record(self) -> dict[str, Any]:
         """Return a JSON-serializable durable representation."""
-        return asdict(self)
+        data = asdict(self)
+        data.pop("heartbeat_stop", None)
+        return data
 
     @classmethod
     def from_record(cls, record: dict[str, Any]) -> CompileJob:
@@ -100,13 +125,26 @@ class CompileJobManager:
         self,
         *,
         store_path: Path | None = None,
+        repository: JobRepository | None = None,
         max_history: int = DEFAULT_MAX_HISTORY,
+        owner_id: str | None = None,
+        lease_ttl_seconds: float = DEFAULT_LEASE_TTL_SECONDS,
     ) -> None:
-        self._store_path = store_path
+        if repository is not None:
+            self._repository: JobRepository | None = repository
+        elif store_path is not None:
+            self._repository = JsonJobRepository(store_path)
+        else:
+            self._repository = None
         self._max_history = max(1, max_history)
+        self._owner_id = owner_id or uuid4().hex
+        self._lease_ttl = max(1.0, lease_ttl_seconds)
         self._jobs: dict[str, CompileJob] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._heartbeats: dict[str, asyncio.Task[None]] = {}
         self._load()
+
+    # -- 提交与运行 ------------------------------------------------
 
     def start(
         self,
@@ -118,10 +156,17 @@ class CompileJobManager:
         attempt: int = 1,
         retry_of: str | None = None,
         timeout_seconds: float | None = None,
+        idempotency_key: str | None = None,
     ) -> CompileJob:
         active = self.active()
         if active is not None:
             return active
+
+        # JOB-05：幂等键命中时返回已有任务，不重复创建
+        if idempotency_key:
+            existing = self._find_by_idempotency_key(idempotency_key)
+            if existing is not None:
+                return existing
 
         job = CompileJob(
             total=total,
@@ -129,14 +174,53 @@ class CompileJobManager:
             limit=limit,
             attempt=attempt,
             retry_of=retry_of,
+            idempotency_key=idempotency_key,
         )
         self._jobs[job.job_id] = job
-        self._persist()
+        self._persist(job)
         self._tasks[job.job_id] = asyncio.create_task(
             self._run(job, runner, timeout_seconds=timeout_seconds),
             name=f"dochris-compile-{job.job_id}",
         )
         return job
+
+    def _find_by_idempotency_key(self, key: str) -> CompileJob | None:
+        for job in reversed(self._jobs.values()):
+            if job.idempotency_key == key:
+                return job
+        finder = getattr(self._repository, "find_by_idempotency_key", None)
+        if finder is not None:
+            record = finder(key)
+            if record is not None:
+                return CompileJob.from_record(record)
+        return None
+
+    def _acquire_lease(self, job: CompileJob) -> None:
+        from datetime import timedelta
+
+        job.lease_owner = self._owner_id
+        job.lease_expires_at = (datetime.now(UTC) + timedelta(seconds=self._lease_ttl)).isoformat()
+        job.heartbeat_at = _utc_now()
+
+    def _renew_lease(self, job: CompileJob) -> None:
+        from datetime import timedelta
+
+        job.lease_expires_at = (datetime.now(UTC) + timedelta(seconds=self._lease_ttl)).isoformat()
+        job.heartbeat_at = _utc_now()
+
+    def _release_lease(self, job: CompileJob) -> None:
+        job.lease_owner = None
+        job.lease_expires_at = None
+
+    async def _heartbeat_loop(self, job: CompileJob) -> None:
+        """JOB-05：运行期间周期性续租，进程死亡后 lease 自然过期。"""
+        interval = self._lease_ttl / 3
+        while job.status in ACTIVE_STATUSES and not job.heartbeat_stop:
+            await asyncio.sleep(interval)
+            if job.status not in ACTIVE_STATUSES or job.heartbeat_stop:
+                break
+            self._renew_lease(job)
+            self._persist(job)
 
     async def _run(
         self,
@@ -148,7 +232,13 @@ class CompileJobManager:
         job.status = "running"
         job.message = "编译进行中"
         job.started_at = _utc_now()
-        self._persist()
+        self._acquire_lease(job)
+        self._persist(job)
+
+        heartbeat = asyncio.create_task(
+            self._heartbeat_loop(job), name=f"dochris-compile-hb-{job.job_id}"
+        )
+        self._heartbeats[job.job_id] = heartbeat
 
         async def _invoke() -> None:
             await runner(
@@ -199,8 +289,16 @@ class CompileJobManager:
                 job.status = "completed"
                 job.message = "编译完成"
         finally:
+            job.heartbeat_stop = True
+            heartbeat.cancel()
+            try:
+                await heartbeat
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._heartbeats.pop(job.job_id, None)
             self._tasks.pop(job.job_id, None)
-            self._persist()
+            self._release_lease(job)
+            self._persist(job)
 
     def _update_progress(
         self,
@@ -222,7 +320,9 @@ class CompileJobManager:
             job.failed_files = list(failed_files)
         if failures is not None:
             job.failure_details = [dict(item) for item in failures]
-        self._persist()
+        self._persist(job)
+
+    # -- 查询 ------------------------------------------------------
 
     def get(self, job_id: str) -> CompileJob | None:
         return self._jobs.get(job_id)
@@ -237,7 +337,7 @@ class CompileJobManager:
             job.cancel_requested = True
             job.status = "cancelling"
             job.message = "正在取消编译"
-            self._persist()
+            self._persist(job)
             task.cancel()
         return job
 
@@ -254,75 +354,52 @@ class CompileJobManager:
         """Return the newest jobs first, capped for API consumption."""
         return list(reversed(self._jobs.values()))[:limit]
 
+    # -- 持久化 ----------------------------------------------------
+
     def _load(self) -> None:
-        if self._store_path is None or not self._store_path.is_file():
+        if self._repository is None:
             return
         try:
-            payload = json.loads(self._store_path.read_text(encoding="utf-8"))
-            records = payload.get("jobs", []) if isinstance(payload, dict) else []
-            recovered_interrupted = False
-            for record in records:
-                if isinstance(record, dict):
-                    job = CompileJob.from_record(record)
-                    if job.status in ACTIVE_STATUSES:
-                        job.status = "interrupted"
-                        job.message = "服务重启，编译任务已中断"
-                        job.current_files = []
-                        job.error = "ServiceRestart: 编译服务在任务完成前退出"
-                        job.finished_at = _utc_now()
-                        recovered_interrupted = True
-                    self._jobs[job.job_id] = job
-            pruned = self._prune_history()
-            if recovered_interrupted or pruned:
-                self._persist()
-        except (OSError, TypeError, ValueError):
+            records = self._repository.recover_stale_leases(self._owner_id)
+        except Exception:
             logger.warning("无法加载编译任务历史", exc_info=True)
-            self._quarantine_corrupt_store()
-
-    def _quarantine_corrupt_store(self) -> None:
-        """Preserve an unreadable store for diagnosis and recreate a valid empty store."""
-        if self._store_path is None or not self._store_path.exists():
             return
-        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-        quarantine_path = self._store_path.with_name(
-            f"{self._store_path.stem}.corrupt-{timestamp}{self._store_path.suffix}"
-        )
-        try:
-            self._store_path.replace(quarantine_path)
-        except OSError:
-            logger.warning("无法隔离损坏的编译任务历史", exc_info=True)
-        self._persist()
+        recovered_interrupted = False
+        lease_aware = getattr(self._repository, "supports_lease", False)
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            job = CompileJob.from_record(record)
+            if job.status in ACTIVE_STATUSES and not lease_aware:
+                # 无 lease 语义的仓库（JSON）：活动任务按旧语义标记中断。
+                # lease 仓库（SQLite）已在 recover_stale_leases 中处理：
+                # 过期 lease → interrupted；他人有效 lease → 保留 running。
+                job.status = "interrupted"
+                job.message = "服务重启，编译任务已中断"
+                job.current_files = []
+                job.error = "ServiceRestart: 编译服务在任务完成前退出"
+                job.finished_at = _utc_now()
+                recovered_interrupted = True
+            self._jobs[job.job_id] = job
+        pruned = self._prune_history()
+        if recovered_interrupted and self._repository is not None:
+            # 恢复结果落盘，避免磁盘记录停留在外假的 running 状态
+            for job in self._jobs.values():
+                if job.status == "interrupted":
+                    try:
+                        self._repository.save(job.to_record())
+                    except Exception:
+                        logger.warning("无法持久化中断恢复结果", exc_info=True)
+        _ = pruned
 
-    def _persist(self) -> None:
-        if self._store_path is None:
-            return
+    def _persist(self, job: CompileJob) -> None:
         self._prune_history()
-        self._store_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path: str | None = None
+        if self._repository is None:
+            return
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=self._store_path.parent,
-                prefix=f".{self._store_path.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temp_path = handle.name
-                json.dump(
-                    {"version": 1, "jobs": [job.to_record() for job in self._jobs.values()]},
-                    handle,
-                    ensure_ascii=False,
-                    indent=2,
-                )
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_path, self._store_path)
-        except OSError:
-            logger.warning("无法保存编译任务历史", exc_info=True)
-        finally:
-            if temp_path is not None and os.path.exists(temp_path):
-                os.unlink(temp_path)
+            self._repository.save(job.to_record())
+        except Exception:
+            logger.warning("无法保存编译任务 %s", job.job_id, exc_info=True)
 
     def _prune_history(self) -> bool:
         """Keep bounded terminal history while never discarding an active job."""
@@ -336,6 +413,11 @@ class CompileJobManager:
         removed = False
         for job_id in removable[:excess]:
             self._jobs.pop(job_id, None)
+            if self._repository is not None:
+                try:
+                    self._repository.delete(job_id)
+                except Exception:
+                    logger.warning("无法删除任务历史 %s", job_id, exc_info=True)
             removed = True
         return removed
 
@@ -346,9 +428,10 @@ class CompileJobManager:
                 self.cancel(job_id)
         if tasks:
             await asyncio.gather(*(task for _, task in tasks), return_exceptions=True)
-
-
-def _error_summary(exc: Exception) -> str:
-    from dochris.core.error_sanitizer import error_summary
-
-    return error_summary(exc)
+        for heartbeat in self._heartbeats.values():
+            heartbeat.cancel()
+        if self._heartbeats:
+            await asyncio.gather(*self._heartbeats.values(), return_exceptions=True)
+            self._heartbeats.clear()
+        if self._repository is not None:
+            self._repository.close()
