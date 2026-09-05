@@ -29,6 +29,10 @@ ENV/
 .venv/
 *.venv
 
+# 前端本地依赖与构建产物（镜像内必须从 lockfile 重建）
+node_modules/
+frontend/dist/
+
 # IDE 配置
 .vscode/
 .idea/

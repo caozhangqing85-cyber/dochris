@@ -20,12 +20,13 @@ services:
       args:
         DEBIAN_FRONTEND: noninteractive
         BUILD_TARGET: ${BUILD_TARGET:-core}
-    image: dochris:latest
+    image: dochris:core
     container_name: dochris
 
     # 环境变量从 .env 文件加载
     env_file:
-      - .env
+      - path: .env
+        required: false
 
     # 环境变量覆盖（Docker 特定）
     environment:
@@ -71,7 +72,7 @@ services:
 
     # 健康检查
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "kb", "status"]
       interval: 30s
       timeout: 10s
       start_period: 10s
@@ -87,17 +88,19 @@ services:
       args:
         DEBIAN_FRONTEND: noninteractive
         BUILD_TARGET: api
-    image: dochris:latest
+    image: dochris:api
     container_name: dochris-api
     profiles:
       - api
 
     env_file:
-      - .env
+      - path: .env
+        required: false
 
     environment:
       - WORKSPACE=/app
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DOCHRIS_ALLOW_UNAUTHENTICATED=${DOCHRIS_ALLOW_UNAUTHENTICATED:-true}
 
     volumes:
       - kb-data:/app/data
@@ -110,7 +113,7 @@ services:
       - kb-cache:/app/cache
 
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
 
     depends_on:
       chromadb:
@@ -132,10 +135,47 @@ services:
     command: ["uvicorn", "dochris.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=5).read()
       interval: 30s
       timeout: 10s
       start_period: 15s
+      retries: 3
+
+  # ============================================================
+  # React 生产前端（与 API 同 profile 启动）
+  # ============================================================
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: dochris:web
+    container_name: dochris-web
+    profiles:
+      - api
+
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:80"
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    networks:
+      - kb-network
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
       retries: 3
 
   # ============================================================
@@ -149,7 +189,7 @@ services:
       - kb-chroma:/chroma/chroma
 
     ports:
-      - "${CHROMA_PORT:-8100}:8000"
+      - "127.0.0.1:${CHROMA_PORT:-8100}:8000"
 
     environment:
       - CHROMA_SERVER_HOST=0.0.0.0
@@ -169,7 +209,15 @@ services:
       - kb-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      test:
+        - CMD
+        - bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8000;
+          printf 'GET /api/v2/heartbeat HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          IFS= read -r status <&3;
+          [[ "$$status" == *" 200 "* ]]
       interval: 30s
       timeout: 10s
       start_period: 15s
