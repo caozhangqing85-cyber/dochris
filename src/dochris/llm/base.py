@@ -32,7 +32,7 @@ class BaseLLMProvider(ABC):
         model: str = "",
         max_tokens: int = 4000,
         temperature: float = 0.7,
-        timeout: int = 120,
+        timeout: float = 120,
         **kwargs: Any,
     ) -> None:
         """初始化 LLM 提供商
@@ -43,7 +43,7 @@ class BaseLLMProvider(ABC):
             model: 模型名称
             max_tokens: 最大生成 token 数
             temperature: 采样温度（0.0-1.0）
-            timeout: 请求超时时间（秒）
+            timeout: 请求超时时间（秒，支持小数预算）
             **kwargs: 其他提供商特定参数
         """
         self.api_key = api_key

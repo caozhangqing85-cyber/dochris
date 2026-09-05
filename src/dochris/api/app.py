@@ -93,6 +93,8 @@ def create_app() -> FastAPI:
             )
         return response
 
+    # 安全限流（SEC-02）：默认关闭，设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 启用
+    from dochris.api.ratelimit import SlidingWindowLimiter, rate_limit_per_minute
     from dochris.api.routes.compile import router as compile_router
     from dochris.api.routes.config import router as config_router
     from dochris.api.routes.contribution import router as contribution_router
@@ -106,9 +108,6 @@ def create_app() -> FastAPI:
     from dochris.api.routes.recompile import router as recompile_router
     from dochris.api.routes.schema import router as schema_router
     from dochris.api.routes.status import router as status_router
-
-    # 安全限流（SEC-02）：默认关闭，设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 启用
-    from dochris.api.ratelimit import SlidingWindowLimiter, rate_limit_per_minute
 
     _limit_per_minute = rate_limit_per_minute()
     if _limit_per_minute > 0:

@@ -1012,11 +1012,9 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
 def _query_timeout(settings: Any) -> float:
     """查询链路 provider 超时预算（QRY-11）：settings.llm_timeout，非法时回退 60s。"""
     raw = getattr(settings, "llm_timeout", None)
-    try:
-        timeout = float(raw)
-        return timeout if timeout > 0 else 60.0
-    except (TypeError, ValueError):
+    if not isinstance(raw, (int, float)):
         return 60.0
+    return float(raw) if raw > 0 else 60.0
 
 
 def _try_create_provider(

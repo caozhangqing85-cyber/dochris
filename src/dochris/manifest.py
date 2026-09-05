@@ -133,11 +133,15 @@ def create_manifest(
     """
     _ensure_dirs(workspace_path)
 
+    from dochris.core.identity import canonical_document_id
+
     manifest = {
         "id": src_id,
         "title": title,
         "type": file_type,
         "source_path": str(source_path),
+        # DATA-01：路径维度的稳定身份（符号链接/大小写归一化后的 sha256 前缀）
+        "canonical_id": canonical_document_id(source_path),
         "file_path": file_path,
         "content_hash": content_hash,
         "date_ingested": datetime.now().strftime("%Y-%m-%d"),
@@ -160,6 +164,24 @@ def create_manifest(
         append_to_index(workspace_path, manifest)
 
     return manifest
+
+
+def find_manifest_by_content_hash(workspace_path: Path, content_hash: str) -> dict | None:
+    """按内容哈希查找已存在的 manifest（DATA-03 ingest 幂等依据）。
+
+    Args:
+        workspace_path: 工作区路径
+        content_hash: 文件 SHA-256 哈希
+
+    Returns:
+        第一个匹配的 manifest 字典；无匹配或哈希为空时返回 None
+    """
+    if not content_hash:
+        return None
+    for manifest in get_all_manifests(workspace_path):
+        if manifest.get("content_hash") == content_hash:
+            return manifest
+    return None
 
 
 def get_manifest(workspace_path: Path, src_id: str) -> dict | None:
