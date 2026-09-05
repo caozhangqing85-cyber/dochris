@@ -1,0 +1,50 @@
+{"id": "gq-001", "question": "Dochris 是什么？它的定位一句话概括是什么？", "source_title": "README", "ground_truth": "Doc + Chris——用 LLM 把海量文档锻造为可用的个人知识库。"}
+{"id": "gq-002", "question": "Dochris 的四阶段流水线分别是哪几个阶段？", "source_title": "README", "ground_truth": "文档扫描 → Manifest/Hash → LLM 编译与摘要 → Wiki/知识图谱/向量索引。"}
+{"id": "gq-003", "question": "Dochris 支持哪些 LLM Provider？", "source_title": "README", "ground_truth": "任何 OpenAI 兼容 API（智谱、DeepSeek、OpenAI 等）与 Ollama 本地模型。"}
+{"id": "gq-004", "question": "Dochris 的查询引擎如何防止幻觉？", "source_title": "README", "ground_truth": "Prompt 锚定 + 概念白名单 + 后处理验证 wiki-link，并强制 [Sn] 引用标注。"}
+{"id": "gq-005", "question": "如何安装 Dochris 的推荐运行能力？", "source_title": "installation", "ground_truth": "pip install -e \".[standard]\"（含 API、PDF、Chroma/语义检索）。"}
+{"id": "gq-006", "question": "Dochris 对 Python 版本的要求是什么？", "source_title": "installation", "ground_truth": "Python 3.11 及以上（3.11/3.12 为 CI 支持矩阵）。"}
+{"id": "gq-007", "question": "运行 Dochris 需要配置哪些环境变量？", "source_title": "installation", "ground_truth": "OPENAI_API_KEY、OPENAI_API_BASE（或 .env 文件），可选 WORKSPACE、MODEL、QUERY_MODEL 等。"}
+{"id": "gq-008", "question": "如何快速把文档导入知识库并编译？", "source_title": "QUICKSTART", "ground_truth": "kb init 初始化工作区后导入文件（kb ingest），再执行编译（kb compile 或 API POST /compile）。"}
+{"id": "gq-009", "question": "知识库默认的工作区路径在哪里？", "source_title": "QUICKSTART", "ground_truth": "~/.dochris/knowledge-base（可用 WORKSPACE 环境变量覆盖）。"}
+{"id": "gq-010", "question": "CLI 中有哪些主要命令组？", "source_title": "cli", "ground_truth": "init/ingest/compile/query/status/plugin/storage/graph/serve 等 kb 子命令。"}
+{"id": "gq-011", "question": "四层信任模型从低到高是怎么分的？", "source_title": "concepts", "ground_truth": "raw（原始）→ outputs（编译产物）→ wiki（已晋升）→ curated（人工精选）。"}
+{"id": "gq-012", "question": "Manifest 记录了哪些关键信息？", "source_title": "concepts", "ground_truth": "id（SRC-NNNN）、标题、类型、source_path、canonical_id、content_hash、状态、质量分等。"}
+{"id": "gq-013", "question": "查询模式 mode 有哪几种可选值？", "source_title": "query", "ground_truth": "concept / summary / vector / combined / all。"}
+{"id": "gq-014", "question": "SSE 流式查询会发送哪些事件？", "source_title": "query", "ground_truth": "meta、warning、retrieval、rerank、answer_delta、done、error、ping。"}
+{"id": "gq-015", "question": "回答中的 [S1] 引用代表什么？", "source_title": "query", "ground_truth": "指向检索上下文中的来源编号，API 返回结构化 citations 映射到 manifest/来源/通道/内容哈希。"}
+{"id": "gq-016", "question": "Reranker 什么时候应该启用？", "source_title": "query", "ground_truth": "默认关闭；应先用真实语料基线证明收益后再开启（reranker_enabled=true）。"}
+{"id": "gq-017", "question": "文档编译的质量分怎么用？", "source_title": "quality", "ground_truth": "编译后自动评分，低于 min_quality_score（默认 85）的文档可进入自动重编译或人工复核。"}
+{"id": "gq-018", "question": "如何把编译产物晋升到 Wiki 层？", "source_title": "promote", "ground_truth": "kb promote SRC-NNNN 或 POST /api/v1/promote/{src_id}，target 为 wiki 或 curated。"}
+{"id": "gq-019", "question": "知识图谱有哪几种节点类型？", "source_title": "graph", "ground_truth": "source（源文档）、concept（概念）、summary（摘要）。"}
+{"id": "gq-020", "question": "语义分块是什么？默认开启吗？", "source_title": "configuration", "ground_truth": "按句子 embedding 相似度切分的分块策略，默认关闭，需用真实语料基准验证收益。"}
+{"id": "gq-021", "question": "MODEL 和 QUERY_MODEL 两个配置有什么区别？", "source_title": "configuration", "ground_truth": "MODEL 用于编译链路，QUERY_MODEL 用于查询回答，可分别选择不同模型控制成本。"}
+{"id": "gq-022", "question": "LLM_PROVIDER 配置项可以取哪些值？", "source_title": "configuration", "ground_truth": "openai_compat（默认）和 ollama。"}
+{"id": "gq-023", "question": "如何为 Dochris 编写一个自定义解析器插件？", "source_title": "plugins", "ground_truth": "实现 ingest_parser 钩子并注册到插件目录，插件通过 pluggy hookspec 接入流水线。"}
+{"id": "gq-024", "question": "插件系统提供哪些扩展点？", "source_title": "plugins", "ground_truth": "ingest_parser、pre_compile、post_compile、quality_score、pre_query、post_query 六个钩子。"}
+{"id": "gq-025", "question": "Docker Compose 部署默认暴露哪些端口？", "source_title": "docker", "ground_truth": "Web UI 127.0.0.1:3000、API 127.0.0.1:8000（可用 WEB_PORT 等覆盖）。"}
+{"id": "gq-026", "question": "Compose 部署如何验证服务健康？", "source_title": "docker", "ground_truth": "curl /health（API 进程）、/ready（工作区就绪）、:3000/healthz（Web/Nginx）。"}
+{"id": "gq-027", "question": "公开部署 Dochris 时必须做哪些安全配置？", "source_title": "docker", "ground_truth": "设置 DOCHRIS_API_KEY、DOCHRIS_ALLOW_UNAUTHENTICATED=false、DOCHRIS_CORS_ORIGINS 白名单。"}
+{"id": "gq-028", "question": "Docker 部署的数据保存在哪里？删除数据要注意什么？", "source_title": "docker", "ground_truth": "命名卷（raw/manifests/outputs/wiki/curated/data/cache/logs）；down --volumes 才会删除，删除前必须备份。"}
+{"id": "gq-029", "question": "Dochris 支持哪些本地向量数据库？", "source_title": "vector-stores", "ground_truth": "ChromaDB（默认）、FAISS、LEANN（实验性），通过 VECTOR_STORE 配置切换。"}
+{"id": "gq-030", "question": "默认的 embedding 模型是什么？", "source_title": "vector-stores", "ground_truth": "BAAI/bge-small-zh-v1.5（Chroma 与 FAISS 统一使用 settings.embedding_model）。"}
+{"id": "gq-031", "question": "如何切换到 FAISS 向量库？", "source_title": "vector-stores", "ground_truth": "设置 VECTOR_STORE=faiss 并安装向量依赖（dochris[vector]）。"}
+{"id": "gq-032", "question": "结构化日志怎么配置？", "source_title": "logging", "ground_truth": "日志写入工作区 logs 目录，格式与日期格式由 LOG_FORMAT/LOG_DATE_FORMAT 配置。"}
+{"id": "gq-033", "question": "Ollama 本地模型如何接入 Dochris？", "source_title": "llm-providers", "ground_truth": "LLM_PROVIDER=ollama，API_BASE 指向 http://localhost:11434，无需 API key。"}
+{"id": "gq-034", "question": "RAG 评估支持哪些检索指标？", "source_title": "RELEASE", "ground_truth": "recall@k、precision@k、MRR、NDCG@k，以及 faithfulness/answer_relevance/context_relevance/citation_correctness。"}
+{"id": "gq-035", "question": "发布一个新版本要经过哪些门禁？", "source_title": "RELEASE", "ground_truth": "lint+typecheck+fast+integration、前端全套、Docker 双镜像与 Compose 健康、docs strict，全部通过后 tag 触发 release workflow。"}
+{"id": "gq-036", "question": "回滚 Dochris 版本有哪些方式？", "source_title": "RELEASE", "ground_truth": "pip install 旧版本或回退镜像 tag；命名卷数据在 down 后保留，删除前必须备份。"}
+{"id": "gq-037", "question": "RAG 质量门槛中 recall@5 的建议值是多少？", "source_title": "RELEASE", "ground_truth": "不低于基线且绝对值 ≥ 0.7。"}
+{"id": "gq-038", "question": "如何贡献代码到 Dochris？", "source_title": "CONTRIBUTING", "ground_truth": "Fork → 分支 → make check（lint+format+fast tests）→ PR，CI 必须绿色。"}
+{"id": "gq-039", "question": "发现安全漏洞应该怎么报告？", "source_title": "SECURITY", "ground_truth": "按 SECURITY.md 中的私下披露渠道报告，不要公开 Issue。"}
+{"id": "gq-040", "question": "Dochris 的整体代码结构是怎样划分的？", "source_title": "architecture", "ground_truth": "phases（四阶段流水线）、api（FastAPI）、rag（检索增强）、vector（向量抽象）、llm（Provider）、plugin（扩展）、settings（配置）等子包。"}
+{"id": "gq-041", "question": "项目的快速测试门禁包含什么？", "source_title": "testing", "ground_truth": "make test-fast 运行标记为 fast 的单元与 API 契约测试，PR 必须通过。"}
+{"id": "gq-042", "question": "使用示例里演示了哪些能力？", "source_title": "EXAMPLES", "ground_truth": "基础导入、质量评分、自定义解析器、LLM Provider、向量库与插件钩子六个示例。"}
+{"id": "gq-043", "question": "后台编译任务的中间状态有哪些？", "source_title": "QUICKSTART", "ground_truth": "accepted/queued/running/cancelling 为活动状态，终态为 completed/completed_with_errors/failed/cancelled/interrupted。"}
+{"id": "gq-044", "question": "编译任务部分失败时系统如何表现？", "source_title": "QUICKSTART", "ground_truth": "任务标记 completed_with_errors 并可重试，failed_files/failure_details 记录失败文档与脱敏错误。"}
+{"id": "gq-045", "question": "存储迁移工具支持哪些操作？", "source_title": "cli", "ground_truth": "kb storage 提供 audit/dry-run、apply 和 backup+rollback 能力。"}
+{"id": "gq-046", "question": "查询缓存是怎么工作的？", "source_title": "query", "ground_truth": "相同查询+相同上下文直接返回缓存结果；缓存保存在工作区 cache 目录。"}
+{"id": "gq-047", "question": "ingest 重复导入同一份文件会怎样？", "source_title": "ingestion", "ground_truth": "按内容 SHA-256 哈希去重，命中已存在 manifest 时跳过，不会产生重复条目。"}
+{"id": "gq-048", "question": "什么时候应该用 compiled 摘要而不是原文？", "source_title": "concepts", "ground_truth": "compiled_summary 是 LLM 提炼的结构化摘要（含概念与要点），用于检索与概览；原文用于溯源核对。"}
+{"id": "gq-049", "question": "如何限制单次编译的文档数量？", "source_title": "cli", "ground_truth": "kb compile --limit N 或 API CompileRequest.limit（1-1000）。"}
+{"id": "gq-050", "question": "Dochris 的 API 支持流式输出吗？", "source_title": "api", "ground_truth": "GET /api/v1/query/stream 提供 SSE 流式查询，与普通查询共享同一执行管线。"}
