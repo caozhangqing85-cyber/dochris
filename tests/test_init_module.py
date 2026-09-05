@@ -7,11 +7,19 @@ class TestInitModuleAttributes:
     """测试 __init__.py 模块属性"""
 
     def test_version_exists(self):
-        """测试版本号存在"""
+        """测试版本号存在（与 pyproject 单一来源一致）"""
         import dochris
 
         assert hasattr(dochris, "__version__")
-        assert dochris.__version__ == "1.4.0"
+        assert dochris.__version__
+        # 版本号必须与 pyproject.toml 保持一致（单一来源约定）
+        import tomllib
+        from pathlib import Path
+
+        pyproject = Path(__file__).parent.parent / "pyproject.toml"
+        if pyproject.exists():
+            expected = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+            assert dochris.__version__ == expected
 
     def test_author_exists(self):
         """测试作者信息存在"""

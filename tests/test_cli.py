@@ -29,14 +29,15 @@ class TestCLIMain:
         assert rc == 0
 
     def test_main_version_flag(self):
-        """--version 标志打印版本并返回 0"""
+        """--version 标志打印版本并返回 0（与包 __version__ 一致，避免硬编码漂移）"""
+        import dochris
         from dochris.cli.main import main
 
         with patch("sys.argv", ["kb", "--version"]), patch("builtins.print") as mock_print:
             rc = main()
         assert rc == 0
         mock_print.assert_called_once()
-        assert "1.4.0" in mock_print.call_args[0][0]
+        assert dochris.__version__ in mock_print.call_args[0][0]
 
     def test_main_verbose_flag(self):
         """-v 标志不影响命令路由"""

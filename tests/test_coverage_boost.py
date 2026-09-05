@@ -20,7 +20,7 @@ from dochris.parsers.pdf_parser import (
     parse_pdf,
     parse_with_pdfplumber,
     parse_with_pymupdf,
-    parse_with_pypdf2,
+    parse_with_pypdf,
     parse_with_tesseract_ocr,
 )
 
@@ -168,24 +168,24 @@ class TestSplitSentences:
 
 
 class TestParseWithPypdf2InternalPaths:
-    """覆盖 parse_with_pypdf2 行 46-52 (正常路径), 56-67 (异常路径)"""
+    """覆盖 parse_with_pypdf 行 46-52 (正常路径), 56-67 (异常路径)"""
 
     def test_pypdf2_import_error(self, tmp_path: Path):
-        """PyPDF2 未安装走 ImportError 分支（行 53-55）"""
+        """pypdf 未安装走 ImportError 分支（行 53-55）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        with patch.dict("sys.modules", {"PyPDF2": None}):
-            result = parse_with_pypdf2(pdf_file)
+        with patch.dict("sys.modules", {"pypdf": None}):
+            result = parse_with_pypdf(pdf_file)
             assert result is None
 
     def test_pypdf2_expected_exception(self, tmp_path: Path):
-        """PyPDF2 抛出 OSError/ValueError/RuntimeError/KeyError（行 56-61）"""
+        """pypdf 抛出 OSError/ValueError/RuntimeError/KeyError（行 56-61）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=OSError("损坏")),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", side_effect=OSError("损坏")),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):
@@ -193,13 +193,13 @@ class TestParseWithPypdf2InternalPaths:
             assert isinstance(result, str)
 
     def test_pypdf2_unexpected_exception(self, tmp_path: Path):
-        """PyPDF2 抛出未预期异常（行 62-67）"""
+        """pypdf 抛出未预期异常（行 62-67）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", side_effect=MemoryError("OOM")),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", side_effect=MemoryError("OOM")),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):
@@ -207,13 +207,13 @@ class TestParseWithPypdf2InternalPaths:
             assert isinstance(result, str)
 
     def test_pypdf2_success_path(self, tmp_path: Path):
-        """PyPDF2 成功解析且超过100字符（行 46-52）"""
+        """pypdf 成功解析且超过100字符（行 46-52）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="pypdf2成功" * 30),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value="pypdf2成功" * 30),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):
@@ -221,13 +221,13 @@ class TestParseWithPypdf2InternalPaths:
             assert "pypdf2成功" in result
 
     def test_pypdf2_short_text_returns_none(self, tmp_path: Path):
-        """PyPDF2 提取文本不足100字符返回 None（行 52）"""
+        """pypdf 提取文本不足100字符返回 None（行 52）"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value="短"),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value="短"),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value="x" * 200),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):

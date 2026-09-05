@@ -13,7 +13,7 @@ from dochris.parsers.pdf_parser import (
     parse_with_markitdown,
     parse_with_pdfplumber,
     parse_with_pymupdf,
-    parse_with_pypdf2,
+    parse_with_pypdf,
     parse_with_tesseract_ocr,
 )
 
@@ -65,28 +65,28 @@ class TestParseWithMarkitdown:
 
 
 class TestParseWithPypdf2:
-    """测试 PyPDF2 解析器"""
+    """测试 pypdf 解析器"""
 
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     def test_import_error_returns_none(self, mock_parse):
-        """PyPDF2 未安装时返回 None"""
+        """pypdf 未安装时返回 None"""
         # 直接测试函数行为 — 模拟 ImportError
-        with patch.dict("sys.modules", {"PyPDF2": None}):
-            # PyPDF2 导入失败时函数内部捕获 ImportError
+        with patch.dict("sys.modules", {"pypdf": None}):
+            # pypdf 导入失败时函数内部捕获 ImportError
             pass
 
     def test_nonexistent_file_returns_none(self):
         """不存在的文件返回 None"""
-        result = parse_with_pypdf2(Path("/nonexistent/file.pdf"))
+        result = parse_with_pypdf(Path("/nonexistent/file.pdf"))
         assert result is None
 
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2.__module__")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf.__module__")
     def test_short_text_returns_none(self, tmp_path: Path):
         """提取文本少于 100 字符时返回 None"""
         pdf_file = tmp_path / "test.pdf"
         pdf_file.write_bytes(b"%PDF-1.4 fake")
-        # PyPDF2 无法解析假 PDF，返回 None
-        result = parse_with_pypdf2(pdf_file)
+        # pypdf 无法解析假 PDF，返回 None
+        result = parse_with_pypdf(pdf_file)
         assert result is None
 
 
@@ -143,7 +143,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_first_parser_succeeds(
@@ -161,7 +161,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_fallback_to_pymupdf(
@@ -178,7 +178,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_fallback_to_pypdf2(
@@ -196,7 +196,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_fallback_to_markitdown(
@@ -215,7 +215,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_all_parsers_fail(
@@ -237,7 +237,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_short_text_considers_failure(
@@ -260,7 +260,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_parser_exception_continues_chain(
@@ -287,7 +287,7 @@ class TestParsePdfFallbackChain:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_string_path_handled(
@@ -316,7 +316,7 @@ class TestParseWithPdfplumberMocked:
 
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf") as m2,
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2"),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf"),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown"),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"),
         ):
@@ -335,7 +335,7 @@ class TestParseWithPdfplumberMocked:
 
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):
@@ -355,7 +355,7 @@ class TestParseWithPdfplumberMocked:
 
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf"),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2"),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf"),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown"),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr"),
         ):
@@ -368,7 +368,7 @@ class TestParseWithPymupdfMocked:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None)
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None)
     def test_pymupdf_succeeds_after_pdfplumber_fails(
@@ -384,7 +384,7 @@ class TestParseWithPymupdfMocked:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None)
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None)
     def test_pymupdf_raises_runtime_error(
@@ -402,11 +402,11 @@ class TestParseWithPymupdfMocked:
 
 
 class TestParseWithPypdf2Mocked:
-    """测试 PyPDF2 解析器（模拟路径）"""
+    """测试 pypdf 解析器（模拟路径）"""
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None)
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None)
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None)
     def test_pypdf2_returns_valid_text(
@@ -440,7 +440,7 @@ class TestParsePdfErrorDetails:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_error_message_contains_parser_names(
@@ -465,7 +465,7 @@ class TestParsePdfErrorDetails:
 
     @patch("dochris.parsers.pdf_parser.parse_with_pdfplumber")
     @patch("dochris.parsers.pdf_parser.parse_with_pymupdf")
-    @patch("dochris.parsers.pdf_parser.parse_with_pypdf2")
+    @patch("dochris.parsers.pdf_parser.parse_with_pypdf")
     @patch("dochris.parsers.pdf_parser.parse_with_markitdown")
     @patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr")
     def test_unexpected_exception_caught(
@@ -519,7 +519,7 @@ class TestParserModuleConstants:
             parse_with_markitdown,
             parse_with_pdfplumber,
             parse_with_pymupdf,
-            parse_with_pypdf2,
+            parse_with_pypdf,
             parse_with_tesseract_ocr,
         ]:
             assert callable(func)

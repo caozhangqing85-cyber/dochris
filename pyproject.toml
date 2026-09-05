@@ -1,6 +1,6 @@
 [project]
 name = "dochris"
-version = "1.4.0"
+version = "1.5.0"
 description = "个人知识库编译系统 - 四阶段流水线"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -59,7 +59,7 @@ ollama = [
 ]
 audio = ["faster-whisper>=0.10.0"]
 pdf = [
-    "PyPDF2>=3.0.0",
+    "pypdf>=4.0.0",
     "pdfplumber>=0.10.0",
     "PyMuPDF>=1.20.0",
 ]
@@ -77,6 +77,12 @@ dev = [
     "mypy>=1.5.0",
     "pre-commit>=3.0.0",
     "httpx>=0.24.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+    "markdown-exec>=1.8.0",
 ]
 standard = [
     "dochris[api,documents,pdf,vector]",

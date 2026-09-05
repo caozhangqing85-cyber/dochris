@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+import dochris
 from tests.test_api.conftest import _make_manifest, _write_manifest
 
 pytestmark = pytest.mark.fast
@@ -104,7 +105,7 @@ class TestStatusEndpoint:
         assert resp.status_code == 200
         assert resp.json() == {
             "status": "ready",
-            "version": "1.4.0",
+            "version": dochris.__version__,
             "checks": {
                 "workspace": {
                     "status": "ok",
@@ -130,7 +131,7 @@ class TestStatusEndpoint:
         assert resp.status_code == 503
         assert resp.json() == {
             "status": "not_ready",
-            "version": "1.4.0",
+            "version": dochris.__version__,
             "checks": {
                 "workspace": {
                     "status": "missing",

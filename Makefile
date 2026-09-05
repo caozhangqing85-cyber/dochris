@@ -3,7 +3,7 @@ PYTEST ?= $(PYTHON) -m pytest
 RUFF ?= $(PYTHON) -m ruff
 MYPY ?= $(PYTHON) -m mypy
 
-.PHONY: help install install-standard install-dev install-all install-audio test test-cov test-fast test-full test-full-no-cov lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api graph-stats graph-export
+.PHONY: help install install-standard install-dev install-all install-audio install-docs test test-cov test-fast test-full test-full-no-cov lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs docs-serve changelog release web web-api graph-stats graph-export
 
 # 默认目标
 help: ## 显示帮助信息
@@ -100,8 +100,11 @@ bench-report: ## 运行基准测试并保存报告
 		-v
 
 # 文档
-docs: ## 生成 API 文档
-	pdoc dochris -o docs/html
+docs: ## 构建 MkDocs 文档（strict 模式，与 CI docs.yml 一致）
+	$(PYTHON) -m mkdocs build --strict
+
+docs-serve: ## 本地预览文档
+	$(PYTHON) -m mkdocs serve
 
 # 发布相关
 changelog: ## 生成 CHANGELOG

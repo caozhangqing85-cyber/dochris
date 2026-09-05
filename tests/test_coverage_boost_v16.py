@@ -465,15 +465,15 @@ class TestHierarchicalSummarizerAsyncFallbacks:
 class TestPdfParserFallbacks:
     """测试 PDF 解析器的各种降级路径"""
 
-    def test_parse_with_pypdf2_import_error(self):
-        from dochris.parsers.pdf_parser import parse_with_pypdf2
+    def test_parse_with_pypdf_import_error(self):
+        from dochris.parsers.pdf_parser import parse_with_pypdf
 
         with patch.dict("sys.modules", {"PyPDF2": None}):
-            result = parse_with_pypdf2(Path("/fake/test.pdf"))
+            result = parse_with_pypdf(Path("/fake/test.pdf"))
             assert result is None
 
-    def test_parse_with_pypdf2_short_text(self):
-        from dochris.parsers.pdf_parser import parse_with_pypdf2
+    def test_parse_with_pypdf_short_text(self):
+        from dochris.parsers.pdf_parser import parse_with_pypdf
 
         mock_page = MagicMock()
         mock_page.extract_text.return_value = "short"
@@ -483,14 +483,14 @@ class TestPdfParserFallbacks:
         mock_pdf_module.PdfReader = MagicMock(return_value=mock_reader)
 
         with (
-            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch.dict("sys.modules", {"pypdf": mock_pdf_module}),
             patch("builtins.open", MagicMock()),
         ):
-            result = parse_with_pypdf2(Path("/fake/test.pdf"))
+            result = parse_with_pypdf(Path("/fake/test.pdf"))
             assert result is None  # < 100 chars
 
-    def test_parse_with_pypdf2_success(self):
-        from dochris.parsers.pdf_parser import parse_with_pypdf2
+    def test_parse_with_pypdf_success(self):
+        from dochris.parsers.pdf_parser import parse_with_pypdf
 
         mock_page = MagicMock()
         mock_page.extract_text.return_value = "A" * 200
@@ -500,37 +500,37 @@ class TestPdfParserFallbacks:
         mock_pdf_module.PdfReader = MagicMock(return_value=mock_reader)
 
         with (
-            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch.dict("sys.modules", {"pypdf": mock_pdf_module}),
             patch("builtins.open", MagicMock()),
         ):
-            result = parse_with_pypdf2(Path("/fake/test.pdf"))
+            result = parse_with_pypdf(Path("/fake/test.pdf"))
             assert result is not None
             assert len(result) >= 100
 
-    def test_parse_with_pypdf2_runtime_error(self):
-        from dochris.parsers.pdf_parser import parse_with_pypdf2
+    def test_parse_with_pypdf_runtime_error(self):
+        from dochris.parsers.pdf_parser import parse_with_pypdf
 
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(side_effect=RuntimeError("pdf broken"))
 
         with (
-            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch.dict("sys.modules", {"pypdf": mock_pdf_module}),
             patch("builtins.open", MagicMock()),
         ):
-            result = parse_with_pypdf2(Path("/fake/test.pdf"))
+            result = parse_with_pypdf(Path("/fake/test.pdf"))
             assert result is None
 
-    def test_parse_with_pypdf2_unexpected_error(self):
-        from dochris.parsers.pdf_parser import parse_with_pypdf2
+    def test_parse_with_pypdf_unexpected_error(self):
+        from dochris.parsers.pdf_parser import parse_with_pypdf
 
         mock_pdf_module = MagicMock()
         mock_pdf_module.PdfReader = MagicMock(side_effect=TypeError("unexpected"))
 
         with (
-            patch.dict("sys.modules", {"PyPDF2": mock_pdf_module}),
+            patch.dict("sys.modules", {"pypdf": mock_pdf_module}),
             patch("builtins.open", MagicMock()),
         ):
-            result = parse_with_pypdf2(Path("/fake/test.pdf"))
+            result = parse_with_pypdf(Path("/fake/test.pdf"))
             assert result is None
 
     def test_parse_with_pdfplumber_import_error(self):
@@ -557,7 +557,7 @@ class TestPdfParserFallbacks:
         with (
             patch("dochris.parsers.pdf_parser.parse_with_pdfplumber", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_pymupdf", return_value=None),
-            patch("dochris.parsers.pdf_parser.parse_with_pypdf2", return_value=None),
+            patch("dochris.parsers.pdf_parser.parse_with_pypdf", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_markitdown", return_value=None),
             patch("dochris.parsers.pdf_parser.parse_with_tesseract_ocr", return_value=None),
         ):

@@ -45,28 +45,28 @@ def parse_with_markitdown(file_path: Path) -> str | None:
         return None
 
 
-def parse_with_pypdf2(file_path: Path) -> str | None:
-    """使用 PyPDF2 解析"""
+def parse_with_pypdf(file_path: Path) -> str | None:
+    """使用 pypdf 解析（PyPDF2 的继任者，DEBT-01）"""
     try:
-        from PyPDF2 import PdfReader
+        from pypdf import PdfReader
 
         with open(file_path, "rb") as f:
             reader = PdfReader(f)
             text = ""
             for page in reader.pages:
-                text += page.extract_text()
+                text += page.extract_text() or ""
 
             return text if len(text) > 100 else None
     except ImportError:
-        logger.debug("PyPDF2 not installed")
+        logger.debug("pypdf not installed")
         return None
     except (OSError, ValueError, RuntimeError, KeyError) as e:
-        logger.warning(f"PyPDF2 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
-        logger.debug(f"PyPDF2 错误堆栈:\n{traceback.format_exc()}")
+        logger.warning(f"pypdf 解析失败: {type(e).__name__}: {e} | 文件: {file_path}")
+        logger.debug(f"pypdf 错误堆栈:\n{traceback.format_exc()}")
         return None
     except Exception as e:
-        logger.error(f"PyPDF2 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}")
-        logger.debug(f"PyPDF2 错误堆栈:\n{traceback.format_exc()}")
+        logger.error(f"pypdf 未预期错误: {type(e).__name__}: {e} | 文件: {file_path}")
+        logger.debug(f"pypdf 错误堆栈:\n{traceback.format_exc()}")
         return None
 
 
@@ -157,7 +157,7 @@ def parse_pdf(file_path: Path) -> str:
     parsers: list[tuple[str, Callable[[Path], str | None]]] = [
         ("pdfplumber", parse_with_pdfplumber),
         ("pymupdf", parse_with_pymupdf),
-        ("pypdf2", parse_with_pypdf2),
+        ("pypdf", parse_with_pypdf),
         ("markitdown", parse_with_markitdown),
         ("tesseract_ocr", parse_with_tesseract_ocr),
     ]

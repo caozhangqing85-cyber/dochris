@@ -148,3 +148,4 @@ nav:
     - 结构化日志: advanced/logging.md
     - HTTP API: advanced/api.md
     - Docker 部署: advanced/docker.md
+  - 发布就绪: RELEASE.md

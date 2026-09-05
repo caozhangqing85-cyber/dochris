@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-09-05
+
+本版本主题：**可发布基线** —— 工作树治理、安全修复、统一查询管线、任务部分失败语义、发布流水线闭环。
+
+### Added
+- **统一 QueryPipeline**（`phases/query_pipeline.py`）：普通查询与 SSE 流式查询共用同一套 retrieve → rerank → context → generate 编排，结构化 `PipelineEvent` 驱动 SSE
+- **结构化 Citation**：回答中的 `[Sn]` 引用映射到 manifest/source/channel/text_hash，`GET /query` 返回 `citations`/`unresolved_refs`，SSE `done` 事件携带同结构数据
+- **SSE ping 心跳**：事件间隔超过 15s 自动发送 ping 帧；客户端断开时取消向上传播
+- **部分失败语义**：编译任务新增 `completed_with_errors` 状态（可重试），携带 `failed_files`/`failure_details`；新增 `GET /compile/jobs/{id}/failures` 失败明细下载
+- **SSE warning 事件**：combined 模式向量检索失败时发 warning 降级提示；vector 模式失败返回类型化错误（不再静默吞掉）
+- **阶段耗时**：`QueryResponse.timings` 与 SSE `done.timings` 暴露 retrieval/rerank/first_token/generation/total
+- **存储迁移工具**（`storage/migration.py` + `kb storage` CLI）：dry-run、backup、rollback
+- **Provider 注册表接入查询链路**：`settings.llm_provider` 通过 `dochris.llm.get_provider()` 选择 provider（openai_compat / ollama），Ollama 免 key 直连
+
+### Fixed
+- **Graph tooltip XSS**（P0）：tooltip 改用 DOM `textContent` 构建，用户文档中的 label 不再经 `.html()` 注入
+- **Graph metadata 渲染**（P0）：前端类型改为 `Record<string, unknown>`，任意 JSON 值安全格式化，对象/数组不再导致 React 崩溃
+- **流式/非流式一致**：`done.final_answer` 为与非流式一致的 wiki-link 清理后答案；LLM 流式异常不再以答案文本 chunk 输出（避免泄露底层异常）
+- **编译任务状态语义**：部分文档失败时不再标记为完全成功
+- **前端 `QueryResponse.answer` 空值类型**修正为可空
+
+### Changed
+- **工作树治理**：约 11,700 行未提交变更按领域拆分为可独立审查/回滚的提交；清除 `:memory:.ses`、`docs/advanced/docker 2.md` 误生成文件
+- **CI/发布闭环**：PR 增加 integration suite 门禁；CI 构建 API + Web 双镜像并做 API 镜像 smoke；完整 Compose 启动健康检查；tag 发布必须先过 release gate（测试+类型+集成+干净环境安装 smoke）；PyPI 迁移到 Trusted Publishing（OIDC）；发布产物附 checksums + CycloneDX SBOM
+- **`make docs`** 改为 `mkdocs build --strict`（与 CI docs.yml 一致），新增 `docs` extra
+- 测试与工具链：fast 套件 374 项；前端新增 graph-safety 测试；全量套件 3219 passed
+
+### Security
+- 错误脱敏（API key / Bearer / 本机路径）统一收敛到 `dochris/core/error_sanitizer.py`，任务存储与编译流水线共用
+
 ## [1.4.0] - 2026-05-04
 
 ### Added
