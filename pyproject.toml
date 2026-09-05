@@ -4,7 +4,7 @@ version = "1.4.0"
 description = "个人知识库编译系统 - 四阶段流水线"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "caozhangqing85-cyber"}
 ]
@@ -14,7 +14,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -32,23 +31,31 @@ classifiers = [
 
 dependencies = [
     "openai>=1.0.0",
-    "markitdown>=0.0.1",
-    "chromadb>=0.4.0",
-    "sentence-transformers>=2.2.0",
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",
     "json-repair>=0.30.0",
 ]
 
 [project.optional-dependencies]
+documents = [
+    "markitdown>=0.0.1",
+]
+vector = [
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+]
 api = [
     "fastapi>=0.100.0",
+    "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.20.0",
     "prometheus-client>=0.20.0",
     "sse-starlette>=2.1.0",
 ]
 leann = [
-    "leann-vector>=0.1.0",
+    "leann>=0.3.7",
+]
+ollama = [
+    "aiohttp>=3.9.0",
 ]
 audio = ["faster-whisper>=0.10.0"]
 pdf = [
@@ -71,15 +78,18 @@ dev = [
     "pre-commit>=3.0.0",
     "httpx>=0.24.0",
 ]
+standard = [
+    "dochris[api,documents,pdf,vector]",
+]
 all = [
-    "dochris[audio,pdf,ocr,dev,api,leann]",
+    "dochris[api,audio,documents,leann,ocr,ollama,pdf,vector]",
 ]
 
 [project.scripts]
 kb = "dochris.cli.main:main"
 
 [build-system]
-requires = ["setuptools>=65.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -153,6 +163,20 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = [
+    "aiohttp",
+    "faiss",
+    "faster_whisper",
+    "fitz",
+    "importlib_metadata",
+    "leann",
+    "pdfplumber",
+    "prometheus_client",
+    "PyPDF2",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -168,6 +192,7 @@ addopts = [
     "--cov-fail-under=60",
 ]
 markers = [
+    "fast: Gate 1A fast PR suite for targeted unit and API contract checks",
     "unit: Unit tests",
     "integration: Integration tests",
     "slow: Slow running tests",

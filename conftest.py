@@ -1,4 +1,5 @@
 """Root conftest.py - ensures 'dochris' is importable even if editable install .pth is broken."""
+
 import os
 import sys
 from pathlib import Path

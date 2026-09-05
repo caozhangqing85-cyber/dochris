@@ -1,4 +1,9 @@
-.PHONY: help install install-dev install-all install-audio test test-cov test-fast lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api graph-stats graph-export
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+PYTEST ?= $(PYTHON) -m pytest
+RUFF ?= $(PYTHON) -m ruff
+MYPY ?= $(PYTHON) -m mypy
+
+.PHONY: help install install-standard install-dev install-all install-audio test test-cov test-fast test-full test-full-no-cov lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs changelog release web web-api graph-stats graph-export
 
 # 默认目标
 help: ## 显示帮助信息
@@ -9,41 +14,49 @@ help: ## 显示帮助信息
 
 # 安装相关
 install: ## 安装项目（基础依赖）
-	pip install -e .
+	$(PYTHON) -m pip install -e .
 
-install-dev: ## 安装开发依赖
-	pip install -e ".[dev]"
+install-standard: ## 安装推荐运行能力（API、PDF、Chroma/语义检索）
+	$(PYTHON) -m pip install -e ".[standard]"
 
-install-all: ## 安装所有依赖（包括音频、PDF、OCR）
-	pip install -e ".[all]"
+install-dev: ## 安装推荐运行能力和开发依赖
+	$(PYTHON) -m pip install -e ".[dev,standard]"
+
+install-all: ## 安装所有运行时依赖（开发工具请使用 install-dev）
+	$(PYTHON) -m pip install -e ".[all]"
 
 install-audio: ## 安装音频处理依赖
-	pip install -e ".[audio]"
+	$(PYTHON) -m pip install -e ".[audio]"
 
 # 测试相关
-test: ## 运行测试
-	pytest tests/ --tb=short -q
+test: ## 运行完整测试（使用 pyproject 覆盖率门禁）
+	$(PYTEST) tests/ --tb=short -q
 
 test-cov: ## 运行测试并生成覆盖率报告
-	pytest tests/ --cov=dochris --cov-report=term --cov-report=html --tb=short -q
+	$(PYTEST) tests/ --cov=dochris --cov-report=term --cov-report=html --tb=short -q
 
-test-fast: ## 运行快速测试（跳过慢速测试）
-	pytest tests/ --tb=short -q -m "not slow"
+test-fast: ## Gate 1A 快速测试（仅 unit/API contract，不跑覆盖率门禁）
+	$(PYTEST) tests/ --tb=short -q -m "fast" --no-cov
+
+test-full: test ## 运行完整测试别名（保留覆盖率门禁）
+
+test-full-no-cov: ## 运行完整测试但关闭覆盖率门禁（push/nightly 诊断用）
+	$(PYTEST) tests/ --tb=short -q --no-cov
 
 # 代码质量
 lint: ## 运行 linter 检查
-	ruff check src/ tests/
+	$(RUFF) check src/ tests/
 
 format: ## 格式化代码
-	ruff format src/ tests/
+	$(RUFF) format src/ tests/
 
 format-check: ## 检查代码格式
-	ruff format --check src/ tests/
+	$(RUFF) format --check src/ tests/
 
-typecheck: ## 运行类型检查（可选）
-	mypy src/
+typecheck: ## 运行类型检查（可选依赖例外见 pyproject.toml）
+	$(MYPY) src/dochris/
 
-check: lint format-check test ## 完整检查（lint + format + test）
+check: lint format-check test-fast ## 快速 PR 检查（lint + format + Gate 1A）
 
 # 清理
 clean: ## 清理临时文件和构建产物
@@ -54,7 +67,7 @@ clean: ## 清理临时文件和构建产物
 
 # 构建
 build: ## 构建发布包
-	python -m build
+	$(PYTHON) -m build
 
 # Docker 相关
 docker-build: ## 构建 Docker 镜像（默认 core）
@@ -78,11 +91,11 @@ docker-down: ## 停止 Docker 容器
 
 # 基准测试
 bench: ## 运行所有基准测试
-	pytest benchmark/ --benchmark-only -v
+	$(PYTEST) benchmark/ --benchmark-only -v
 
 bench-report: ## 运行基准测试并保存报告
 	@mkdir -p reports
-	pytest benchmark/ --benchmark-only \
+	$(PYTEST) benchmark/ --benchmark-only \
 		--benchmark-json=reports/benchmark-$$(date +%Y%m%d-%H%M%S).json \
 		-v
 
@@ -95,7 +108,7 @@ changelog: ## 生成 CHANGELOG
 	git-cliff -o CHANGELOG.md
 
 release: ## 创建发布（tag + push）
-	@echo "当前版本: $$(python -c 'import dochris; print(dochris.__version__)')"
+	@echo "当前版本: $$($(PYTHON) -c 'import dochris; print(dochris.__version__)')"
 	@read -p "输入新版本号 (如 1.2.0): " version; \
 		sed -i "s/__version__ = \".*\"/__version__ = \"$$version\"/" src/dochris/__init__.py && \
 		sed -i "s/version = \".*\"/version = \"$$version\"/" pyproject.toml && \
@@ -104,18 +117,15 @@ release: ## 创建发布（tag + push）
 		git tag v$$version && git push origin main --tags
 
 # Web UI
-web: ## 启动 Gradio Web UI
-	kb serve --web
+web: ## 启动 React Web UI（需要另行运行 make web-api）
+	cd frontend && npm run dev
 
-web-api: ## 启动 FastAPI + Gradio
-	@echo "启动 API 服务..."
-	@kb serve --host 0.0.0.0 --port 8000 & sleep 2 && echo "API 启动完成: http://0.0.0.0:8000/docs"
-	@echo "启动 Web UI..."
-	@kb serve --web --host 0.0.0.0 --web-port 7860
+web-api: ## 在 127.0.0.1:8000 启动 React 开发环境所需的 FastAPI API
+	PYTHONPATH=src $(PYTHON) -m dochris.cli.main serve --host 127.0.0.1 --port 8000
 
 # 知识图谱
 graph-stats: ## 显示知识图谱统计
-	kb graph stats
+	PYTHONPATH=src $(PYTHON) -m dochris.cli.main graph stats
 
 graph-export: ## 导出知识图谱为 JSON
-	kb graph export --output graph.json
+	PYTHONPATH=src $(PYTHON) -m dochris.cli.main graph export --output graph.json
