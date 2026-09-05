@@ -9,7 +9,7 @@ Workers 模块导入测试
 print("✓ Testing workers imports...")
 
 try:
-    from workers import compiler_worker
+    from dochris.workers import compiler_worker
 
     print("✓ workers.compiler_worker")
     print(f"  - CompilerWorker: {hasattr(compiler_worker.CompilerWorker, '__init__')}")
@@ -20,7 +20,7 @@ except ImportError as e:
     traceback.print_exc()
 
 try:
-    from workers import monitor_worker
+    from dochris.workers import monitor_worker
 
     print("✓ workers.monitor_worker")
     print(f"  - MonitorWorker: {hasattr(monitor_worker.MonitorWorker, '__init__')}")

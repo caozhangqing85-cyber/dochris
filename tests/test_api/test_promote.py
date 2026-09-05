@@ -8,6 +8,10 @@ class TestPromoteEndpoint:
         with (
             patch("dochris.api.routes.promote.get_manifest") as mock_get,
             patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={"passed": True, "reason": "通过"},
+            ),
             patch("dochris.promote.promote_to_wiki", return_value=True),
         ):
             mock_get.return_value = {
@@ -39,6 +43,10 @@ class TestPromoteEndpoint:
         with (
             patch("dochris.api.routes.promote.get_manifest") as mock_get,
             patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={"passed": True, "reason": "通过"},
+            ),
             patch("dochris.promote.promote_to_wiki", return_value=False),
         ):
             mock_get.return_value = {
@@ -56,6 +64,10 @@ class TestPromoteEndpoint:
         with (
             patch("dochris.api.routes.promote.get_manifest") as mock_get,
             patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={"passed": True, "reason": "通过"},
+            ),
             patch("dochris.promote.promote_to_wiki", side_effect=Exception("db error")),
         ):
             mock_get.return_value = {
@@ -92,6 +104,10 @@ class TestPromoteEndpoint:
         with (
             patch("dochris.api.routes.promote.get_manifest") as mock_get,
             patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={"passed": True, "reason": "通过"},
+            ),
             patch("dochris.promote.promote_to_wiki", return_value=True),
         ):
             mock_get.return_value = {
@@ -111,6 +127,10 @@ class TestPromoteEndpoint:
         with (
             patch("dochris.api.routes.promote.get_manifest") as mock_get,
             patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={"passed": True, "reason": "通过"},
+            ),
             patch("dochris.promote.promote_to_wiki", return_value=True),
         ):
             mock_get.return_value = {
@@ -123,3 +143,34 @@ class TestPromoteEndpoint:
             resp = client.post("/api/v1/promote/SRC-0001")
         assert resp.status_code == 200
         assert resp.json()["target"] == "wiki"
+
+    def test_promote_rejected_by_quality_gate(self, client):
+        with (
+            patch("dochris.api.routes.promote.get_manifest") as mock_get,
+            patch("dochris.api.routes.promote.get_settings") as mock_gs,
+            patch(
+                "dochris.api.routes.promote.quality_gate",
+                return_value={
+                    "passed": False,
+                    "reason": "质量分数 69 低于门槛 85",
+                },
+            ),
+            patch("dochris.promote.promote_to_wiki") as mock_promote,
+        ):
+            mock_get.return_value = {
+                "id": "SRC-0001",
+                "status": "compiled",
+                "quality_score": 69,
+                "filename": "test.pdf",
+            }
+            mock_gs.return_value.workspace = MagicMock()
+            resp = client.post("/api/v1/promote/SRC-0001", json={"target": "wiki"})
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "src_id": "SRC-0001",
+            "target": "wiki",
+            "success": False,
+            "message": "质量门禁未通过: 质量分数 69 低于门槛 85",
+        }
+        mock_promote.assert_not_called()

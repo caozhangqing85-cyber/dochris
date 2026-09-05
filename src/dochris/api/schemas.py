@@ -49,6 +49,29 @@ class QueryResponse(BaseModel):
     """请求追踪 ID，用于关联后端日志"""
 
 
+class QueryContributionRequest(BaseModel):
+    """将一次已完成的只读查询显式写入候选知识区。"""
+
+    query: str = Field(..., min_length=1, max_length=500)
+    mode: str = Field(default="combined", max_length=32)
+    concepts: list[SearchResult] = Field(default_factory=list)
+    summaries: list[SearchResult] = Field(default_factory=list)
+    vector_results: list[SearchResult] = Field(default_factory=list)
+    search_sources: list[str] = Field(default_factory=list)
+    answer: str = Field(..., min_length=100, max_length=200_000)
+    time_seconds: float = Field(default=0.0, ge=0.0)
+
+
+class QueryContributionResponse(BaseModel):
+    """显式贡献写入回执。"""
+
+    id: str
+    quality_score: int = Field(ge=0, le=100)
+    needs_review: bool = True
+    auto_promoted: bool = False
+    status: str = "candidate"
+
+
 # ── 编译 ─────────────────────────────────────────────────────
 
 
@@ -63,11 +86,24 @@ class CompileRequest(BaseModel):
 class CompileResponse(BaseModel):
     """编译响应"""
 
+    job_id: str | None = None
     status: str
     message: str
     total: int = 0
+    processed: int = 0
     compiled: int = 0
     failed: int = 0
+    current_files: list[str] = Field(default_factory=list)
+    cancel_requested: bool = False
+    concurrency: int = 1
+    limit: int | None = None
+    attempt: int = 1
+    retry_of: str | None = None
+    retryable: bool = False
+    error: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
 
 
 # ── 状态 ─────────────────────────────────────────────────────

@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from tests.test_api.conftest import _make_manifest, _write_manifest
+
+pytestmark = pytest.mark.fast
 
 
 class TestStatusEndpoint:
@@ -88,3 +93,60 @@ class TestStatusEndpoint:
         resp = client.get("/health")
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
+
+    def test_readiness_reports_a_usable_workspace(self, client, tmp_workspace) -> None:
+        """readiness 只在运行所需目录存在且可写时返回 ready"""
+        settings = SimpleNamespace(workspace=tmp_workspace)
+
+        with patch("dochris.api.app.get_settings", return_value=settings, create=True):
+            resp = client.get("/ready")
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "status": "ready",
+            "version": "1.4.0",
+            "checks": {
+                "workspace": {
+                    "status": "ok",
+                    "path": str(tmp_workspace),
+                    "writable": True,
+                },
+                "directories": {
+                    "status": "ok",
+                    "missing": [],
+                    "unwritable": [],
+                },
+            },
+        }
+
+    def test_readiness_rejects_a_missing_workspace(self, client, tmp_path) -> None:
+        """缺失工作区时 readiness 返回稳定的 503 诊断，不假装服务可用"""
+        missing_workspace = tmp_path / "not-created"
+        settings = SimpleNamespace(workspace=missing_workspace)
+
+        with patch("dochris.api.app.get_settings", return_value=settings, create=True):
+            resp = client.get("/ready")
+
+        assert resp.status_code == 503
+        assert resp.json() == {
+            "status": "not_ready",
+            "version": "1.4.0",
+            "checks": {
+                "workspace": {
+                    "status": "missing",
+                    "path": str(missing_workspace),
+                    "writable": False,
+                },
+                "directories": {
+                    "status": "missing",
+                    "missing": [
+                        "curated",
+                        "manifests/sources",
+                        "outputs",
+                        "raw",
+                        "wiki",
+                    ],
+                    "unwritable": [],
+                },
+            },
+        }

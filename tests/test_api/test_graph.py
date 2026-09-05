@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 from dochris.api.app import create_app
 
+pytestmark = pytest.mark.fast
+
 
 @pytest.fixture
 def client() -> TestClient:

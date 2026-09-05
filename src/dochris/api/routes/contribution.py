@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from dochris.api.schemas import QueryContributionRequest, QueryContributionResponse
 from dochris.quality.query_contribution import (
+    auto_contribute_from_query,
     discard_candidate,
     list_candidates,
     promote_candidate,
@@ -16,6 +19,39 @@ from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["contribution"])
+
+
+@router.post(
+    "/query/contribution",
+    response_model=QueryContributionResponse,
+    status_code=201,
+)
+async def create_query_contribution(
+    payload: QueryContributionRequest,
+) -> QueryContributionResponse:
+    """将客户端确认的一次完整查询结果显式写入候选区。"""
+    settings = get_settings()
+    query_result = payload.model_dump()
+    try:
+        contribution = await asyncio.to_thread(
+            auto_contribute_from_query,
+            workspace_path=settings.workspace,
+            query_result=query_result,
+        )
+    except OSError as exc:
+        logger.exception("查询贡献写入失败")
+        raise HTTPException(status_code=503, detail="候选知识存储暂不可用") from exc
+
+    if contribution is None:
+        raise HTTPException(status_code=422, detail="回答内容不足，未写入候选知识区")
+
+    return QueryContributionResponse(
+        id=contribution["id"],
+        quality_score=contribution["quality_score"],
+        needs_review=contribution.get("needs_review", True),
+        auto_promoted=contribution.get("auto_promoted", False),
+        status=contribution.get("status", "candidate"),
+    )
 
 
 @router.get("/candidates")

@@ -499,7 +499,7 @@ class CompilerWorker:
             settings = get_settings()
             data_dir = self.workspace / "data"
             store_cls = get_store(settings.vector_store)
-            self._vector_store = store_cls(persist_directory=str(data_dir))
+            self._vector_store = store_cls(persist_directory=str(data_dir))  # type: ignore[call-arg]
             return self._vector_store
         except ImportError:
             logger.debug("向量存储依赖未安装")
@@ -508,9 +508,7 @@ class CompilerWorker:
             logger.warning(f"向量存储初始化失败: {e}")
             return None
 
-    def _index_raw_chunks(
-        self, src_id: str, text: str, manifest: dict[str, Any]
-    ) -> None:
+    def _index_raw_chunks(self, src_id: str, text: str, manifest: dict[str, Any]) -> None:
         """将原文切分为 chunk 并索引到向量库的 chunks collection。
 
         由 INDEX_RAW_CHUNKS 配置控制开关，默认关闭。

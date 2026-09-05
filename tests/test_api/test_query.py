@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 
 from dochris.api.app import create_app
 
+pytestmark = pytest.mark.fast
+
 
 @pytest.fixture
 def client() -> TestClient:
@@ -87,6 +89,19 @@ class TestQueryEndpoint:
         assert resp.status_code == 200
         call_kwargs = mock_query.call_args
         assert call_kwargs[1]["top_k"] == 10
+
+    def test_get_query_never_enables_contribution_side_effects(self, client) -> None:
+        """兼容旧参数，但 GET 查询必须始终保持只读。"""
+        with patch("dochris.api.routes.query.do_query_async", new_callable=AsyncMock) as mock_query:
+            mock_query.return_value = _mock_query_result()
+
+            resp = client.get(
+                "/api/v1/query",
+                params={"q": "测试", "contribute": "true"},
+            )
+
+        assert resp.status_code == 200
+        assert mock_query.await_args.kwargs["contribute"] is False
 
     def test_query_missing_q(self, client) -> None:
         """缺少查询参数返回 422"""

@@ -4,14 +4,30 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from dochris import __version__
 from dochris.api.auth import verify_api_key
+from dochris.settings.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """Run non-blocking startup work without deprecated event hooks."""
+    await _preload_embedding_model()
+    try:
+        yield
+    finally:
+        compile_jobs = getattr(application.state, "compile_jobs", None)
+        if compile_jobs is not None:
+            await compile_jobs.close()
 
 
 def _get_cors_origins() -> list[str]:
@@ -23,11 +39,7 @@ def _get_cors_origins() -> list[str]:
         "CORS 使用默认 localhost 配置。生产环境请设置 DOCHRIS_CORS_ORIGINS 环境变量指定允许的来源。"
     )
     return [
-        "http://localhost:8000",
-        "http://localhost:7860",
         "http://localhost:3000",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:7860",
         "http://127.0.0.1:3000",
     ]
 
@@ -42,6 +54,7 @@ def create_app() -> FastAPI:
         title="dochris API",
         description="知识库编译系统 REST API",
         version=__version__,
+        lifespan=_lifespan,
     )
 
     application.add_middleware(
@@ -139,15 +152,72 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @application.get("/ready", tags=["health"])
+    async def readiness(response: Response) -> dict[str, object]:
+        """报告工作区是否满足 API 的最小运行条件。"""
+        workspace = Path(get_settings().workspace).expanduser()
+        required_directories = (
+            "curated",
+            "manifests/sources",
+            "outputs",
+            "raw",
+            "wiki",
+        )
+
+        workspace_exists = workspace.is_dir()
+        workspace_writable = workspace_exists and os.access(workspace, os.W_OK)
+        missing = sorted(
+            relative for relative in required_directories if not (workspace / relative).is_dir()
+        )
+        unwritable = sorted(
+            relative
+            for relative in required_directories
+            if (workspace / relative).is_dir() and not os.access(workspace / relative, os.W_OK)
+        )
+        is_ready = workspace_exists and workspace_writable and not missing and not unwritable
+        if not is_ready:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+        workspace_status = (
+            "missing" if not workspace_exists else "read_only" if not workspace_writable else "ok"
+        )
+        directories_status = "missing" if missing else "read_only" if unwritable else "ok"
+
+        return {
+            "status": "ready" if is_ready else "not_ready",
+            "version": __version__,
+            "checks": {
+                "workspace": {
+                    "status": workspace_status,
+                    "path": str(workspace),
+                    "writable": workspace_writable,
+                },
+                "directories": {
+                    "status": directories_status,
+                    "missing": missing,
+                    "unwritable": unwritable,
+                },
+            },
+        }
+
     return application
 
 
 app = create_app()
 
 
-@app.on_event("startup")
 async def _preload_embedding_model() -> None:
-    """应用启动时预加载嵌入模型，避免首次查询时冷启动延迟"""
+    """按需后台预加载嵌入模型，避免默认启动触发模型下载。"""
+    preload_enabled = os.environ.get("DOCHRIS_PRELOAD_EMBEDDING", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if not preload_enabled:
+        logger.debug("Embedding preload disabled; set DOCHRIS_PRELOAD_EMBEDDING=true to enable it")
+        return
+
     import threading
 
     def _load() -> None:

@@ -30,6 +30,11 @@ async def verify_api_key(request: Request) -> None:
 
     api_key = os.environ.get("DOCHRIS_API_KEY", "")
     if not api_key:
+        allow_unauthenticated = os.environ.get("DOCHRIS_ALLOW_UNAUTHENTICATED", "").strip().lower()
+        if allow_unauthenticated in {"1", "true", "yes", "on"}:
+            logger.debug(f"显式无认证模式访问: {path}")
+            return
+
         # 未配置 API Key 时，仅允许本地访问和测试客户端
         client_info = getattr(request, "client", None)
         client_host = client_info.host if client_info else ""

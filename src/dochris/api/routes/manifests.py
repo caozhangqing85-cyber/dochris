@@ -52,6 +52,8 @@ async def list_manifests(
                 "detailed_summary": summary.get("detailed_summary", ""),
                 "concepts": summary.get("concepts", []),
                 "quality_score": summary.get("quality_score"),
+                "provenance": summary.get("provenance"),
+                "lint": summary.get("lint"),
             }
         result.append(item)
     return result

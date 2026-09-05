@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Path
 
 from dochris.api.schemas import ErrorResponse, PromoteRequest, PromoteResponse
 from dochris.manifest import get_manifest
+from dochris.quality.quality_gate import quality_gate
 from dochris.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,14 @@ async def promote_artifact(
 
     try:
         if target_layer == "wiki":
+            gate = quality_gate(workspace, src_id)
+            if not gate["passed"]:
+                return PromoteResponse(
+                    src_id=src_id,
+                    target=target_layer,
+                    success=False,
+                    message=f"质量门禁未通过: {gate['reason']}",
+                )
             from dochris.promote import promote_to_wiki
 
             success = promote_to_wiki(workspace, src_id)

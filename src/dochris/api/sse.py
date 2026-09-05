@@ -122,28 +122,63 @@ def sse_retrieval_event(
     )
 
 
+def sse_rerank_event(reranked_count: int) -> str:
+    """构建已应用 Reranker 的阶段事件。"""
+    return sse_encode(
+        QueryStreamEventName.RERANK,
+        {
+            "v": SSE_EVENT_VERSION,
+            "reranked": True,
+            "result_count": reranked_count,
+        },
+    )
+
+
 def sse_answer_delta(text: str) -> str:
     """构建 answer_delta 事件。"""
     return sse_encode(QueryStreamEventName.ANSWER_DELTA, text)
 
 
-def sse_done_event(time_seconds: float, trace_id: str = "") -> str:
+def sse_done_event(
+    time_seconds: float,
+    trace_id: str = "",
+    contribution: dict[str, Any] | None = None,
+    timings: dict[str, float] | None = None,
+) -> str:
     """构建 done 事件。"""
     data: dict[str, Any] = {
         "v": SSE_EVENT_VERSION,
         "time_seconds": round(time_seconds, 2),
     }
+    if timings:
+        data["timings"] = timings
     if trace_id:
         data["trace_id"] = trace_id
+    if contribution:
+        data["contribution"] = contribution
     return sse_encode(QueryStreamEventName.DONE, data)
 
 
-def sse_error_event(message: str) -> str:
+def sse_error_event(
+    message: str,
+    *,
+    code: str = "stream_error",
+    terminal: bool = True,
+    trace_id: str = "",
+    timings: dict[str, float] | None = None,
+) -> str:
     """构建 error 事件。"""
-    return sse_encode(
-        QueryStreamEventName.ERROR,
-        {"v": SSE_EVENT_VERSION, "message": message},
-    )
+    data: dict[str, Any] = {
+        "v": SSE_EVENT_VERSION,
+        "message": message,
+        "code": code,
+        "terminal": terminal,
+    }
+    if trace_id:
+        data["trace_id"] = trace_id
+    if timings:
+        data["timings"] = timings
+    return sse_encode(QueryStreamEventName.ERROR, data)
 
 
 def sse_ping_event() -> str:
