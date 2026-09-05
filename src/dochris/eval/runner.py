@@ -35,6 +35,7 @@ class RAGEvaluator:
         k: 检索指标截断位置（默认 5）
         rerank: 是否启用 Reranker
         mode: 查询模式
+        concurrency: 有界并发数（1 = 串行；受 Provider 限流约束不应设过大）
     """
 
     def __init__(
@@ -42,10 +43,12 @@ class RAGEvaluator:
         k: int = 5,
         rerank: bool = False,
         mode: str = "combined",
+        concurrency: int = 1,
     ) -> None:
         self.k = k
         self.rerank = rerank
         self.mode = mode
+        self.concurrency = max(1, concurrency)
 
     async def evaluate_sample(
         self,
@@ -82,10 +85,9 @@ class RAGEvaluator:
         # 将检索结果转为 QueryEvidence
         evidence = self._extract_evidence(result)
 
-        # 计算检索指标
-        eval_result = evaluate_sample(sample, evidence, k=self.k)
-        # 直接复用本次查询的 answer，避免二次查询
-        eval_result.answer = result.get("answer", "")
+        # 计算检索指标 + 生成质量指标
+        answer = result.get("answer", "") or ""
+        eval_result = evaluate_sample(sample, evidence, k=self.k, answer=answer)
         return eval_result
 
     async def evaluate_dataset(
@@ -94,18 +96,25 @@ class RAGEvaluator:
     ) -> RAGEvalReport:
         """批量评估并输出汇总报告。
 
+        使用有界并发（semaphore）执行样本查询，避免打爆 Provider 限流。
+
         Args:
             samples: 评估样本列表
 
         Returns:
             RAGEvalReport 含逐条结果和汇总指标
         """
-        results: list[RAGEvalResult] = []
+        import asyncio
 
-        for i, sample in enumerate(samples, 1):
-            logger.info("评估样本 %d/%d: %s", i, len(samples), sample.id)
-            eval_result = await self.evaluate_sample(sample)
-            results.append(eval_result)
+        results: list[RAGEvalResult] = [None] * len(samples)  # type: ignore[list-item]
+        semaphore = asyncio.Semaphore(self.concurrency)
+
+        async def _bounded(idx: int, sample: RAGEvalSample) -> None:
+            async with semaphore:
+                logger.info("评估样本 %d/%d: %s", idx + 1, len(samples), sample.id)
+                results[idx] = await self.evaluate_sample(sample)
+
+        await asyncio.gather(*(_bounded(i, s) for i, s in enumerate(samples)))
 
         # 汇总
         summary = aggregate_metrics(results)
@@ -113,7 +122,9 @@ class RAGEvaluator:
             "k": self.k,
             "rerank": self.rerank,
             "mode": self.mode,
+            "concurrency": self.concurrency,
             "sample_count": len(samples),
+            **self._environment_metadata(),
         }
 
         report = RAGEvalReport(
@@ -127,6 +138,41 @@ class RAGEvaluator:
 
         logger.info("评估完成: %d 样本, 指标: %s", len(samples), summary)
         return report
+
+    @staticmethod
+    def _environment_metadata() -> dict[str, Any]:
+        """捕获评测环境元数据（RAG-06）：模型、provider、语料版本、commit。
+
+        每次评测报告都保存这些字段，保证结果可复现、可对比。
+        """
+        import subprocess
+
+        meta: dict[str, Any] = {}
+        try:
+            from dochris.settings import get_settings
+
+            settings = get_settings()
+            meta["model"] = settings.query_model
+            meta["llm_provider"] = settings.llm_provider
+            meta["embedding_model"] = settings.embedding_model
+            meta["vector_store"] = settings.vector_store
+            meta["workspace"] = settings.workspace
+        except Exception:
+            logger.debug("无法读取 settings 元数据", exc_info=True)
+
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if sha.returncode == 0:
+                meta["commit_sha"] = sha.stdout.strip()
+        except Exception:
+            logger.debug("无法读取 git commit SHA", exc_info=True)
+        return meta
 
     def _extract_evidence(self, query_result: dict[str, Any]) -> list[QueryEvidence]:
         """从查询结果中提取证据列表。

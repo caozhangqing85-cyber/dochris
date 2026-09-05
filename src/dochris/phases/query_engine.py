@@ -77,10 +77,12 @@ def get_vector_store() -> object:
     settings = get_settings()
     store_cls = get_store_cls(settings.vector_store)
 
-    # 创建存储实例
-    if settings.vector_store == "chromadb":
-        # ChromaDB 使用 data_dir 作为持久化目录
-        _vector_store_cache = store_cls(persist_directory=str(DATA_PATH))  # type: ignore[call-arg]
+    # 创建存储实例（embedding 模型统一来自 settings，RAG-09）
+    if settings.vector_store in ("chromadb", "faiss"):
+        _vector_store_cache = store_cls(
+            persist_directory=str(DATA_PATH),
+            embedding_model=settings.embedding_model,
+        )  # type: ignore[call-arg]
     elif settings.vector_store == "leann":
         # LEANN 使用 data_dir 下的子目录
         _vector_store_cache = store_cls(index_dir=str(DATA_PATH / "leann_indexes"))  # type: ignore[call-arg]

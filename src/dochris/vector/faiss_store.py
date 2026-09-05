@@ -35,16 +35,22 @@ class FAISSStore(BaseVectorStore):
     def __init__(
         self,
         persist_directory: str | Path | None = None,
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedding_model: str | None = None,
         **kwargs: Any,
     ) -> None:
         """初始化 FAISS 存储
 
         Args:
             persist_directory: 持久化目录路径
-            embedding_model: sentence-transformers 模型名称
+            embedding_model: sentence-transformers 模型名称；
+                None 时使用 ``settings.embedding_model``（BAAI/bge-small-zh-v1.5），
+                与 ChromaDB 保持一致（RAG-09）
             **kwargs: 其他参数（当前未使用）
         """
+        if embedding_model is None:
+            from dochris.settings import get_settings
+
+            embedding_model = get_settings().embedding_model
         self._persist_directory = (
             Path(persist_directory) if persist_directory else Path("./faiss_data")
         )

@@ -117,17 +117,97 @@ def _compute_ndcg(top_k: list[str], expected_set: set[str], k: int = 5) -> float
     return dcg / idcg if idcg > 0 else 0.0
 
 
+def compute_generation_metrics(
+    question: str,
+    answer: str,
+    evidence: list[QueryEvidence],
+) -> dict[str, float]:
+    """计算单条样本的生成质量指标（启发式，无需 LLM judge）。
+
+    - faithfulness：回答句子获得证据支持的比例（句内关键词与任一证据重叠）
+    - answer_relevance：问题关键词被回答覆盖的比例
+    - context_relevance：与问题相关的证据占全部证据的比例
+    - citation_correctness：回答中 [Sn] 引用可映射到证据的比例
+
+    这些是确定性启发式指标，作为 LLM-judge 落地前的基线。
+
+    Returns:
+        指标字典，值域 [0, 1]
+    """
+    import re
+
+    def _terms(text: str) -> set[str]:
+        """提取比较用词项：西文按词，中文按字符 bigram（无分词器时的确定性近似）。"""
+        terms: set[str] = set()
+        for token in re.findall(r"[\w\u4e00-\u9fff]+", text.lower()):
+            if len(token) < 2:
+                continue
+            if any("\u4e00" <= ch <= "\u9fff" for ch in token):
+                if len(token) == 2:
+                    terms.add(token)
+                else:
+                    terms.update(token[i : i + 2] for i in range(len(token) - 1))
+            else:
+                terms.add(token)
+        return terms
+
+    question_terms = _terms(question)
+    evidence_terms = [_terms(e.text) for e in evidence]
+    combined_evidence: set[str] = set()
+    for terms in evidence_terms:
+        combined_evidence |= terms
+
+    # faithfulness：逐句检查是否有证据词支持
+    sentences = [s for s in re.split(r"[。！？!?\n.]", answer) if len(s.strip()) >= 2]
+    faithfulness = 0.0
+    if sentences:
+        supported = 0
+        for sentence in sentences:
+            s_terms = _terms(sentence)
+            if s_terms & combined_evidence or "[s" in sentence.lower():
+                supported += 1
+        faithfulness = supported / len(sentences)
+
+    # answer relevance：问题关键词被回答覆盖的比例
+    answer_terms = _terms(answer)
+    answer_relevance = (
+        len(question_terms & answer_terms) / len(question_terms) if question_terms else 0.0
+    )
+
+    # context relevance：与问题相关的证据条数占比
+    context_relevance = 0.0
+    if evidence:
+        relevant = sum(1 for terms in evidence_terms if terms & question_terms)
+        context_relevance = relevant / len(evidence)
+
+    # citation correctness：[Sn] 引用编号需落在证据条数范围内
+    refs = re.findall(r"\[S(\d+)\]", answer)
+    citation_correctness = 0.0
+    if refs:
+        valid = sum(1 for r in refs if int(r) >= 1 and int(r) <= len(evidence))
+        citation_correctness = valid / len(refs)
+
+    return {
+        "faithfulness": round(faithfulness, 4),
+        "answer_relevance": round(answer_relevance, 4),
+        "context_relevance": round(context_relevance, 4),
+        "citation_correctness": round(citation_correctness, 4),
+    }
+
+
 def evaluate_sample(
     sample: RAGEvalSample,
     evidence: list[QueryEvidence],
     k: int = 5,
+    answer: str = "",
 ) -> RAGEvalResult:
-    """评估单个样本，计算检索指标并归因失败。
+    """评估单个样本，计算检索指标 + 生成指标并归因失败。
 
     Args:
         sample: 评估样本（含期望来源）
         evidence: 实际检索到的证据列表
         k: 截断位置
+        answer: 生成的回答（用于生成质量指标；空则跳过）
 
     Returns:
         RAGEvalResult 含指标和失败归因
@@ -141,6 +221,9 @@ def evaluate_sample(
         expected_ids=sample.expected_source_ids,
         k=k,
     )
+    # 生成质量指标（RAG-03/04/05）
+    if answer:
+        metrics.update(compute_generation_metrics(sample.question, answer, evidence))
 
     # 失败归因
     failures: list[str] = []
@@ -154,7 +237,7 @@ def evaluate_sample(
     return RAGEvalResult(
         sample_id=sample.id,
         question=sample.question,
-        answer="",  # generation 指标后续迭代
+        answer=answer,
         evidence=evidence,
         metrics=metrics,
         failures=failures,

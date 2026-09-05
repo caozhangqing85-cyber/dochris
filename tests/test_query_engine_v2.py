@@ -50,7 +50,11 @@ class TestGetVectorStore(unittest.TestCase):
         with patch("dochris.phases.query_engine.DATA_PATH", Path("/tmp/test")):
             result = get_vector_store()
 
-        mock_store_cls.assert_called_once_with(persist_directory=str(Path("/tmp/test")))
+        # get_vector_store 内部使用真实 settings 的 embedding_model（RAG-09 单一来源）
+        mock_store_cls.assert_called_once_with(
+            persist_directory=str(Path("/tmp/test")),
+            embedding_model="BAAI/bge-small-zh-v1.5",
+        )
         self.assertEqual(result, mock_store_instance)
 
     @patch("dochris.vector.get_store")

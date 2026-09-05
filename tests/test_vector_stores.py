@@ -404,10 +404,12 @@ class TestFAISSStore:
         assert FAISSStore.name == "faiss"
 
     def test_init_with_defaults(self) -> None:
-        """测试默认参数初始化"""
-        store = FAISSStore()
+        """测试默认参数初始化（默认 embedding 与 settings 一致，RAG-09）"""
+        with patch("dochris.settings.get_settings") as mock_settings:
+            mock_settings.return_value.embedding_model = "BAAI/bge-small-zh-v1.5"
+            store = FAISSStore()
         assert "faiss_data" in str(store._persist_directory)
-        assert store._embedding_model_name == "all-MiniLM-L6-v2"
+        assert store._embedding_model_name == "BAAI/bge-small-zh-v1.5"
         assert store._model is None
         assert store._indexes == {}
         assert store._documents == {}
@@ -434,7 +436,7 @@ class TestFAISSStore:
         mock_sentence_transformers.SentenceTransformer = MagicMock(return_value=mock_model)
 
         with patch.dict("sys.modules", {"sentence_transformers": mock_sentence_transformers}):
-            store = FAISSStore()
+            store = FAISSStore(embedding_model="all-MiniLM-L6-v2")
             model = store._get_model()
 
             assert model == mock_model
