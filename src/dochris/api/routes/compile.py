@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -69,6 +70,7 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
         ),
         concurrency=req.concurrency,
         limit=req.limit,
+        timeout_seconds=_compile_timeout_seconds(),
     )
     await asyncio.sleep(0)
 
@@ -206,6 +208,19 @@ async def cancel_compile_job(job_id: str, request: Request) -> CompileResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="编译任务不存在")
     return job.as_response()
+
+
+def _compile_timeout_seconds() -> float | None:
+    """读取任务级超时预算（JOB-06）。未配置则不限制。"""
+    raw = os.environ.get("DOCHRIS_COMPILE_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return None
+    try:
+        timeout = float(raw)
+        return timeout if timeout > 0 else None
+    except ValueError:
+        logger.warning("无效的 DOCHRIS_COMPILE_TIMEOUT_SECONDS=%r，忽略超时预算", raw)
+        return None
 
 
 def _get_compile_job_manager(request: Request) -> CompileJobManager:

@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from dochris.core.error_sanitizer import sanitize_error_text
+from dochris.observability.tracing import span
 from dochris.rag.schemas import SourceRef
 
 # 无事件时发送 SSE ping 的间隔（秒）
@@ -146,9 +147,10 @@ class QueryPipeline:
         """
         logger = self._cb.resolved_logger()
         try:
-            result = await asyncio.to_thread(
-                self._cb.retrieve, query, mode, top_k, logger, vector_raise_on_error=True
-            )
+            with span("query.retrieve", mode=mode, top_k=top_k):
+                result = await asyncio.to_thread(
+                    self._cb.retrieve, query, mode, top_k, logger, vector_raise_on_error=True
+                )
             return result, None
         except QueryPipelineError:
             raise
@@ -160,23 +162,25 @@ class QueryPipeline:
                 ) from exc
             warning = f"向量检索不可用，已降级为关键词检索: {sanitize_error_text(str(exc))}"
             logger.warning("%s", warning)
-            result = await asyncio.to_thread(
-                self._cb.retrieve,
-                query,
-                mode,
-                top_k,
-                logger,
-                vector_raise_on_error=False,
-                include_vector=False,
-            )
+            with span("query.retrieve_fallback", mode=mode):
+                result = await asyncio.to_thread(
+                    self._cb.retrieve,
+                    query,
+                    mode,
+                    top_k,
+                    logger,
+                    vector_raise_on_error=False,
+                    include_vector=False,
+                )
             return result, warning
 
     async def _rerank(self, query: str, result: dict[str, Any], top_k: int) -> dict[str, Any]:
         if self._cb.rerank is None:
             return result
-        return await asyncio.to_thread(
-            self._cb.rerank, query, result, top_k, self._cb.resolved_logger()
-        )
+        with span("query.rerank", top_k=top_k):
+            return await asyncio.to_thread(
+                self._cb.rerank, query, result, top_k, self._cb.resolved_logger()
+            )
 
     def _context_and_whitelist(
         self, query: str, result: dict[str, Any]
@@ -267,15 +271,16 @@ class QueryPipeline:
             context, source_map, _ = self._context_and_whitelist(query, result)
             provider = self._cb.provider_factory(logger)
             if provider is not None and self._cb.generate is not None:
-                answer = await self._cb.generate(
-                    query,
-                    result.get("concepts", []),
-                    result.get("summaries", []),
-                    result.get("vector_results", []),
-                    provider,
-                    logger,
-                    context=context,
-                )
+                with span("query.generate", mode=mode):
+                    answer = await self._cb.generate(
+                        query,
+                        result.get("concepts", []),
+                        result.get("summaries", []),
+                        result.get("vector_results", []),
+                        provider,
+                        logger,
+                        context=context,
+                    )
             else:
                 answer = _LLM_UNAVAILABLE_ANSWER
                 logger.warning("LLM provider 不可用，仅返回检索结果")

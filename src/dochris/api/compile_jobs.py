@@ -117,6 +117,7 @@ class CompileJobManager:
         limit: int | None = None,
         attempt: int = 1,
         retry_of: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> CompileJob:
         active = self.active()
         if active is not None:
@@ -132,25 +133,50 @@ class CompileJobManager:
         self._jobs[job.job_id] = job
         self._persist()
         self._tasks[job.job_id] = asyncio.create_task(
-            self._run(job, runner),
+            self._run(job, runner, timeout_seconds=timeout_seconds),
             name=f"dochris-compile-{job.job_id}",
         )
         return job
 
-    async def _run(self, job: CompileJob, runner: CompileRunner) -> None:
+    async def _run(
+        self,
+        job: CompileJob,
+        runner: CompileRunner,
+        *,
+        timeout_seconds: float | None = None,
+    ) -> None:
         job.status = "running"
         job.message = "编译进行中"
         job.started_at = _utc_now()
         self._persist()
-        try:
+
+        async def _invoke() -> None:
             await runner(
                 progress_callback=lambda **progress: self._update_progress(job, **progress)
             )
+
+        try:
+            if timeout_seconds is not None:
+                # JOB-06：任务级超时预算，防止后台编译无限占用
+                await asyncio.wait_for(_invoke(), timeout=timeout_seconds)
+            else:
+                await _invoke()
         except asyncio.CancelledError:
             job.status = "cancelled"
             job.message = "编译已取消"
             job.current_files = []
             job.finished_at = _utc_now()
+        except TimeoutError:
+            job.status = "failed"
+            job.message = "编译任务超时"
+            job.current_files = []
+            job.error = f"TimeoutError: 任务超过 {timeout_seconds:.0f}s 超时预算被终止"
+            job.finished_at = _utc_now()
+            logger.error(
+                "后台编译超时: %s",
+                job.error,
+                extra={"job_id": job.job_id},
+            )
         except Exception as exc:
             job.status = "failed"
             job.message = "编译任务失败"

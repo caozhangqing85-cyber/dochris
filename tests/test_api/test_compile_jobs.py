@@ -15,11 +15,14 @@ from dochris.api.compile_jobs import CompileJobManager
 pytestmark = pytest.mark.fast
 
 
-async def _wait_for_status(job: object, expected: str) -> None:
-    for _ in range(20):
+async def _wait_for_status(job: object, expected: str, timeout: float = 2.0) -> None:
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         if getattr(job, "status", None) == expected:
             return
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.01)
     pytest.fail(f"compile job did not reach {expected}")
 
 
@@ -256,3 +259,35 @@ async def test_close_cancels_and_waits_for_running_jobs() -> None:
     assert job.cancel_requested is True
     assert job.current_files == []
     assert manager.active() is None
+
+
+@pytest.mark.asyncio
+async def test_job_timeout_budget_marks_job_failed() -> None:
+    """JOB-06：超过任务级超时预算必须标记为 failed（含脱敏的超时说明）。"""
+    manager = CompileJobManager()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        await asyncio.sleep(5)
+
+    job = manager.start(total=1, runner=runner, timeout_seconds=0.05)
+    await _wait_for_status(job, "failed")
+
+    assert job.status == "failed"
+    assert job.message == "编译任务超时"
+    assert job.error is not None
+    assert job.error.startswith("TimeoutError:")
+    assert "0s" in job.error  # 0.05s 截断为 0s 预算描述
+    assert manager.active() is None
+
+
+@pytest.mark.asyncio
+async def test_job_without_timeout_budget_runs_to_completion() -> None:
+    """未配置超时预算时保持原有行为。"""
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        progress_callback(processed=1, compiled=1, failed=0, current_files=[])
+
+    manager = CompileJobManager()
+    job = manager.start(total=1, runner=runner, timeout_seconds=None)
+    await _wait_for_status(job, "completed")
+    assert job.status == "completed"
