@@ -1009,6 +1009,16 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
         return None
 
 
+def _query_timeout(settings: Any) -> float:
+    """查询链路 provider 超时预算（QRY-11）：settings.llm_timeout，非法时回退 60s。"""
+    raw = getattr(settings, "llm_timeout", None)
+    try:
+        timeout = float(raw)
+        return timeout if timeout > 0 else 60.0
+    except (TypeError, ValueError):
+        return 60.0
+
+
 def _try_create_provider(
     provider_name: str,
     api_key: str,
@@ -1016,6 +1026,7 @@ def _try_create_provider(
     model: str,
     logger: logging.Logger | None,
     source_label: str,
+    timeout: float = 60.0,
 ) -> BaseLLMProvider | None:
     """用给定参数通过 provider registry 创建 BaseLLMProvider。
 
@@ -1026,6 +1037,7 @@ def _try_create_provider(
         model: 模型名称
         logger: 日志记录器
         source_label: 来源标签（用于日志）
+        timeout: 请求超时预算（秒）
 
     Returns:
         创建成功的 provider，失败时返回 None
@@ -1038,7 +1050,7 @@ def _try_create_provider(
             model=model,
             max_tokens=2048,
             temperature=0.1,
-            timeout=60,
+            timeout=timeout,
         )
         if logger:
             logger.info(
@@ -1102,9 +1114,12 @@ def create_query_provider(logger: logging.Logger | None = None) -> BaseLLMProvid
             ("OpenClaw config", str(openclaw["apiKey"]), openclaw.get("baseUrl") or None)
         )
 
+    # QRY-11：provider 级超时预算
+    timeout_budget = _query_timeout(settings)
+
     for source_label, api_key, base_url in attempts:
         provider = _try_create_provider(
-            provider_name, api_key, base_url, model, logger, source_label
+            provider_name, api_key, base_url, model, logger, source_label, timeout_budget
         )
         if provider:
             _llm_client_cache = provider
@@ -1119,6 +1134,7 @@ def create_query_provider(logger: logging.Logger | None = None) -> BaseLLMProvid
             model,
             logger,
             "keyless local provider",
+            timeout_budget,
         )
         if provider:
             _llm_client_cache = provider

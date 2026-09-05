@@ -107,6 +107,28 @@ def create_app() -> FastAPI:
     from dochris.api.routes.schema import router as schema_router
     from dochris.api.routes.status import router as status_router
 
+    # 安全限流（SEC-02）：默认关闭，设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 启用
+    from dochris.api.ratelimit import SlidingWindowLimiter, rate_limit_per_minute
+
+    _limit_per_minute = rate_limit_per_minute()
+    if _limit_per_minute > 0:
+        limiter = SlidingWindowLimiter(_limit_per_minute, window_seconds=60.0)
+
+        @application.middleware("http")
+        async def _rate_limit_middleware(request, call_next):  # type: ignore[no-untyped-def]
+            if request.url.path.startswith("/api"):
+                client_host = request.client.host if request.client else "unknown"
+                if not limiter.allow(client_host):
+                    from fastapi.responses import JSONResponse
+
+                    return JSONResponse(
+                        status_code=429,
+                        content={"detail": "请求过于频繁，请稍后重试"},
+                    )
+            return await call_next(request)
+    else:
+        logger.info("API 限流未启用（设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 以启用）")
+
     # API 路由需要认证（开发模式下 DOCHRIS_API_KEY 为空则跳过）
     application.include_router(
         query_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)]
