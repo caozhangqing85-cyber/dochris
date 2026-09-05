@@ -70,6 +70,29 @@ def create_app() -> FastAPI:
 
     application.add_middleware(TracingMiddleware)
 
+    # 安全审计：写操作审计 + 操作 ID（SEC-04）
+    from dochris.api.audit import new_operation_id, record_operation
+
+    @application.middleware("http")
+    async def _audit_middleware(request, call_next):  # type: ignore[no-untyped-def]
+        operation_id = new_operation_id()
+        idempotency_key = request.headers.get("Idempotency-Key", "")
+        if request.method != "GET":
+            request.state.operation_id = operation_id
+        response = await call_next(request)
+        if request.method != "GET":
+            response.headers["X-Operation-ID"] = operation_id
+            record_operation(
+                operation_id=operation_id,
+                method=request.method,
+                path=request.url.path,
+                client=request.client.host if request.client else "",
+                trace_id=response.headers.get("X-Trace-ID", ""),
+                idempotency_key=idempotency_key,
+                status_code=response.status_code,
+            )
+        return response
+
     from dochris.api.routes.compile import router as compile_router
     from dochris.api.routes.config import router as config_router
     from dochris.api.routes.contribution import router as contribution_router

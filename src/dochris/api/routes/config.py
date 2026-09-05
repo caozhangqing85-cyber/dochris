@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from dochris.settings import get_settings
@@ -61,8 +61,22 @@ async def get_config() -> ConfigResponse:
 
 @router.put("/config", response_model=ConfigResponse)
 async def update_config(body: ConfigUpdateRequest) -> ConfigResponse:
-    """更新配置到 .env 文件"""
+    """更新配置到 .env 文件
+
+    SEC-03：受保护部署（配置了 DOCHRIS_API_KEY 且未显式放行）禁止在运行时
+    修改 workspace 根目录，避免通过 API 把数据/配置写入任意路径。
+    """
+    from dochris.api.audit import workspace_rewrite_allowed
     from dochris.settings.config import reset_settings
+
+    if body.workspace and not workspace_rewrite_allowed():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "当前安全模式禁止修改 workspace。"
+                "如确需运行时修改，请设置环境变量 DOCHRIS_ALLOW_WORKSPACE_REWRITE=true。"
+            ),
+        )
 
     settings = get_settings()
     updates: dict[str, str] = {}
