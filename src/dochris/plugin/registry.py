@@ -183,7 +183,7 @@ class PluginManager:
                 # Python 3.10+
                 from importlib.metadata import entry_points
             except ImportError:
-                from importlib_metadata import entry_points  # type: ignore[no-redef]
+                from importlib_metadata import entry_points  # type: ignore[no-redef,assignment]
 
             eps = entry_points(group=group)
             for ep in eps:

@@ -164,7 +164,9 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12：numpy 2.5+ 等 stub 使用 PEP 695 语法，3.11 目标无法解析其 stub。
+# 3.11 运行时兼容由 CI 的 3.11 测试矩阵兜底。
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
