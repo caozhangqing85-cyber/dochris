@@ -68,7 +68,9 @@ class OpenAICompatProvider(BaseLLMProvider):
                     base_url=self.api_base,
                     max_retries=0,
                     timeout=self.timeout,
-                    http_client=httpx.AsyncClient(
+                    # 部分 openai 版本的 stub 将 http_client 声明为 vendored httpx2，
+                    # 运行时两者同为 httpx.AsyncClient，忽略该 stub 漂移
+                    http_client=httpx.AsyncClient(  # type: ignore[arg-type]
                         # 连接池扩大：max_concurrency=3 配置需要匹配的连接池上限
                         limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
                         timeout=self.timeout,
