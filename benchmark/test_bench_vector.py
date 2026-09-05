@@ -3,9 +3,11 @@
 测试 ChromaDB 向量存储的增删查性能（使用内存模式）。
 """
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
-import pytest
+if TYPE_CHECKING:
+    from dochris.vector.chromadb_store import ChromaDBStore
 
 
 class TestVectorPerformance:

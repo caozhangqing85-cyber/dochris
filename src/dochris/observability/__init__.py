@@ -12,7 +12,7 @@
     obs.record_llm_usage(LLMUsage(...))
 """
 
-from collections.abc import Generator
+from contextlib import AbstractContextManager
 
 from dochris.observability.cost import CostEstimator
 from dochris.observability.metrics import (
@@ -67,7 +67,7 @@ class ObservabilityManager:
         """是否启用可观测性。"""
         return self._enabled
 
-    def span(self, name: str, **attrs: str | int | float) -> Generator[SpanContext, None, None]:
+    def span(self, name: str, **attrs: str | int | float) -> AbstractContextManager[SpanContext]:
         """创建 trace span（上下文管理器）。
 
         即使 disabled 也返回有效的 context manager，不报错。

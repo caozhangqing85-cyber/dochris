@@ -51,10 +51,7 @@ def create_reranker(
 
     if provider not in _PROVIDERS:
         available = ", ".join(sorted(_PROVIDERS.keys()))
-        raise ValueError(
-            f"不支持的 Reranker provider: '{provider}'。"
-            f"可选值: {available}"
-        )
+        raise ValueError(f"不支持的 Reranker provider: '{provider}'。可选值: {available}")
 
     cls = _PROVIDERS[provider]
 

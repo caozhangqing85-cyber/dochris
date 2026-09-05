@@ -61,9 +61,7 @@ class CrossEncoderReranker(BaseReranker):
                     "安装命令: pip install sentence-transformers"
                 ) from None
 
-            logger.info(
-                "加载 CrossEncoder 模型: %s (device=%s)", self._model_name, self._device
-            )
+            logger.info("加载 CrossEncoder 模型: %s (device=%s)", self._model_name, self._device)
             self._model = CrossEncoder(
                 self._model_name,
                 max_length=self._max_length,
@@ -97,6 +95,8 @@ class CrossEncoderReranker(BaseReranker):
             return []
 
         self._ensure_model()
+        if self._model is None:
+            raise RuntimeError("CrossEncoder model is not initialized")
 
         # 构建 query-document pairs
         pairs = [(query, c.text) for c in candidates]

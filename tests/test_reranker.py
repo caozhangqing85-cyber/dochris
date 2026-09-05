@@ -206,7 +206,9 @@ class TestRerankCandidatesIntegration(TestCase):
 
     @patch("dochris.rag.reranker.factory.create_reranker")
     @patch("dochris.phases.query_engine.get_settings")
-    def test_rerank_enabled_calls_reranker(self, mock_settings: MagicMock, mock_factory: MagicMock) -> None:
+    def test_rerank_enabled_calls_reranker(
+        self, mock_settings: MagicMock, mock_factory: MagicMock
+    ) -> None:
         """reranker_enabled='true' 时调用 create_reranker"""
         from dochris.phases.query_engine import rerank_candidates
 
@@ -225,9 +227,7 @@ class TestRerankCandidatesIntegration(TestCase):
         result = rerank_candidates("测试", candidates, top_k=2)
 
         self.assertEqual(len(result), 2)
-        mock_factory.assert_called_once_with(
-            provider="identity", model_name="test-model"
-        )
+        mock_factory.assert_called_once_with(provider="identity", model_name="test-model")
         mock_reranker.rerank.assert_called_once()
 
     def test_rerank_empty_candidates(self) -> None:
@@ -242,7 +242,9 @@ class TestRerankCandidatesIntegration(TestCase):
 
     @patch("dochris.rag.reranker.factory.create_reranker")
     @patch("dochris.phases.query_engine.get_settings")
-    def test_rerank_import_error_fallback(self, mock_settings: MagicMock, mock_factory: MagicMock) -> None:
+    def test_rerank_import_error_fallback(
+        self, mock_settings: MagicMock, mock_factory: MagicMock
+    ) -> None:
         """依赖缺失时回退到截断"""
         from dochris.phases.query_engine import rerank_candidates
 

@@ -22,10 +22,8 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # 上下文变量：当前请求的 trace_id 和 span 栈
-_current_trace_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "trace_id", default=""
-)
-_current_span_stack: contextvars.ContextVar[list[str]] = contextvars.ContextVar(
+_current_trace_id: contextvars.ContextVar[str] = contextvars.ContextVar("trace_id", default="")
+_current_span_stack: contextvars.ContextVar[list[str] | None] = contextvars.ContextVar(
     "span_stack", default=None
 )
 
@@ -104,7 +102,10 @@ def span(name: str, **attrs: Any) -> Generator[SpanContext, None, None]:
 
     logger.debug(
         "span:start name=%s span_id=%s trace_id=%s attrs=%s",
-        name, span_id, trace_id, attrs,
+        name,
+        span_id,
+        trace_id,
+        attrs,
     )
 
     try:

@@ -17,6 +17,7 @@ import os
 import shutil
 import sys
 import tempfile
+from filecmp import cmp as files_equal
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +56,12 @@ def _copy_file(src: Path, dst_dir: Path) -> Path:
     dst = dst_dir / src.name
     counter = 1
     while dst.exists():
+        try:
+            if files_equal(src, dst, shallow=False):
+                return dst
+        except OSError:
+            # 读取失败时继续走现有冲突保护，绝不覆盖未知目标。
+            pass
         if counter > MAX_COPY_RETRIES:
             raise ValueError(f"文件复制重名冲突超过上限 ({MAX_COPY_RETRIES}): {src.name}")
         stem = src.stem
@@ -392,7 +399,7 @@ def _update_chunks_trust_level(workspace_path: Path, src_id: str, trust_level: s
         # 只有启用了 chunk indexing 才尝试更新（否则无 chunks collection）
         if settings.index_raw_chunks == "true":
             store_cls = get_store(settings.vector_store)
-            store = store_cls(persist_directory=str(workspace_path / "data"))
+            store = store_cls(persist_directory=str(workspace_path / "data"))  # type: ignore[call-arg]
             if "chunks" not in store.list_collections():
                 return
             # 查找该 src_id 的所有 chunk id

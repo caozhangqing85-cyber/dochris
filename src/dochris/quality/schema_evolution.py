@@ -253,7 +253,7 @@ def auto_tag_manifests(workspace_path: Path) -> dict[str, Any]:
 
     # 收集每个 manifest 的概念列表
     manifest_concepts: dict[str, list[str]] = {}
-    concept_counter = Counter()
+    concept_counter: Counter[str] = Counter()
 
     for m in manifests:
         compiled = m.get("compiled_summary") or {}

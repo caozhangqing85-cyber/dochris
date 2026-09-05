@@ -7,17 +7,13 @@
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 
 class TestQueryPerformance:
     """查询引擎性能基准"""
 
-    def test_keyword_search(
-        self, benchmark, sample_text_medium: str, tmp_path: Path
-    ) -> None:
+    def test_keyword_search(self, benchmark, sample_text_medium: str, tmp_path: Path) -> None:
         """关键词搜索性能"""
         from dochris.phases.query_utils import _keyword_search
 

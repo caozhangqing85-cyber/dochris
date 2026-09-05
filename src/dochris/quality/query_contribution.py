@@ -211,7 +211,8 @@ def contribute_query_result(
         "content_hash": content_hash,
         "quality_score": quality_score,
         "status": "candidate",
-        "needs_review": quality_score < _get_min_quality_score() or contradiction["has_contradiction"],
+        "needs_review": quality_score < _get_min_quality_score()
+        or contradiction["has_contradiction"],
         "contradiction": contradiction,
         "answer_preview": (answer[:500] if len(answer) > 500 else answer),
         "source_manifest_ids": source_manifest_ids or [],
@@ -528,7 +529,30 @@ def auto_contribute_from_query(
         return None
 
     query_str = query_result.get("query", "")
-    concepts = query_result.get("concepts", [])
+    raw_concepts = query_result.get("concepts", [])
+    concepts = []
+    for concept in raw_concepts:
+        if not isinstance(concept, dict):
+            continue
+
+        name = str(concept.get("name") or concept.get("title") or "").strip()
+        explanation = str(
+            concept.get("explanation")
+            or concept.get("description")
+            or concept.get("content")
+            or concept.get("definition")
+            or ""
+        ).strip()
+        if not name:
+            continue
+
+        concepts.append(
+            {
+                **concept,
+                "name": name,
+                "explanation": explanation,
+            }
+        )
     mode = query_result.get("mode", "combined")
 
     # 提取引用的 manifest IDs

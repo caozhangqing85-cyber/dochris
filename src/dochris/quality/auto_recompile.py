@@ -115,7 +115,7 @@ def recompile_single(
         # 导入编译器（延迟导入避免循环依赖）
         from dochris.workers.compiler_worker import CompilerWorker
 
-        worker = CompilerWorker(workspace_path=str(workspace_path))
+        worker = CompilerWorker(workspace=workspace_path)
 
         # 重置 manifest 为 ingested 状态以允许重编译
         from dochris.manifest import update_manifest_status

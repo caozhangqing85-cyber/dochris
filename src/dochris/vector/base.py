@@ -134,9 +134,7 @@ class BaseVectorStore(ABC):
             ids: 要更新的文档 ID 列表
             metadatas: 对应的新元数据列表（长度须与 ids 一致）
         """
-        raise NotImplementedError(
-            f"{self.name} 后端不支持 update_metadata，请在子类实现"
-        )
+        raise NotImplementedError(f"{self.name} 后端不支持 update_metadata，请在子类实现")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"

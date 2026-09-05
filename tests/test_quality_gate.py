@@ -93,8 +93,9 @@ class TestQualityGate(unittest.TestCase):
         )
 
         result = quality_gate(self.temp_path, "SRC-0002")
-        # 质量分 60 低于阈值，应标记为 warning/低质量等级
-        # （质量分是软信号不阻止晋升，passed 取决于硬门禁 status/error/summary/lint）
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["checks"]["score"])
+        self.assertIn("分数", result["reason"])
         self.assertEqual(result["quality_score"], 60)
         self.assertIn(result["quality_level"], ("low", "medium"))
 

@@ -395,9 +395,7 @@ class FAISSStore(BaseVectorStore):
             metadatas: 对应的新元数据列表（长度须与 ids 一致）
         """
         if len(ids) != len(metadatas):
-            raise ValueError(
-                f"ids ({len(ids)}) 和 metadatas ({len(metadatas)}) 长度不匹配"
-            )
+            raise ValueError(f"ids ({len(ids)}) 和 metadatas ({len(metadatas)}) 长度不匹配")
         self._load_collection(collection)
         metas = self._metadatas.get(collection, {})
         for doc_id, new_meta in zip(ids, metadatas, strict=True):

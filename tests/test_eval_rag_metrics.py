@@ -315,7 +315,9 @@ class TestDatasetIO(TestCase):
             mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
         ) as f:
             f.write('{"id": "q1", "question": "什么是AI？", "expected_source_ids": ["SRC-0001"]}\n')
-            f.write('{"id": "q2", "question": "深度学习原理", "expected_source_ids": ["SRC-0002"], "ground_truth": "DL是..."}\n')
+            f.write(
+                '{"id": "q2", "question": "深度学习原理", "expected_source_ids": ["SRC-0002"], "ground_truth": "DL是..."}\n'
+            )
             f.write("# 注释行\n")
             f.write("\n")
             f.flush()

@@ -66,7 +66,9 @@ class CostEstimator:
             return None
 
         prompt_price, completion_price = pricing
-        cost = (prompt_tokens / 1000.0) * prompt_price + (completion_tokens / 1000.0) * completion_price
+        cost = (prompt_tokens / 1000.0) * prompt_price + (
+            completion_tokens / 1000.0
+        ) * completion_price
         return round(cost, 6)
 
     def _find_pricing(self, provider: str, model: str) -> tuple[float, float] | None:

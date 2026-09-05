@@ -87,7 +87,6 @@ async def generate_summary_with_llm(
         摘要字典，失败返回 None
     """
     from dochris.core.llm_client import LLMClient
-    from dochris.settings import get_settings
 
     settings = get_settings()
 
@@ -138,8 +137,14 @@ async def compile_with_model_fallback(
     Returns:
         摘要字典，失败返回 None
     """
+    if not text.strip():
+        logger.warning("待编译文本为空，跳过模型调用")
+        return None
+    if not model_chain:
+        logger.warning("模型链为空，跳过模型调用")
+        return None
+
     from dochris.core.llm_client import LLMClient
-    from dochris.settings import get_settings
 
     settings = get_settings()
 
@@ -477,18 +482,20 @@ async def run_compensate(
         batch_success = 0
         batch_failed = 0
 
-        tasks = []
+        tasks: list[asyncio.Task[tuple[str, bool, str, str]]] = []
         for m in batch:
             if shutdown_event.is_set():
                 break
             tasks.append(
-                compensate_single(
-                    m,
-                    logger,
-                    semaphore,
-                    adaptive_delay,
-                    MODEL_CHAIN,
-                    compensate_type,
+                asyncio.create_task(
+                    compensate_single(
+                        m,
+                        logger,
+                        semaphore,
+                        adaptive_delay,
+                        MODEL_CHAIN,
+                        compensate_type,
+                    )
                 )
             )
 

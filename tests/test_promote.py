@@ -119,6 +119,35 @@ class TestCopyFile:
         assert result.exists()
         assert result.read_text() == "内容"
 
+    def test_copy_file_reuses_identical_existing_content(self, tmp_path):
+        """重试晋升时复用相同内容，不能继续制造编号副本。"""
+        src = tmp_path / "file.txt"
+        src.write_text("相同内容", encoding="utf-8")
+        dst_dir = tmp_path / "dest"
+        dst_dir.mkdir()
+        existing = dst_dir / "file.txt"
+        existing.write_text("相同内容", encoding="utf-8")
+
+        result = _copy_file(src, dst_dir)
+
+        assert result == existing
+        assert sorted(path.name for path in dst_dir.iterdir()) == ["file.txt"]
+
+    def test_copy_file_reuses_identical_numbered_variant(self, tmp_path):
+        """若同名主文件不同但编号副本相同，必须复用已有副本。"""
+        src = tmp_path / "file.txt"
+        src.write_text("待晋升内容", encoding="utf-8")
+        dst_dir = tmp_path / "dest"
+        dst_dir.mkdir()
+        (dst_dir / "file.txt").write_text("另一版本", encoding="utf-8")
+        existing = dst_dir / "file_1.txt"
+        existing.write_text("待晋升内容", encoding="utf-8")
+
+        result = _copy_file(src, dst_dir)
+
+        assert result == existing
+        assert sorted(path.name for path in dst_dir.iterdir()) == ["file.txt", "file_1.txt"]
+
     def test_copy_file_max_retries_exceeded(self, tmp_path, monkeypatch):
         """测试超过最大重试次数"""
         # 降低 MAX_COPY_RETRIES 以加快测试

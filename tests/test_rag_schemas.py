@@ -12,6 +12,8 @@ import hashlib
 import unittest
 from unittest.mock import Mock, patch
 
+import pytest
+
 from dochris.rag.schemas import (
     RetrievalCandidate,
     SourceRef,
@@ -19,6 +21,8 @@ from dochris.rag.schemas import (
     normalize_score,
     normalize_vector_score,
 )
+
+pytestmark = pytest.mark.fast
 
 # ============================================================
 # 归一化函数测试

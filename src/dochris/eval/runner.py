@@ -243,24 +243,28 @@ class RAGEvaluator:
         for key, value in report.config.items():
             lines.append(f"- {key}: {value}")
 
-        lines.extend([
-            "",
-            "## 汇总指标",
-            "",
-            "| 指标 | 值 |",
-            "|------|-----|",
-        ])
+        lines.extend(
+            [
+                "",
+                "## 汇总指标",
+                "",
+                "| 指标 | 值 |",
+                "|------|-----|",
+            ]
+        )
         for key, value in report.summary.items():
             lines.append(f"| {key} | {value:.4f} |")
 
         # 失败样本
         failed = [r for r in report.results if r.failures]
         if failed:
-            lines.extend([
-                "",
-                f"## 失败样本 ({len(failed)})",
-                "",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"## 失败样本 ({len(failed)})",
+                    "",
+                ]
+            )
             for r in failed[:10]:
                 lines.append(f"### {r.sample_id}: {r.question}")
                 lines.append(f"- 指标: {r.metrics}")

@@ -1,7 +1,6 @@
 """文件解析性能基准测试"""
-from pathlib import Path
 
-import pytest
+from pathlib import Path
 
 
 class TestParserPerformance:

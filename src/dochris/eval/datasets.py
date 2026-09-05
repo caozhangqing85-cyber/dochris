@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from dochris.eval.schemas import RAGEvalSample
 
@@ -72,7 +73,7 @@ def save_dataset(samples: list[RAGEvalSample], path: str | Path) -> None:
 
     with open(path, "w", encoding="utf-8") as f:
         for sample in samples:
-            data = {
+            data: dict[str, Any] = {
                 "id": sample.id,
                 "question": sample.question,
                 "expected_source_ids": sample.expected_source_ids,

@@ -48,9 +48,7 @@ class SemanticChunker(BaseChunker):
         embedding_func: Any | None = None,
     ) -> None:
         if not 0 < breakpoint_percentile <= 100:
-            raise ValueError(
-                f"breakpoint_percentile 必须在 (0, 100]，得到 {breakpoint_percentile}"
-            )
+            raise ValueError(f"breakpoint_percentile 必须在 (0, 100]，得到 {breakpoint_percentile}")
         if chunk_size <= 0:
             raise ValueError(f"chunk_size 必须为正数，得到 {chunk_size}")
         if overlap < 0 or overlap >= chunk_size:
@@ -171,9 +169,7 @@ class SemanticChunker(BaseChunker):
                 result.append(p)
         return result if result else [text]
 
-    def _compute_adjacent_distances(
-        self, sentences: list[str], embedder: Any
-    ) -> list[float]:
+    def _compute_adjacent_distances(self, sentences: list[str], embedder: Any) -> list[float]:
         """计算相邻句子的 embedding 余弦距离（1 - cosine_similarity）。"""
         import numpy as np
 

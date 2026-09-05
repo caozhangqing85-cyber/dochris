@@ -162,13 +162,12 @@ def quality_gate(
 ) -> dict[str, Any]:
     """质量门禁检查
 
-    质量分数作为信号展示，不作为硬门禁。真正的门禁条件：
+    自动晋升必须同时满足：
     1. status 必须是 "compiled"
     2. error_message 必须为空
     3. summary 必须存在
     4. lint 必须通过（无 error 级别问题）
-
-    质量分数 < min_score 时标记为 warning，但不阻止晋升。
+    5. quality_score 必须达到 min_score
 
     Returns:
         {
@@ -177,7 +176,13 @@ def quality_gate(
             "reason": str,
             "quality_score": int,
             "quality_level": "high" | "medium" | "low",
-            "checks": { "status": bool, "error": bool, "summary": bool, "lint": bool },
+            "checks": {
+                "status": bool,
+                "error": bool,
+                "summary": bool,
+                "lint": bool,
+                "score": bool,
+            },
         }
     """
     # 延迟读取 settings，支持运行时/测试重置（min_score 默认 None 表示动态读）
@@ -219,7 +224,7 @@ def quality_gate(
     if provenance_data and isinstance(provenance_data, dict):
         provenance_label = provenance_data.get("overall_label")
 
-    # 质量分数 → 信号灯级别（信息性，不阻止晋升）
+    # 质量分数 → 信号灯级别，并作为自动晋升门禁
     quality_score = manifest.get("quality_score", 0)
     if quality_score >= 80:
         quality_level = "high"
@@ -229,12 +234,12 @@ def quality_gate(
         quality_level = "low"
     score_warning = quality_score < min_score
 
-    # 真正的门禁条件（不含分数）
     checks = {
         "status": manifest["status"] == "compiled",
         "error": manifest.get("error_message") is None,
         "summary": manifest.get("summary") is not None,
         "lint": lint_passed,
+        "score": not score_warning,
     }
 
     all_passed = all(checks.values())
@@ -248,6 +253,8 @@ def quality_gate(
         reasons.append("缺少 summary 数据")
     if not checks["lint"]:
         reasons.append(f"Lint 未通过: {'; '.join(lint_errors[:3])}")
+    if not checks["score"]:
+        reasons.append(f"质量分数 {quality_score} 低于门槛 {min_score}")
 
     result = {
         "passed": all_passed,
@@ -443,9 +450,7 @@ def generate_report(workspace_path: Path) -> dict:
     # 满足 promote 条件的 manifest
     min_score = _get_min_quality_score()
     promotable = [
-        m
-        for m in manifests
-        if m["status"] == "compiled" and m.get("quality_score", 0) >= min_score
+        m for m in manifests if m["status"] == "compiled" and m.get("quality_score", 0) >= min_score
     ]
 
     report = {

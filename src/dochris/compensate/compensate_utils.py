@@ -6,10 +6,9 @@ import datetime
 import logging
 import sys
 from enum import Enum
+from pathlib import Path
 
 from dochris.settings import get_default_workspace
-
-KB_PATH = get_default_workspace()
 
 # ============================================================
 # 配置
@@ -55,8 +54,10 @@ class CompensateError(Enum):
 # ============================================================
 
 
-def setup_logging() -> logging.Logger:
-    log_dir = KB_PATH / "logs"
+def setup_logging(workspace_path: Path | None = None) -> logging.Logger:
+    """Configure compensation logging without resolving the workspace at import time."""
+    workspace = get_default_workspace() if workspace_path is None else Path(workspace_path)
+    log_dir = workspace / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"compensate_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logging.basicConfig(

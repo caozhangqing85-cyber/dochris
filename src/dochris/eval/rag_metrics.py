@@ -133,9 +133,7 @@ def evaluate_sample(
         RAGEvalResult 含指标和失败归因
     """
     # 提取检索到的 manifest_id 列表
-    retrieved_ids = [
-        e.manifest_id for e in evidence if e.manifest_id is not None
-    ]
+    retrieved_ids = [e.manifest_id for e in evidence if e.manifest_id is not None]
 
     # 计算检索指标
     metrics = compute_retrieval_metrics(

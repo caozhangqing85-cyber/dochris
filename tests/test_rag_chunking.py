@@ -185,7 +185,9 @@ class TestSemanticChunker(TestCase):
         chunker = SemanticChunker(
             chunk_size=200, overlap=0, embedding_func=mock_embed, breakpoint_percentile=90.0
         )
-        text = "短句。这是一个稍长一点的句子。短。又是短句。这个句子非常非常非常长用于制造语义跳跃。"
+        text = (
+            "短句。这是一个稍长一点的句子。短。又是短句。这个句子非常非常非常长用于制造语义跳跃。"
+        )
         chunks = chunker.split(text, ChunkMetadata(src_id="S1"))
         self.assertGreaterEqual(len(chunks), 1)
 

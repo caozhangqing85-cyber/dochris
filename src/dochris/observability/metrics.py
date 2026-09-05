@@ -110,10 +110,15 @@ def _register_metrics() -> None:
     使用 try/except 防止热重载或测试场景下重复注册导致 ValueError。
     """
     global \
-        _query_counter, _query_latency, \
-        _llm_counter, _llm_latency, _llm_tokens, \
-        _retrieval_counter, _retrieval_latency, \
-        _rerank_counter, _rerank_latency, \
+        _query_counter, \
+        _query_latency, \
+        _llm_counter, \
+        _llm_latency, \
+        _llm_tokens, \
+        _retrieval_counter, \
+        _retrieval_latency, \
+        _rerank_counter, \
+        _rerank_latency, \
         _cache_counter
 
     from prometheus_client import Counter, Histogram
@@ -144,7 +149,7 @@ def _register_metrics() -> None:
         _llm_tokens = Counter(
             "dochris_llm_tokens_total",
             "Total LLM token usage",
-            ["provider", "model", "type"],  # type: prompt / completion
+            ["provider", "model", "type"],  # token type: prompt / completion
         )
         _retrieval_counter = Counter(
             "dochris_retrieval_total",
@@ -199,17 +204,17 @@ def record_llm_usage(usage: LLMUsage) -> None:
         status=status,
     ).inc()
     if usage.latency_ms > 0 and _llm_latency is not None:
-        _llm_latency.labels(
-            provider=usage.provider, model=usage.model
-        ).observe(usage.latency_ms / 1000.0)
+        _llm_latency.labels(provider=usage.provider, model=usage.model).observe(
+            usage.latency_ms / 1000.0
+        )
     if usage.prompt_tokens > 0 and _llm_tokens is not None:
-        _llm_tokens.labels(
-            provider=usage.provider, model=usage.model, type="prompt"
-        ).inc(usage.prompt_tokens)
+        _llm_tokens.labels(provider=usage.provider, model=usage.model, type="prompt").inc(
+            usage.prompt_tokens
+        )
     if usage.completion_tokens > 0 and _llm_tokens is not None:
-        _llm_tokens.labels(
-            provider=usage.provider, model=usage.model, type="completion"
-        ).inc(usage.completion_tokens)
+        _llm_tokens.labels(provider=usage.provider, model=usage.model, type="completion").inc(
+            usage.completion_tokens
+        )
 
 
 def record_retrieval(
@@ -253,6 +258,7 @@ def generate_metrics() -> str:
     try:
         from prometheus_client import generate_latest
 
-        return generate_latest().decode("utf-8")
+        metric_bytes: bytes = generate_latest()
+        return metric_bytes.decode("utf-8")
     except ImportError:
         return ""

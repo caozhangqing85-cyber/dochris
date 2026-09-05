@@ -59,14 +59,15 @@ def create_chunker(
             "可通过 CHUNK_STRATEGY 环境变量配置。"
         )
 
-    # semantic 策略接受额外的 embedding 相关参数
     if strategy == "semantic":
-        return cls(  # type: ignore[call-arg]
+        return SemanticChunker(
             chunk_size=chunk_size,
             overlap=overlap,
             **kwargs,
         )
-    return cls(chunk_size=chunk_size, overlap=overlap)
+    if strategy == "recursive":
+        return RecursiveChunker(chunk_size=chunk_size, overlap=overlap)
+    return StructureChunker(chunk_size=chunk_size, overlap=overlap)
 
 
 __all__ = [

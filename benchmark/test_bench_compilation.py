@@ -8,8 +8,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestCompilationPerformance:
     """编译流水线性能基准"""

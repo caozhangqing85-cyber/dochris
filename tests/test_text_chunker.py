@@ -1,6 +1,10 @@
 """测试 dochris.core.text_chunker 模块"""
 
+import pytest
+
 from dochris.core.text_chunker import TextChunk, semantic_chunk
+
+pytestmark = pytest.mark.fast
 
 
 class TestTextChunk:

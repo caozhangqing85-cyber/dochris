@@ -1,5 +1,4 @@
 """质量评分性能基准测试"""
-import pytest
 
 
 class TestQualityPerformance:
