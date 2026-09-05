@@ -10,8 +10,6 @@
 [![Downloads](https://img.shields.io/pypi/dm/dochris)](https://pypi.org/project/dochris/)
 [![Coverage](https://img.shields.io/codecov/c/github/caozhangqing85-cyber/dochris)](https://codecov.io/github/caozhangqing85-cyber/dochris)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-material-blue)](https://caozhangqing85-cyber.github.io/dochris/)
-[![Tests](https://img.shields.io/badge/tests-2402%20passing-brightgreen)](https://github.com/caozhangqing85-cyber/dochris)
-[![Version](https://img.shields.io/badge/version-1.4.0-orange)](https://pypi.org/project/dochris/)
 
 **"Doc"** 代表文档，**"Chris"** 是作者的名字。Dochris 意味着：**让文档为 Chris 服务** — 将海量信息锻造为可用的知识。
 
@@ -434,13 +432,13 @@ VECTOR_STORE=faiss
 
 | 指标 | 数值 |
 |------|------|
-| 测试 | 2402 passing |
-| 覆盖率 | 76.03% |
+| 测试 | 见 CI 状态徽章（动态） |
+| 覆盖率 | 见 Codecov 徽章（动态） |
 | 类型检查 | mypy 0 errors |
 | 代码规范 | ruff 0 errors |
 | Python | 3.11+ |
 | 许可证 | MIT |
-| 版本 | 1.4.0 |
+| 版本 | 见 PyPI 徽章（动态） |
 
 ## 常见问题
 

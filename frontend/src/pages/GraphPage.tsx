@@ -573,8 +573,18 @@ export default function GraphPage() {
               {/* Concept detail */}
               {'conceptData' in selectedNode && (selectedNode as SemanticNode).conceptData && (
                 <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-2)' }}>
-                    概念说明
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)' }}>
+                      概念说明
+                    </span>
+                    {selectedNode.metadata?.derived === true && (
+                      <span title="后端图谱未收录此概念，由前端从 manifest 派生补全" style={{
+                        fontSize: '10px', fontWeight: 600, color: 'var(--status-warning)',
+                        background: 'var(--status-warning-bg)', borderRadius: 'var(--radius-full)', padding: '1px 6px',
+                      }}>
+                        前端派生
+                      </span>
+                    )}
                   </div>
                   <p style={{ fontSize: 'var(--text-sm)', lineHeight: 'var(--leading-relaxed)', color: 'var(--text-secondary)', margin: 0, fontWeight: 400 }}>
                     {(selectedNode as SemanticNode).conceptData!.explanation || '暂无说明'}

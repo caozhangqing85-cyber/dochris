@@ -125,7 +125,8 @@ export function buildSemanticGraph(
           id: conceptId,
           label: cluster.name,
           node_type: 'concept',
-          metadata: { sourceCount: String(cluster.sourceCount) },
+          // UX-01：标记为前端派生节点（后端图谱缺失时由 manifests 补全）
+          metadata: { sourceCount: String(cluster.sourceCount), derived: true },
         })
       }
     }
