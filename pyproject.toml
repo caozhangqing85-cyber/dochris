@@ -177,6 +177,7 @@ module = [
     "fitz",
     "importlib_metadata",
     "leann",
+    "numpy",
     "pdfplumber",
     "prometheus_client",
     "pypdf",
