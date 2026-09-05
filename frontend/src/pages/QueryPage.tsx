@@ -3,7 +3,7 @@ import {
   Search, Loader2, Brain, Sparkles, Database, FileText,
   BookmarkPlus, BookmarkCheck, ChevronDown,
   MessageSquare, Tag, Zap, ToggleLeft, ToggleRight,
-  X, History, Star, Download,
+  X, History, Star, Download, AlertTriangle,
 } from 'lucide-react'
 import { queryKnowledge, queryKnowledgeStream, contributeQueryResult, getManifests, ApiError } from '@/lib/api'
 import type { ContributionMeta, PhaseTimings, StreamErrorEvent } from '@/lib/api'
@@ -295,6 +295,7 @@ export default function QueryPage() {
   const [elapsed, setElapsed] = useState(0)
   const [contributionReceipt, setContributionReceipt] = useState<ContributionMeta | null>(null)
   const [phaseTimings, setPhaseTimings] = useState<PhaseTimings | null>(null)
+  const [degradationNotice, setDegradationNotice] = useState<string | null>(null)
   const [cancellable, setCancellable] = useState(false)
 
   // UI state
@@ -449,7 +450,7 @@ export default function QueryPage() {
     const queryText = q || query
     if (!queryText.trim()) return
     const useMode = overrideMode || mode
-    setLoading(true); setError(''); setQueryError(null); setResult(null); setElapsed(0); setContributionReceipt(null); setPhaseTimings(null); setCancellable(false); setActiveTab('answer')
+    setLoading(true); setError(''); setQueryError(null); setResult(null); setElapsed(0); setContributionReceipt(null); setPhaseTimings(null); setDegradationNotice(null); setCancellable(false); setActiveTab('answer')
     if (!q) setQuery(queryText)
     const start = Date.now()
 
@@ -490,6 +491,10 @@ export default function QueryPage() {
                 setResult({ ...streamResult, answer: fullAnswer || '' })
               }
             },
+            onWarning: (warning) => {
+              if (!isActiveRequest()) return
+              setDegradationNotice(warning.message)
+            },
             onChunk: (text) => {
               if (!isActiveRequest()) return
               fullAnswer += text
@@ -497,18 +502,34 @@ export default function QueryPage() {
                 setResult({ ...streamResult, answer: fullAnswer })
               }
             },
-            onDone: (finalTime, _traceId, _legacyContributionMeta, donePhaseTimings) => {
+            onDone: (finalTime, _traceId, _legacyContributionMeta, donePhaseTimings, done) => {
               if (!isActiveRequest()) return
               const elapsedSec = finalTime || (Date.now() - start) / 1000
               setElapsed(Math.round(elapsedSec * 10) / 10)
               setPhaseTimings(donePhaseTimings ?? null)
+              // done.final_answer 是后端清理后的最终答案，与非流式完全一致；
+              // 用它替换增量拼接文本，保证两种模式结果相同
+              const finalAnswer = done?.final_answer ?? fullAnswer
               if (streamResult) {
-                const finalRes = { ...streamResult, answer: fullAnswer, time_seconds: finalTime || elapsedSec }
+                const finalRes: QueryResponse = {
+                  ...streamResult,
+                  answer: finalAnswer,
+                  time_seconds: finalTime || elapsedSec,
+                  citations: (done?.citations ?? []).map(c => ({
+                    ref: c.ref,
+                    manifest_id: c.manifest_id ?? null,
+                    source: c.source ?? '',
+                    channel: c.channel ?? '',
+                    text_hash: c.text_hash ?? '',
+                    score: c.score ?? 0,
+                  })),
+                  unresolved_refs: done?.unresolved_refs ?? [],
+                }
                 setResult(finalRes)
                 void persistContribution(finalRes)
                 const entry: HistoryEntry = {
                   query: queryText, mode: useMode, timestamp: Date.now(),
-                  answerPreview: fullAnswer.slice(0, 80),
+                  answerPreview: finalAnswer.slice(0, 80),
                 }
                 // 函数式更新：避免依赖 history 闭包（防快速连查时旧闭包覆盖新历史）
                 setHistory(prev => {
@@ -995,6 +1016,30 @@ export default function QueryPage() {
                 border: '1px solid var(--border-default)', background: 'var(--bg-card)',
               }}>
                 <StreamingMarkdown content={result.answer} streaming={loading} />
+                {(result.citations?.length || result.unresolved_refs?.length) ? (
+                  <div style={{
+                    marginTop: 'var(--space-4)', paddingTop: 'var(--space-3)',
+                    borderTop: '1px solid var(--border-subtle)',
+                  }}>
+                    <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-1)' }}>
+                      引用来源
+                    </div>
+                    <ul style={{ margin: 0, paddingInlineStart: '18px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                      {(result.citations ?? []).map(c => (
+                        <li key={c.ref} style={{ wordBreak: 'break-word' }}>
+                          <span style={{ fontWeight: 600 }}>[{c.ref}]</span>
+                          {' '}{c.manifest_id || c.source || '未知来源'}
+                          {' · '}{c.channel}
+                        </li>
+                      ))}
+                      {(result.unresolved_refs ?? []).length > 0 && (
+                        <li style={{ color: 'var(--status-warning)' }}>
+                          未匹配来源：{(result.unresolved_refs ?? []).join('、')}
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             )}
             {activeTab === 'documents' && result.summaries && result.summaries.length > 0 && (
@@ -1040,6 +1085,17 @@ export default function QueryPage() {
                 {queryError.retryable ? ' · 可重试' : ''}
               </div>
             </div>
+          </div>
+        )}
+
+        {degradationNotice && (
+          <div style={{
+            padding: 'var(--space-3) var(--space-4)', borderRadius: '4px', marginBottom: 'var(--space-4)',
+            background: 'var(--status-warning-bg)', color: 'var(--status-warning)', fontSize: 'var(--text-xs)',
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          }} role="status">
+            <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+            <span>{degradationNotice}</span>
           </div>
         )}
 

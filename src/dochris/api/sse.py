@@ -33,6 +33,7 @@ class QueryStreamEventName(StrEnum):
     META = "meta"
     RETRIEVAL = "retrieval"
     RERANK = "rerank"
+    WARNING = "warning"
     ANSWER_DELTA = "answer_delta"
     DONE = "done"
     ERROR = "error"
@@ -134,6 +135,18 @@ def sse_rerank_event(reranked_count: int) -> str:
     )
 
 
+def sse_warning_event(
+    message: str,
+    *,
+    code: str = "warning",
+) -> str:
+    """构建非致命 warning 事件（如 combined 模式向量降级）。"""
+    return sse_encode(
+        QueryStreamEventName.WARNING,
+        {"v": SSE_EVENT_VERSION, "message": message, "code": code},
+    )
+
+
 def sse_answer_delta(text: str) -> str:
     """构建 answer_delta 事件。"""
     return sse_encode(QueryStreamEventName.ANSWER_DELTA, text)
@@ -144,8 +157,15 @@ def sse_done_event(
     trace_id: str = "",
     contribution: dict[str, Any] | None = None,
     timings: dict[str, float] | None = None,
+    final_answer: str | None = None,
+    citations: list[dict[str, Any]] | None = None,
+    unresolved_refs: list[str] | None = None,
 ) -> str:
-    """构建 done 事件。"""
+    """构建 done 事件。
+
+    final_answer 是与非流式一致的后处理答案；前端应在收到 done 时用其
+    替换增量渲染的文本，保证两种模式最终答案完全一致。
+    """
     data: dict[str, Any] = {
         "v": SSE_EVENT_VERSION,
         "time_seconds": round(time_seconds, 2),
@@ -156,6 +176,12 @@ def sse_done_event(
         data["trace_id"] = trace_id
     if contribution:
         data["contribution"] = contribution
+    if final_answer is not None:
+        data["final_answer"] = final_answer
+    if citations:
+        data["citations"] = citations
+    if unresolved_refs:
+        data["unresolved_refs"] = unresolved_refs
     return sse_encode(QueryStreamEventName.DONE, data)
 
 

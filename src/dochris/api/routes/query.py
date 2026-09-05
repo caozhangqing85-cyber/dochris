@@ -1,4 +1,8 @@
-"""查询路由 — GET /api/v1/query, GET /api/v1/query/stream"""
+"""查询路由 — GET /api/v1/query, GET /api/v1/query/stream
+
+两个端点都通过 QueryPipeline 执行同一套 retrieve → rerank → context →
+generate 编排；路由层只负责协议映射（JSON 响应 / SSE 事件）。
+"""
 
 from __future__ import annotations
 
@@ -10,10 +14,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from dochris.api.schemas import ErrorResponse, QueryResponse, SearchResult
+from dochris.api.schemas import Citation, ErrorResponse, QueryResponse, SearchResult
 from dochris.observability.tracing import get_current_trace_id
 from dochris.phases import query_engine
 from dochris.phases.phase3_query import query_async as do_query_async
+from dochris.phases.query_pipeline import (
+    QueryPipelineError,
+    stream_with_ping,
+)
 from dochris.rag.schemas import normalize_score
 
 logger = logging.getLogger(__name__)
@@ -82,11 +90,14 @@ async def query_knowledge_base(
             workspace_path=None,
             rerank=rerank,
         )
+    except QueryPipelineError as exc:
+        logger.warning("查询类型化失败 (%s): %s", exc.code, exc.message)
+        raise HTTPException(status_code=503, detail=f"{exc.code}: {exc.message}") from exc
     except Exception as exc:
         logger.exception("查询失败")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    response = QueryResponse(
+    return QueryResponse(
         query=result["query"],
         mode=result["mode"],
         concepts=[_to_search_result(r, "keyword") for r in result.get("concepts", [])],
@@ -96,10 +107,15 @@ async def query_knowledge_base(
         answer=result.get("answer"),
         time_seconds=result.get("time_seconds", 0.0),
         reranked="reranker" in result.get("search_sources", []),
+        citations=[
+            Citation(**item)
+            for item in result.get("citations", [])  # type: ignore[misc]
+        ],
+        unresolved_refs=result.get("unresolved_refs", []),
+        warnings=result.get("warnings", []),
+        timings=result.get("timings", {}),
         trace_id=get_current_trace_id(),
     )
-
-    return response
 
 
 @router.get(
@@ -115,190 +131,116 @@ async def query_stream(
 ) -> StreamingResponse:
     """流式查询知识库 — SSE 端点
 
-    先返回检索结果（concepts, summaries, vector_results），
-    然后流式返回 LLM 生成的回答。
+    与 GET /query 共用 QueryPipeline 编排。事件顺序：
+    meta → (warning) → retrieval → (rerank + retrieval) → answer_delta* → done。
 
     SSE 事件格式 (v=1):
     - event: meta         — 查询元信息 (query, mode, search_sources)
+    - event: warning      — 非致命降级（如 combined 模式向量检索不可用）
     - event: retrieval    — 检索结果 JSON (concepts + summaries + vector_results)
+    - event: rerank       — 已应用 Reranker
     - event: answer_delta — LLM 回答的一个文本 chunk
-    - event: done         — 流结束（含 trace_id）
-    - event: error        — 错误信息
-    - event: ping         — 心跳保活
+    - event: done         — 流结束（含 final_answer / citations / timings / trace_id）
+    - event: error        — 类型化错误信息
+    - event: ping         — 心跳保活（生成期间每 15s）
     """
     if contribute:
         logger.info("忽略 GET /query/stream 的已弃用 contribute 参数；查询保持只读")
 
     async def _async_generate() -> Any:
+        from dochris.api.sse import (
+            sse_answer_delta,
+            sse_done_event,
+            sse_error_event,
+            sse_meta_event,
+            sse_ping_event,
+            sse_rerank_event,
+            sse_retrieval_event,
+            sse_warning_event,
+        )
+        from dochris.phases import phase3_query
+        from dochris.phases.query_pipeline import PipelineCallbacks, QueryPipeline
+
         start = time.perf_counter()
-        retrieval_seconds: float | None = None
-        rerank_seconds: float | None = None
-        first_token_seconds: float | None = None
-        generation_seconds: float | None = None
 
         def phase_timings() -> dict[str, float]:
-            timings = {"total_seconds": round(time.perf_counter() - start, 2)}
-            if retrieval_seconds is not None:
-                timings["retrieval_seconds"] = round(retrieval_seconds, 2)
-            if rerank_seconds is not None:
-                timings["rerank_seconds"] = round(rerank_seconds, 2)
-            if first_token_seconds is not None:
-                timings["first_token_seconds"] = round(first_token_seconds, 2)
-            if generation_seconds is not None:
-                timings["generation_seconds"] = round(generation_seconds, 2)
-            return timings
+            return {"total_seconds": round(time.perf_counter() - start, 2)}
+
+        # 回调在请求时从模块解析，保持 Provider 可替换与既有测试 patch 面
+        pipeline = QueryPipeline(
+            PipelineCallbacks(
+                retrieve=phase3_query.retrieve_query_context,
+                rerank=phase3_query.rerank_query_context,
+                provider_factory=query_engine.create_query_provider,
+                generate_stream=query_engine.generate_answer_stream_async,
+                logger=logger,
+            )
+        )
+
+        def _dump_retrieval(data: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "concepts": [
+                    _to_search_result(r, "keyword").model_dump() for r in data.get("concepts", [])
+                ],
+                "summaries": [
+                    _to_search_result(r, "keyword").model_dump() for r in data.get("summaries", [])
+                ],
+                "vector_results": [
+                    _to_search_result(r, "vector").model_dump()
+                    for r in data.get("vector_results", [])
+                ],
+            }
 
         try:
-            from dochris.api.sse import (
-                sse_answer_delta,
-                sse_done_event,
-                sse_error_event,
-                sse_meta_event,
-                sse_rerank_event,
-                sse_retrieval_event,
+            events = stream_with_ping(
+                pipeline.stream(q, mode, top_k, rerank=rerank, trace_id=get_current_trace_id())
             )
-            from dochris.phases.phase3_query import (
-                rerank_query_context,
-                retrieve_query_context,
-            )
-
-            initial_context = await asyncio.to_thread(
-                retrieve_query_context,
-                q,
-                mode,
-                top_k,
-                logger,
-                include_vector=mode == "all",
-            )
-            concepts: list[dict] = initial_context["concepts"]
-            summaries: list[dict] = initial_context["summaries"]
-            vector_results: list[dict] = initial_context["vector_results"]
-            search_sources: list[str] = initial_context["search_sources"]
-
-            # 2. 立即发送 meta 事件（不等向量搜索）
-            yield sse_meta_event(
-                query=q,
-                mode=mode,
-                search_sources=sorted(set(search_sources)),
-                time_seconds=time.perf_counter() - start,
-            )
-
-            # 3. 发送概念+摘要结果（让用户立即看到部分结果）
-            yield sse_retrieval_event(
-                concepts=[_to_search_result(r, "keyword").model_dump() for r in concepts],
-                summaries=[_to_search_result(r, "keyword").model_dump() for r in summaries],
-                vector_results=[_to_search_result(r, "vector").model_dump() for r in vector_results]
-                if mode == "all"
-                else [],
-            )
-
-            # 4. 向量检索（异步，通过 provider 抽象层）
-            if mode in ("vector", "combined"):
-                try:
-                    vector_context = await asyncio.to_thread(
-                        retrieve_query_context,
-                        q,
-                        "vector",
-                        top_k,
-                        logger,
+            async for event in events:
+                if isinstance(event, str):
+                    # ping 心跳
+                    yield sse_ping_event()
+                    continue
+                if event.name == "meta":
+                    yield sse_meta_event(
+                        query=event.data["query"],
+                        mode=event.data["mode"],
+                        search_sources=sorted(set(event.data["search_sources"])),
+                        time_seconds=event.data["time_seconds"],
                     )
-                    vector_results = vector_context["vector_results"]
-                    if vector_results:
-                        search_sources = sorted(
-                            set(search_sources) | set(vector_context["search_sources"])
-                        )
-                        yield sse_retrieval_event(
-                            concepts=[
-                                _to_search_result(r, "keyword").model_dump() for r in concepts
-                            ],
-                            summaries=[
-                                _to_search_result(r, "keyword").model_dump() for r in summaries
-                            ],
-                            vector_results=[
-                                _to_search_result(r, "vector").model_dump() for r in vector_results
-                            ],
-                        )
-                except Exception as e:
-                    logger.warning(f"Vector search failed: {e}")
-
-            retrieval_seconds = time.perf_counter() - start
-
-            if rerank and (concepts or summaries or vector_results):
-                rerank_start = time.perf_counter()
-                reranked_context = await asyncio.to_thread(
-                    rerank_query_context,
-                    q,
-                    {
-                        "concepts": concepts,
-                        "summaries": summaries,
-                        "vector_results": vector_results,
-                        "search_sources": search_sources,
-                    },
-                    top_k,
-                    logger,
-                )
-                rerank_seconds = time.perf_counter() - rerank_start
-                if "reranker" in reranked_context["search_sources"]:
-                    concepts = reranked_context["concepts"]
-                    summaries = reranked_context["summaries"]
-                    vector_results = reranked_context["vector_results"]
-                    search_sources = reranked_context["search_sources"]
-                    yield sse_rerank_event(len(concepts) + len(summaries) + len(vector_results))
-                    yield sse_retrieval_event(
-                        concepts=[_to_search_result(r, "keyword").model_dump() for r in concepts],
-                        summaries=[_to_search_result(r, "keyword").model_dump() for r in summaries],
-                        vector_results=[
-                            _to_search_result(r, "vector").model_dump() for r in vector_results
-                        ],
+                elif event.name == "warning":
+                    yield sse_warning_event(
+                        event.data["message"],
+                        code=event.data.get("code", "warning"),
                     )
-
-            # 5. 流式生成 LLM 回答（异步）
-            has_context = concepts or summaries or vector_results
-            if not has_context:
-                yield sse_answer_delta("未找到相关内容。请尝试其他关键词。")
-                timings = phase_timings()
-                yield sse_done_event(
-                    timings["total_seconds"],
-                    trace_id=get_current_trace_id(),
-                    timings=timings,
-                )
-                return
-
-            provider = query_engine.create_query_provider(logger)
-            if not provider:
-                yield sse_answer_delta("（LLM 不可用，请检查 API 认证配置。）")
-                timings = phase_timings()
-                yield sse_done_event(
-                    timings["total_seconds"],
-                    trace_id=get_current_trace_id(),
-                    timings=timings,
-                )
-                return
-
-            answer_chunks: list[str] = []
-            generation_start = time.perf_counter()
-            async for chunk in query_engine.generate_answer_stream_async(
-                q, concepts, summaries, vector_results, provider, logger
-            ):
-                if first_token_seconds is None:
-                    first_token_seconds = time.perf_counter() - generation_start
-                answer_chunks.append(chunk)
-                yield sse_answer_delta(chunk)
-            generation_seconds = time.perf_counter() - generation_start
-
-            timings = phase_timings()
-            yield sse_done_event(
-                timings["total_seconds"],
-                trace_id=get_current_trace_id(),
-                timings=timings,
-            )
+                elif event.name == "retrieval":
+                    yield sse_retrieval_event(**_dump_retrieval(event.data))
+                elif event.name == "rerank":
+                    yield sse_rerank_event(event.data["result_count"])
+                elif event.name == "answer_delta":
+                    yield sse_answer_delta(event.data["text"])
+                elif event.name == "done":
+                    yield sse_done_event(
+                        event.data["time_seconds"],
+                        trace_id=event.data.get("trace_id") or get_current_trace_id(),
+                        timings=event.data.get("timings"),
+                        final_answer=event.data.get("final_answer"),
+                        citations=event.data.get("citations"),
+                        unresolved_refs=event.data.get("unresolved_refs"),
+                    )
 
         except asyncio.CancelledError:
             raise
-        except TimeoutError as exc:
-            from dochris.api.sse import sse_error_event
-
-            logger.warning("流式查询超时: %s", exc)
+        except QueryPipelineError as exc:
+            logger.warning("流式查询类型化失败 (%s): %s", exc.code, exc.message)
+            yield sse_error_event(
+                exc.message,
+                code=exc.code,
+                terminal=True,
+                trace_id=get_current_trace_id(),
+                timings=phase_timings(),
+            )
+        except TimeoutError:
+            logger.warning("流式查询超时")
             yield sse_error_event(
                 "Query stream timed out.",
                 code="timeout",
@@ -307,8 +249,6 @@ async def query_stream(
                 timings=phase_timings(),
             )
         except Exception:
-            from dochris.api.sse import sse_error_event
-
             logger.exception("流式查询失败")
             yield sse_error_event(
                 "Query stream failed.",

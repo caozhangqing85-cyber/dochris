@@ -9,7 +9,8 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any, Literal, cast
 
-from dochris.llm.openai_compat import OpenAICompatProvider
+from dochris.llm import get_provider
+from dochris.llm.base import BaseLLMProvider
 from dochris.phases.query_utils import (
     DATA_PATH,
     MANIFESTS_PATH,
@@ -34,7 +35,7 @@ def _get_query_model() -> str:
 
 
 # 全局缓存
-_llm_client_cache: OpenAICompatProvider | None = None
+_llm_client_cache: BaseLLMProvider | None = None
 _chromadb_client_cache: Any | None = None
 _vector_store_cache: Any | None = None
 
@@ -487,7 +488,13 @@ def rerank_candidates(
 # ============================================================
 
 
-def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list[dict]:
+def vector_search(
+    query: str,
+    top_k: int = 5,
+    logger: logging.Logger | None = None,
+    *,
+    raise_on_error: bool = False,
+) -> list[dict]:
     """使用向量存储进行检索（支持配置切换）
 
     根据 settings.vector_store 配置选择后端：
@@ -498,6 +505,8 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
         query: 搜索查询字符串
         top_k: 返回结果数量
         logger: 日志记录器
+        raise_on_error: True 时检索失败向上抛出异常（供 pipeline 发出
+            类型化错误），默认 False 保持向后兼容的静默降级
 
     Returns:
         检索结果列表，每个结果包含 text、source、score 等字段
@@ -508,7 +517,7 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
 
     # 使用抽象层（非 chromadb 配置）
     if settings.vector_store != "chromadb":
-        return _vector_search_with_store(query, top_k, logger)
+        return _vector_search_with_store(query, top_k, logger, raise_on_error=raise_on_error)
 
     # chromadb 使用原有逻辑（保持向后兼容）
     global _chromadb_client_cache
@@ -568,11 +577,15 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
     except ImportError:
         if logger:
             logger.debug("Vector search unavailable: install 'dochris[vector]' to enable it")
+        if raise_on_error:
+            raise
         return []
     except Exception as e:
         _chromadb_client_cache = None
         if logger:
             logger.error(f"Vector search failed: {e}")
+        if raise_on_error:
+            raise
         return []
 
 
@@ -593,7 +606,11 @@ def _extract_manifest_id(raw_id: str) -> str | None:
 
 
 def _vector_search_with_store(
-    query: str, top_k: int = 5, logger: logging.Logger | None = None
+    query: str,
+    top_k: int = 5,
+    logger: logging.Logger | None = None,
+    *,
+    raise_on_error: bool = False,
 ) -> list[dict]:
     """使用抽象层进行向量检索
 
@@ -603,6 +620,7 @@ def _vector_search_with_store(
         query: 搜索查询字符串
         top_k: 返回结果数量
         logger: 日志记录器
+        raise_on_error: True 时检索失败向上抛出异常
 
     Returns:
         检索结果列表，每个结果包含 text、source、score 等字段
@@ -664,10 +682,14 @@ def _vector_search_with_store(
     except ImportError as e:
         if logger:
             logger.warning(f"Vector store dependency not installed: {e}")
+        if raise_on_error:
+            raise
         return []
     except (OSError, RuntimeError) as e:
         if logger:
             logger.error(f"Vector search failed: {e}")
+        if raise_on_error:
+            raise
         return []
 
 
@@ -823,12 +845,14 @@ async def generate_answer_async(
     concepts: list[dict],
     summaries: list[dict],
     vector_results: list[dict],
-    provider: OpenAICompatProvider,
+    provider: BaseLLMProvider,
     logger: logging.Logger,
+    *,
+    context: str | None = None,
 ) -> str | None:
     """使用 LLM 异步生成回答（三层幻觉防护：Prompt 锚定 + 概念白名单 + 后处理验证）
 
-    通过 BaseLLMProvider 子类调用 LLM，与编译链路共享抽象层。
+    通过 BaseLLMProvider 调用 LLM，Provider 由注册表选择。
     支持查询缓存：相同查询 + 相同上下文直接返回缓存结果。
 
     Args:
@@ -836,13 +860,15 @@ async def generate_answer_async(
         concepts: 相关概念列表
         summaries: 相关摘要列表
         vector_results: 向量检索结果
-        provider: OpenAICompatProvider 实例
+        provider: BaseLLMProvider 实例
         logger: 日志记录器
+        context: 预构建上下文（QueryPipeline 传入，避免重复构建）
 
     Returns:
         生成的回答文本，失败时返回 None
     """
-    context, _source_map = build_answer_context(concepts, summaries, vector_results)
+    if context is None:
+        context, _source_map = build_answer_context(concepts, summaries, vector_results)
     if not context:
         return "未找到相关内容。请尝试其他关键词。"
 
@@ -884,17 +910,33 @@ async def generate_answer_stream_async(
     concepts: list[dict],
     summaries: list[dict],
     vector_results: list[dict],
-    provider: OpenAICompatProvider,
+    provider: BaseLLMProvider,
     logger: logging.Logger,
+    *,
+    context: str | None = None,
 ) -> AsyncIterator[str]:
     """异步流式生成回答，逐 chunk yield。
 
     通过 BaseLLMProvider.generate_stream() 调用 LLM。
 
+    错误语义：LLM 异常不再以答案文本 chunk 输出（那会让前端把失败当
+    正常回答并泄露底层异常），而是记录日志后原样抛出，由 QueryPipeline
+    统一转换为类型化错误 / SSE error 事件。
+
+    Args:
+        query: 用户问题
+        concepts: 相关概念列表
+        summaries: 相关摘要列表
+        vector_results: 向量检索结果
+        provider: BaseLLMProvider 实例
+        logger: 日志记录器
+        context: 预构建上下文（QueryPipeline 传入，避免重复构建）
+
     Yields:
         str: 每个 chunk 的文本内容
     """
-    context, _source_map = build_answer_context(concepts, summaries, vector_results)
+    if context is None:
+        context, _source_map = build_answer_context(concepts, summaries, vector_results)
     if not context:
         yield "未找到相关内容。请尝试其他关键词。"
         return
@@ -912,25 +954,20 @@ async def generate_answer_stream_async(
 
     system, prompt, all_known = build_answer_prompt(context, query, concepts)
 
-    try:
-        full_answer: list[str] = []
-        async for chunk in provider.generate_stream(
-            prompt=prompt,
-            system_prompt=system,
-            max_tokens=2048,
-            temperature=0.1,
-        ):
-            full_answer.append(chunk)
-            yield chunk
+    full_answer: list[str] = []
+    async for chunk in provider.generate_stream(
+        prompt=prompt,
+        system_prompt=system,
+        max_tokens=2048,
+        temperature=0.1,
+    ):
+        full_answer.append(chunk)
+        yield chunk
 
-        # 后处理并缓存完整回答
-        answer = "".join(full_answer).strip()
-        answer = _sanitize_wiki_links(answer, all_known)
-        save_query_cache(settings.cache_dir, cache_key, answer)
-
-    except Exception as e:
-        logger.error(f"LLM API error (stream): {e}")
-        yield f"\n\n[错误] LLM 请求失败: {e}"
+    # 后处理并缓存完整回答
+    answer = "".join(full_answer).strip()
+    answer = _sanitize_wiki_links(answer, all_known)
+    save_query_cache(settings.cache_dir, cache_key, answer)
 
 
 # ============================================================
@@ -971,15 +1008,17 @@ def read_openclaw_config(logger: logging.Logger | None = None) -> dict | None:
 
 
 def _try_create_provider(
+    provider_name: str,
     api_key: str,
     base_url: str | None,
     model: str,
     logger: logging.Logger | None,
     source_label: str,
-) -> OpenAICompatProvider | None:
-    """尝试用给定参数创建 OpenAICompatProvider。
+) -> BaseLLMProvider | None:
+    """用给定参数通过 provider registry 创建 BaseLLMProvider。
 
     Args:
+        provider_name: provider 注册名（settings.llm_provider）
         api_key: API 密钥
         base_url: API 基础 URL（可为 None）
         model: 模型名称
@@ -990,7 +1029,8 @@ def _try_create_provider(
         创建成功的 provider，失败时返回 None
     """
     try:
-        provider = OpenAICompatProvider(
+        provider_cls = get_provider(provider_name)
+        provider = provider_cls(
             api_key=api_key,
             api_base=base_url,
             model=model,
@@ -999,7 +1039,10 @@ def _try_create_provider(
             timeout=60,
         )
         if logger:
-            logger.info(f"Query LLM provider created ({source_label}, base_url={base_url})")
+            logger.info(
+                f"Query LLM provider created "
+                f"({source_label}, provider={provider_name}, base_url={base_url})"
+            )
         return provider
     except Exception as e:
         if logger:
@@ -1007,10 +1050,14 @@ def _try_create_provider(
         return None
 
 
-def create_query_provider(logger: logging.Logger | None = None) -> OpenAICompatProvider | None:
-    """创建查询链路 LLM Provider（3 级 fallback：env → settings → OpenClaw）
+def create_query_provider(logger: logging.Logger | None = None) -> BaseLLMProvider | None:
+    """创建查询链路 LLM Provider（registry 选择 + 3 级 key fallback）。
 
-    使用 OpenAICompatProvider（内部 AsyncOpenAI），与编译链路统一抽象。
+    Provider 类由 ``settings.llm_provider`` 通过 ``dochris.llm.get_provider``
+    注册表决定（openai_compat / ollama），查询引擎不再绑定具体实现。
+
+    Ollama 这类本地 provider 不需要 API key：没有找到任何 key 时仍会尝试
+    用 settings.api_base（默认 http://localhost:11434）创建。
 
     API Key 优先级:
     1. 环境变量 OPENAI_API_KEY
@@ -1021,7 +1068,7 @@ def create_query_provider(logger: logging.Logger | None = None) -> OpenAICompatP
         logger: 日志记录器
 
     Returns:
-        OpenAICompatProvider 实例，失败时返回 None
+        BaseLLMProvider 实例，失败时返回 None
     """
     global _llm_client_cache
     if _llm_client_cache is not None:
@@ -1029,30 +1076,47 @@ def create_query_provider(logger: logging.Logger | None = None) -> OpenAICompatP
 
     settings = get_settings()
     model = settings.query_model
+    raw_provider_name = settings.llm_provider
+    provider_name = (
+        raw_provider_name.strip()
+        if isinstance(raw_provider_name, str) and raw_provider_name.strip()
+        else "openai_compat"
+    )
 
     # 1. 优先尝试环境变量
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        provider = _try_create_provider(api_key, settings.api_base, model, logger, "env var")
-        if provider:
-            _llm_client_cache = provider
-            return _llm_client_cache
+    attempts: list[tuple[str, str, str | None]] = []
+    env_key = os.environ.get("OPENAI_API_KEY")
+    if env_key:
+        attempts.append(("env var", env_key, settings.api_base))
 
     # 2. 尝试 settings 中的 api_key
     if settings.api_key:
+        attempts.append(("settings", settings.api_key, settings.api_base))
+
+    # 3. Fallback: 尝试 OpenClaw 配置文件
+    openclaw = read_openclaw_config(logger)
+    if openclaw:
+        attempts.append(
+            ("OpenClaw config", str(openclaw["apiKey"]), openclaw.get("baseUrl") or None)
+        )
+
+    for source_label, api_key, base_url in attempts:
         provider = _try_create_provider(
-            settings.api_key, settings.api_base, model, logger, "settings"
+            provider_name, api_key, base_url, model, logger, source_label
         )
         if provider:
             _llm_client_cache = provider
             return _llm_client_cache
 
-    # 3. Fallback: 尝试 OpenClaw 配置文件
-    openclaw = read_openclaw_config(logger)
-    if openclaw:
-        base_url = openclaw.get("baseUrl") or None
+    # 本地 provider（如 ollama）无需 API key，允许直接创建
+    if provider_name != "openai_compat":
         provider = _try_create_provider(
-            openclaw["apiKey"], base_url, model, logger, "OpenClaw config"
+            provider_name,
+            settings.api_key or "",
+            settings.api_base or None,
+            model,
+            logger,
+            "keyless local provider",
         )
         if provider:
             _llm_client_cache = provider
@@ -1063,7 +1127,7 @@ def create_query_provider(logger: logging.Logger | None = None) -> OpenAICompatP
     return None
 
 
-def create_client(logger: logging.Logger | None = None) -> OpenAICompatProvider | None:
+def create_client(logger: logging.Logger | None = None) -> BaseLLMProvider | None:
     """已废弃：请使用 create_query_provider()。
 
     保留为向后兼容 alias，供尚未迁移的调用方使用。

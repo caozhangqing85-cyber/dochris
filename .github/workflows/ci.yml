@@ -9,6 +9,10 @@ on:
     - cron: "0 19 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
@@ -30,7 +34,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]" mypy
+      # REL-02: 与生产运行一致的 extras（api/vector/pdf/standard），
+      # 避免 mypy 在缺少可选依赖存根时漏报或误报
+      - run: pip install -e ".[dev,standard]" mypy
       - run: mypy src/dochris/
 
   test-fast:
@@ -48,6 +54,26 @@ jobs:
       - run: pip install -e ".[dev,standard]"
       - name: Run Gate 1A fast suite
         run: make test-fast
+
+  # REL-01: PR 必须跑关键集成套件（write-path / API / migration / 真实传输层契约），
+  # 不能只依赖 fast tests 就合并
+  test-integration:
+    name: Integration Suite (PR gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,standard]"
+      - name: Run integration-critical suites
+        run: |
+          pytest tests/test_write_path_e2e.py \
+                 tests/test_storage_migration.py \
+                 tests/test_api/ \
+                 tests/test_distribution_contracts.py \
+                 tests/test_openai_compat_real_transport.py \
+                 --tb=short -q --no-cov
 
   test-full-coverage:
     name: Full Coverage Gate (push/nightly/manual)
@@ -102,9 +128,87 @@ jobs:
       - name: Validate production Compose contract
         working-directory: .
         run: docker compose --profile api config --quiet
+
+  # REL-03: 同时构建 API 与 Web 两个生产镜像
+  docker-api:
+    name: API Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: dochris:api-ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test API image
+        run: |
+          docker run -d --name dochris-api-smoke -p 8000:8000 \
+            -e DOCHRIS_ALLOW_UNAUTHENTICATED=true dochris:api-ci
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              echo "API healthy"; docker rm -f dochris-api-smoke >/dev/null; exit 0
+            fi
+            sleep 2
+          done
+          docker logs dochris-api-smoke || true
+          docker rm -f dochris-api-smoke >/dev/null || true
+          exit 1
+
+  docker-web:
+    name: Web Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - name: Build production Web image
-        working-directory: .
-        run: docker build -f frontend/Dockerfile -t dochris:web-ci .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          push: false
+          load: true
+          tags: dochris:web-ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # REL-04: 完整 Compose 启动 + 健康检查
+  compose-e2e:
+    name: Compose Stack E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start full stack
+        run: docker compose --profile api up -d --build
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              echo "API healthy"; exit 0
+            fi
+            sleep 3
+          done
+          docker compose --profile api logs --tail=100
+          exit 1
+      - name: Wait for Web health
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null; then
+              echo "Web healthy"; exit 0
+            fi
+            sleep 3
+          done
+          docker compose --profile api logs --tail=100 web
+          exit 1
+      - name: Query smoke through API
+        run: curl --fail --silent "http://127.0.0.1:8000/api/v1/status" >/dev/null
+      - name: Stop and keep volumes
+        run: docker compose --profile api down
 
   security:
     name: Security

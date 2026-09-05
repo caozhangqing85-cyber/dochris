@@ -16,7 +16,6 @@ Phase 3: 查询系统（v3 — async-first + wiki 优先 + manifest 来源追踪
 import asyncio
 import logging
 import sys
-import time
 from pathlib import Path
 
 # 确保 scripts 包可导入
@@ -147,9 +146,17 @@ def search_all(query: str, top_k: int = 5) -> dict:
     }
 
 
-def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list:
+def vector_search(
+    query: str,
+    top_k: int = 5,
+    logger: logging.Logger | None = None,
+    *,
+    raise_on_error: bool = False,
+) -> list:
     """向量搜索包装器，直接委托给 query_engine"""
-    return cast(list, query_engine.vector_search(query, top_k, logger))
+    return cast(
+        list, query_engine.vector_search(query, top_k, logger, raise_on_error=raise_on_error)
+    )
 
 
 def retrieve_query_context(
@@ -159,8 +166,14 @@ def retrieve_query_context(
     logger: logging.Logger | None = None,
     *,
     include_vector: bool = True,
+    vector_raise_on_error: bool = False,
 ) -> dict[str, Any]:
-    """执行普通查询与 SSE 共用的只读检索阶段。"""
+    """执行普通查询与 SSE 共用的只读检索阶段。
+
+    Args:
+        vector_raise_on_error: True 时 vector 检索失败向上抛出（pipeline
+            据此发出类型化错误），False 时静默降级为空结果。
+    """
     if mode == "all" and include_vector:
         return cast(dict[str, Any], search_all(query_str, top_k))
 
@@ -182,7 +195,7 @@ def retrieve_query_context(
     if include_vector and mode in ("vector", "combined", "all"):
         vector_results = cast(
             list[dict[str, Any]],
-            vector_search(query_str, top_k, logger),
+            vector_search(query_str, top_k, logger, raise_on_error=vector_raise_on_error),
         )
         if vector_results:
             search_sources.add("vector")
@@ -271,8 +284,8 @@ async def query_async(
 ) -> dict[str, Any]:
     """异步查询主入口。FastAPI 应 await 此函数。
 
-    搜索阶段（概念/摘要/向量）使用同步调用（本地文件 I/O），
-    LLM 生成阶段使用异步 Provider（AsyncOpenAI）。
+    检索/重排/生成统一委托给 QueryPipeline（与 SSE 共享同一编排）；
+    本函数只额外负责 Query-as-Contribution 写入阶段。
 
     Args:
         query_str: 查询字符串
@@ -289,57 +302,20 @@ async def query_async(
     if logger is None:
         logger = logging.getLogger("phase3")
 
-    start = time.time()
-    result: dict[str, Any] = {
-        "query": query_str,
-        "mode": mode,
-        "concepts": [],
-        "summaries": [],
-        "vector_results": [],
-        "search_sources": [],
-        "answer": None,
-        "time_seconds": 0,
-    }
+    from dochris.phases.query_pipeline import PipelineCallbacks, QueryPipeline
 
-    # --- 搜索阶段（在线程中执行，避免阻塞 API 事件循环） ---
-    retrieval = await asyncio.to_thread(
-        retrieve_query_context,
-        query_str,
-        mode,
-        top_k,
-        logger,
-    )
-    result.update(retrieval)
-
-    # --- Reranker 重排序阶段（可选） ---
-    if rerank:
-        result = await asyncio.to_thread(
-            rerank_query_context,
-            query_str,
-            result,
-            top_k,
-            logger,
+    # 通过模块全局名解析回调：保持既有 @patch('phase3_query.xxx') 面
+    pipeline = QueryPipeline(
+        PipelineCallbacks(
+            retrieve=retrieve_query_context,
+            rerank=rerank_query_context,
+            provider_factory=create_query_provider,
+            generate=generate_answer_async,
+            generate_stream=generate_answer_stream_async,
+            logger=logger,
         )
-
-    # --- LLM 生成阶段（异步） ---
-    if mode in ("combined", "all") and (
-        result["concepts"] or result["summaries"] or result["vector_results"]
-    ):
-        provider = create_query_provider(logger)
-        if provider:
-            result["answer"] = await generate_answer_async(
-                query_str,
-                result["concepts"],
-                result["summaries"],
-                result["vector_results"],
-                provider,
-                logger,
-            )
-        else:
-            result["answer"] = "（LLM 不可用，以下为纯检索结果。请检查 API 认证配置。）"
-            logger.warning("LLM provider creation failed, showing retrieval results only")
-
-    result["time_seconds"] = round(time.time() - start, 2)
+    )
+    result = await pipeline.run(query_str, mode, top_k, rerank=rerank)
 
     # Query-as-Contribution：将高质量回答写回候选区
     if contribute and result.get("answer") and workspace_path:

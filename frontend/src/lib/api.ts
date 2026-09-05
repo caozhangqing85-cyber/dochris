@@ -196,11 +196,25 @@ export const contributeQueryResult = (queryResult: QueryResponse) =>
 
 export type PhaseTimings = Record<string, number>
 
+/** done 事件携带的结构化引用（与后端 Citation 模型对齐） */
+export interface StreamCitation {
+  ref: string
+  manifest_id?: string | null
+  source?: string
+  channel?: string
+  text_hash?: string
+  score?: number
+}
+
 export interface StreamDoneEvent {
   time_seconds: number
   trace_id?: string
   contribution?: ContributionMeta
   phase_timings?: PhaseTimings
+  /** 与非流式一致的清理后最终答案，收到时应替换增量渲染文本 */
+  final_answer?: string
+  citations?: StreamCitation[]
+  unresolved_refs?: string[]
 }
 
 export interface StreamErrorEvent {
@@ -218,8 +232,16 @@ export interface StreamCallbacks {
     vector_results: SearchResult[]
   }) => void
   onRerank?: (data: { reranked: boolean }) => void
+  /** 非致命降级提示（如 combined 模式向量检索不可用） */
+  onWarning?: (warning: { message: string; code?: string }) => void
   onChunk?: (text: string) => void
-  onDone?: (finalTime: number, traceId?: string, contribution?: ContributionMeta, phaseTimings?: PhaseTimings) => void
+  onDone?: (
+    finalTime: number,
+    traceId?: string,
+    contribution?: ContributionMeta,
+    phaseTimings?: PhaseTimings,
+    done?: StreamDoneEvent,
+  ) => void
   onDoneDetailed?: (done: StreamDoneEvent) => void
   onError?: (error: string, detail?: StreamErrorEvent) => void
 }
@@ -372,6 +394,11 @@ function dispatchEvent(
         callbacks.onRerank?.(parsed)
         return false
       }
+      case 'warning': {
+        const parsed = JSON.parse(rawData)
+        callbacks.onWarning?.({ message: parsed?.message ?? rawData, code: parsed?.code })
+        return false
+      }
       case 'answer_delta': {
         // answer_delta 是纯文本，不 JSON 解析
         callbacks.onChunk?.(rawData)
@@ -386,7 +413,11 @@ function dispatchEvent(
           contribution: parsed?.contribution,
           phase_timings: phaseTimings,
         }
-        callbacks.onDone?.(done.time_seconds, done.trace_id, done.contribution, done.phase_timings)
+        // 仅在存在时附加（保持与旧版 payload 的结构兼容）
+        if (parsed?.final_answer !== undefined) done.final_answer = parsed.final_answer
+        if (parsed?.citations !== undefined) done.citations = parsed.citations
+        if (parsed?.unresolved_refs !== undefined) done.unresolved_refs = parsed.unresolved_refs
+        callbacks.onDone?.(done.time_seconds, done.trace_id, done.contribution, done.phase_timings, done)
         callbacks.onDoneDetailed?.(done)
         return true
       }

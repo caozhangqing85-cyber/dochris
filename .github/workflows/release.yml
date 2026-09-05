@@ -1,0 +1,162 @@
+name: Release
+
+# REL-06: tag 推送不能绕过测试直接发布 —— 发布必须先通过完整 release gate，
+# 且只发布通过门禁的同一份 artifact。
+# REL-07: PyPI 采用 Trusted Publishing（OIDC），不再使用长期 API Token。
+#   前置要求：在 PyPI 项目设置中配置 Trusted Publisher，
+#   owner/repo/workflow = <owner>/<repo>/release.yml，environment 留空。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release-gate:
+    name: Release Gate (lint + typecheck + fast + integration)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ruff mypy
+      - run: pip install -e ".[dev,standard]"
+      - name: Lint
+        run: |
+          ruff check src/ tests/
+          ruff format --check src/ tests/
+      - name: Typecheck
+        run: mypy src/dochris/
+      - name: Fast tests
+        run: pytest tests/ -q -m "fast" --no-cov
+      - name: Integration-critical suites
+        run: |
+          pytest tests/test_write_path_e2e.py \
+                 tests/test_storage_migration.py \
+                 tests/test_api/ \
+                 tests/test_distribution_contracts.py \
+                 tests/test_openai_compat_real_transport.py \
+                 --tb=short -q --no-cov
+
+  build:
+    name: Build sdist / wheel / SBOM / checksums
+    needs: [release-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: pip install build twine cyclonedx-bom
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          echo "tag=$TAG_VERSION package=$PKG_VERSION"
+          [ "$TAG_VERSION" = "$PKG_VERSION" ] || {
+            echo "::error::tag v$TAG_VERSION 与 pyproject 版本 $PKG_VERSION 不一致"; exit 1; }
+      - name: Build package
+        run: python -m build
+      - name: Check package
+        run: twine check dist/*
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          pip install -e ".[standard]" --quiet
+          cyclonedx-py environment --output-format json --output-file sbom.json --force
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > ../checksums.sha256
+          cd ..
+          sha256sum sbom.json >> checksums.sha256
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: |
+            dist/
+            sbom.json
+            checksums.sha256
+          retention-days: 7
+
+  # REL-09 验证：wheel 在干净环境安装并完成查询 smoke（macOS arm64 + Linux x86_64）
+  install-smoke:
+    name: Install smoke (${{ matrix.os }})
+    needs: [build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+          - os: macos-latest
+            platform: macos-arm64
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create clean venv and install wheel
+        run: |
+          python -m venv .smoke-venv
+          ./.smoke-venv/bin/pip install --no-cache-dir dist/*.whl
+      - name: Query smoke (offline paths)
+        run: |
+          ./.smoke-venv/bin/python - <<'PY'
+          import dochris
+          from dochris.settings import get_settings
+          s = get_settings()
+          print("version:", dochris.__version__)
+          print("workspace:", s.workspace)
+          assert dochris.__version__, "version must be present"
+          PY
+          ./.smoke-venv/bin/python -m dochris.cli.main --help >/dev/null
+
+  github-release:
+    name: Attach artifacts to GitHub Release
+    needs: [build, install-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+      - name: Create GitHub Release with artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/* sbom.json checksums.sha256
+
+  publish:
+    name: Publish to PyPI (Trusted Publishing)
+    needs: [build, install-smoke, github-release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
