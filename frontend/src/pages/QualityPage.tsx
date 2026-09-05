@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Target, TrendingUp, Award, AlertTriangle, RefreshCw, RotateCcw, ShieldCheck, Shield, ShieldQuestion, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react'
 import { getStatus, resetLowQuality, getManifests } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import type { StatusResponse, ManifestItem } from '@/types'
 import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
 import SectionHeader from '@/components/ui/SectionHeader'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 
 const PROV_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
   extracted: { color: 'var(--status-success)', bg: 'var(--status-success-bg)', icon: <ShieldCheck size={15} />, label: '直接提取' },
@@ -21,33 +23,72 @@ export default function QualityPage() {
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
   const [showScoringHelp, setShowScoringHelp] = useState(false)
-  const load = useCallback(async () => {
-    setLoading(true)
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
+
+  const loadQualityData = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
       const [s, m] = await Promise.all([withMinDelay(getStatus()), getManifests()])
+      if (isCancelled()) return
       setStatus(s)
       setManifests(m)
-    } catch { /* */ }
-    finally { setLoading(false) }
+      setLoadError(null)
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
+    }
+    finally {
+      if (!isCancelled()) setLoading(false)
+    }
   }, [])
-  useEffect(() => { load() }, [load])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    await loadQualityData()
+  }, [loadQualityData])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void loadQualityData(() => cancelled)
+    })
+    return () => { cancelled = true }
+  }, [loadQualityData])
+
+  const threshold = status?.config?.min_quality_score ?? 85
+  const m = status?.manifests
+  const total = m?.total ?? 0; const compiled = m?.compiled ?? 0; const failed = m?.failed ?? 0
+  const ingested = m?.ingested ?? 0
+  const resettableCount = manifests.filter((manifest) => (
+    typeof manifest.quality_score === 'number'
+    && manifest.quality_score < threshold
+    && (manifest.status === 'compiled' || manifest.status === 'compile_failed')
+  )).length
 
   const handleReset = async () => {
+    if (resettableCount === 0) {
+      setResetMsg('当前没有低于质量阈值的已编译文件')
+      return
+    }
+    if (!window.confirm(`将 ${resettableCount} 个低于 ${threshold} 分的文件重置为待编译状态？源文件不会被删除。`)) return
+
     setResetting(true); setResetMsg('')
     try { const res = await resetLowQuality(); setResetMsg(`已重置 ${res.reset_count} 个文件`); await load() }
     catch (e) { setResetMsg('重置失败: ' + (e as Error).message) }
     finally { setResetting(false) }
   }
 
-  const threshold = status?.config?.min_quality_score ?? 85
-  const m = status?.manifests
-  const total = m?.total ?? 0; const compiled = m?.compiled ?? 0; const failed = m?.failed ?? 0
-  const ingested = m?.ingested ?? 0
-  const rate = total ? compiled / total : 0
-
   const compiledPct = total ? Math.round((compiled / total) * 100) : 0
   const failedPct = total ? Math.round((failed / total) * 100) : 0
   const ingestedPct = total ? Math.round((ingested / total) * 100) : 0
+  const qualityScores = manifests
+    .map((manifest) => manifest.quality_score)
+    .filter((score): score is number => typeof score === 'number' && Number.isFinite(score))
+  const averageQualityScore = qualityScores.length
+    ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
+    : null
+  const passingQualityCount = qualityScores.filter((score) => score >= threshold).length
+  const qualityPassRate = qualityScores.length
+    ? Math.round((passingQualityCount / qualityScores.length) * 100)
+    : null
 
   const buckets = [
     { label: '失败', pct: failedPct, color: 'var(--status-error)', bg: 'var(--status-error-bg)' },
@@ -80,10 +121,21 @@ export default function QualityPage() {
     return { passed, failed, noLint, totalWarnings, totalErrors }
   }, [manifests])
 
+  const headerActions = (
+    <button onClick={load} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, opacity: loading ? 0.5 : 1 }}><RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新</button>
+  )
+
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
+      <PageHeader title="质量监控" description="知识库编译质量分析" actions={headerActions} />
+      <RequestErrorState error={loadError} onRetry={load} retrying={loading} />
+    </div>
+  )
+
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
       <PageHeader title="质量监控" description="知识库编译质量分析"
-        actions={<button onClick={load} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, opacity: loading ? 0.5 : 1 }}><RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新</button>}
+        actions={headerActions}
       />
 
       <SectionHeader title="质量概览" />
@@ -94,7 +146,7 @@ export default function QualityPage() {
         <StatCard label="质量阈值" value={threshold} color="var(--status-info)" icon={<Award size={18} />} />
       </div>
 
-      <SectionHeader title="质量分布" />
+      <SectionHeader title="编译状态分布" />
       <div style={{ borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', border: '1px solid var(--border-default)', marginBottom: 'var(--space-6)', background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {buckets.map((b) => (
@@ -201,12 +253,23 @@ export default function QualityPage() {
 
       <div style={{ borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--border-default)', background: 'var(--bg-card)' }}>
         <div>
-          <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>{rate >= 0.8 ? '整体质量优秀' : rate >= 0.6 ? '整体质量良好' : '需要改进'}</div>
-          <div style={{ fontSize: 'var(--text-sm)', marginTop: '2px', color: 'var(--text-muted)', fontWeight: 400 }}>编译成功率: {total ? (rate * 100).toFixed(1) : 0}%</div>
+          <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>
+            {averageQualityScore === null
+              ? '暂无质量评分'
+              : averageQualityScore >= threshold
+                ? '平均质量已达标'
+                : '平均质量低于阈值'}
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', marginTop: '2px', color: 'var(--text-muted)', fontWeight: 400 }}>
+            平均质量分: {averageQualityScore === null ? '—' : averageQualityScore.toFixed(1)}
+            {' · '}编译覆盖率: {compiledPct}%
+            {' · '}已评分文件达标率: {qualityPassRate === null ? '—' : `${qualityPassRate}%`}
+          </div>
         </div>
-        <button onClick={handleReset} disabled={resetting}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 500, border: 'none', cursor: 'pointer', background: 'var(--bg-hover)', color: 'var(--text-secondary)', opacity: resetting ? 0.5 : 1 }}>
-          {resetting ? <RefreshCw size={13} className="animate-spin" /> : <RotateCcw size={13} />} {resetting ? '重置中...' : '重置低质量'}
+        <button onClick={handleReset} disabled={resetting || resettableCount === 0}
+          title={resettableCount === 0 ? '当前没有可重置的低质量文件' : `重置 ${resettableCount} 个低于 ${threshold} 分的文件`}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '4px', fontSize: '14px', fontWeight: 500, border: 'none', cursor: 'pointer', background: 'var(--bg-hover)', color: 'var(--text-secondary)', opacity: resetting || resettableCount === 0 ? 0.45 : 1 }}>
+          {resetting ? <RefreshCw size={13} className="animate-spin" /> : <RotateCcw size={13} />} {resetting ? '重置中...' : `重置低质量 (${resettableCount})`}
         </button>
       </div>
       {resetMsg && <p style={{ fontSize: 'var(--text-sm)', marginTop: 'var(--space-3)', color: resetMsg.startsWith('重置失败') ? 'var(--status-error)' : 'var(--color-primary)', fontWeight: 400 }}>{resetMsg}</p>}

@@ -2,26 +2,45 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FolderOpen, FileCheck, AlertTriangle, Clock, Brain, Database, RefreshCw } from 'lucide-react'
 import { getStatus } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import type { StatusResponse } from '@/types'
 import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 import SectionHeader from '@/components/ui/SectionHeader'
 
 export default function DashboardPage() {
   const [data, setData] = useState<StatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
   const [refreshMsg, setRefreshMsg] = useState('')
   const navigate = useNavigate()
 
   const load = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true); setLoadError(null)
     try { setData(await withMinDelay(getStatus())); return true }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); return false }
+    catch (e) { setLoadError(classifyRequestError(e)); return false }
     finally { setLoading(false) }
   }, [])
-  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadInitial = async () => {
+      try {
+        const nextData = await withMinDelay(getStatus())
+        if (cancelled) return
+        setData(nextData)
+        setLoadError(null)
+      } catch (e) {
+        if (!cancelled) setLoadError(classifyRequestError(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void loadInitial()
+    return () => { cancelled = true }
+  }, [])
 
   const handleRefresh = async () => {
     const ok = await load()
@@ -29,35 +48,12 @@ export default function DashboardPage() {
     setTimeout(() => setRefreshMsg(''), 2000)
   }
 
-  if (error && !data) {
-    return (
-      <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
-        <PageHeader title="仪表盘" description="Dochris 知识库系统" />
-        <div style={{
-          borderRadius: 'var(--radius-lg)', padding: 'var(--space-10)',
-          textAlign: 'center', border: '1px solid var(--status-error-border)',
-          background: 'var(--status-error-bg)',
-        }}>
-          <AlertTriangle size={36} style={{ color: 'var(--status-error)', margin: '0 auto var(--space-4)' }} />
-          <p style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
-            无法连接后端服务
-          </p>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-6)', fontWeight: 400 }}>
-            请确保 FastAPI 后端已启动（默认端口 8000）
-          </p>
-          <button onClick={handleRefresh}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '8px 16px', borderRadius: '4px',
-              fontSize: 'var(--text-sm)', fontWeight: 600, color: '#fff',
-              background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
-            }}>
-            <RefreshCw size={14} /> 重试连接
-          </button>
-        </div>
-      </div>
-    )
-  }
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
+      <PageHeader title="仪表盘" description="Dochris 知识库系统" />
+      <RequestErrorState error={loadError} onRetry={load} retrying={loading} />
+    </div>
+  )
 
   const m = data?.manifests
   const c = data?.config

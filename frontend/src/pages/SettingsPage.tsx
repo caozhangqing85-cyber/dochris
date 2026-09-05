@@ -1,8 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Save, RefreshCw, Plug, Loader2, CheckCircle2, XCircle, Tag, AlertTriangle } from 'lucide-react'
-import { getConfig, updateConfig, getStatus, enrichSchemaFromGraph, autoTagSchema, checkStaleSchema } from '@/lib/api'
+import {
+  getApiAccessKey,
+  getConfig,
+  updateConfig,
+  getStatus,
+  enrichSchemaFromGraph,
+  autoTagSchema,
+  checkStaleSchema,
+  setApiAccessKey,
+} from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 import SectionHeader from '@/components/ui/SectionHeader'
 
 export default function SettingsPage() {
@@ -11,15 +22,21 @@ export default function SettingsPage() {
     llm_provider: 'openai_compat', temperature: 0.1, workspace: '',
     vector_store: 'chromadb',
   })
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [accessKey, setAccessKey] = useState(getApiAccessKey)
+  const [accessKeySaving, setAccessKeySaving] = useState(false)
+  const [accessKeyMessage, setAccessKeyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const loadConfig = useCallback(async () => {
-    setLoading(true)
+  const loadConfig = useCallback(async (isCancelled: () => boolean = () => false) => {
+    if (!isCancelled()) setLoading(true)
     try {
       const c = await withMinDelay(getConfig())
+      if (isCancelled()) return
       setForm({
         api_base: c.api_base || '', api_key: c.api_key ? `${c.api_key.slice(0, 6)}...${c.api_key.slice(-4)}` : '',
         model: c.model || '', query_model: c.query_model || '',
@@ -27,10 +44,23 @@ export default function SettingsPage() {
         workspace: c.workspace || '',
         vector_store: c.vector_store || 'chromadb',
       })
-    } catch { /* */ }
-    finally { setLoading(false) }
+      setConfigLoaded(true)
+      setLoadError(null)
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
+    }
+    finally {
+      if (!isCancelled()) setLoading(false)
+    }
   }, [])
-  useEffect(() => { loadConfig() }, [loadConfig])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void loadConfig(() => cancelled)
+    })
+    return () => { cancelled = true }
+  }, [loadConfig])
 
   const handleSave = async () => {
     setSaving(true); setMessage(null)
@@ -62,6 +92,22 @@ export default function SettingsPage() {
     finally { setTesting(false) }
   }
 
+  const handleSaveAccessKey = async () => {
+    setAccessKeySaving(true); setAccessKeyMessage(null)
+    setApiAccessKey(accessKey)
+    setAccessKey(getApiAccessKey())
+    try {
+      await getStatus()
+      setAccessKeyMessage({ type: 'success', text: accessKey.trim() ? '访问密钥已保存，连接成功' : '本地访问密钥已清除，连接成功' })
+      await loadConfig()
+    } catch (error) {
+      setLoadError(classifyRequestError(error))
+      setAccessKeyMessage({ type: 'error', text: '密钥已保存在当前浏览器，但后端拒绝了连接' })
+    } finally {
+      setAccessKeySaving(false)
+    }
+  }
+
   /* Notion input style */
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '6px 10px', borderRadius: '4px',
@@ -78,6 +124,8 @@ export default function SettingsPage() {
   const [schemaLoading, setSchemaLoading] = useState(false)
   const [schemaMsg, setSchemaMsg] = useState('')
   const handleSchemaEnrich = async () => {
+    if (!window.confirm('从当前知识图谱批量写回 manifest 关系元数据？现有源文件不会被删除，但 manifest 内容会发生变更。')) return
+
     setSchemaLoading(true); setSchemaMsg('')
     try {
       const res = await enrichSchemaFromGraph()
@@ -86,6 +134,8 @@ export default function SettingsPage() {
     finally { setSchemaLoading(false) }
   }
   const handleAutoTag = async () => {
+    if (!window.confirm('根据已编译概念为相关 manifest 批量追加自动标签？现有人工标签会保留，但 manifest 内容会发生变更。')) return
+
     setSchemaLoading(true); setSchemaMsg('')
     try {
       const res = await autoTagSchema()
@@ -102,9 +152,76 @@ export default function SettingsPage() {
     finally { setSchemaLoading(false) }
   }
 
+  const renderAccessKeyCard = () => (
+    <>
+      <SectionHeader title="Dochris 服务访问" />
+      <div style={{
+        borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+        border: '1px solid var(--border-default)', marginBottom: 'var(--space-6)',
+        background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)',
+      }}>
+        <label style={labelStyle}>网关访问密钥</label>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            style={{ ...inputStyle, flex: '1 1 320px' }}
+            type="password"
+            autoComplete="off"
+            placeholder="与后端 DOCHRIS_API_KEY 保持一致"
+            value={accessKey}
+            onChange={(event) => setAccessKey(event.target.value)}
+          />
+          <button
+            onClick={() => { void handleSaveAccessKey() }}
+            disabled={accessKeySaving}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '8px 16px', borderRadius: '4px',
+              fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--bg-card)',
+              background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
+              opacity: accessKeySaving ? 0.5 : 1,
+            }}
+          >
+            {accessKeySaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            保存并重试
+          </button>
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', marginTop: 'var(--space-2)' }}>
+          这是 Dochris 后端访问密钥，不是下方的 LLM 提供商 API 密钥。本机 Docker 默认无需填写；启用 DOCHRIS_API_KEY 后在此输入同一值。
+        </div>
+        {accessKeyMessage && (
+          <div style={{
+            fontSize: 'var(--text-sm)', marginTop: 'var(--space-3)',
+            color: accessKeyMessage.type === 'success' ? 'var(--status-success)' : 'var(--status-error)',
+          }}>
+            {accessKeyMessage.text}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
+      <PageHeader title="系统设置" description="配置 LLM 模型、API 端点和工作区" />
+      {renderAccessKeyCard()}
+      <RequestErrorState error={loadError} onRetry={loadConfig} retrying={loading} />
+    </div>
+  )
+
+  if (loading && !configLoaded) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
+      <PageHeader title="系统设置" description="配置 LLM 模型、API 端点和工作区" />
+      <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--text-muted)' }}>
+        正在加载配置...
+      </div>
+    </div>
+  )
+
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
       <PageHeader title="系统设置" description="配置 LLM 模型、API 端点和工作区" />
+
+      {renderAccessKeyCard()}
 
       <SectionHeader title="可观测性" />
       <div style={{
@@ -257,7 +374,7 @@ export default function SettingsPage() {
           }}>
           {testing ? <Loader2 size={14} className="animate-spin" /> : <Plug size={14} />} {testing ? '测试中...' : '测试连接'}
         </button>
-        <button onClick={loadConfig} disabled={loading}
+        <button onClick={() => { void loadConfig() }} disabled={loading}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '8px 16px', borderRadius: '4px',

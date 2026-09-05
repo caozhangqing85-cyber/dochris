@@ -176,6 +176,11 @@ input:focus, textarea:focus, select:focus {
 /* ── Interactive hover helpers ── */
 .quick-question-btn:hover { background: var(--bg-hover) !important; border-color: var(--border-default) !important; }
 
+svg g.nodes > g[role="button"]:focus { outline: none; }
+svg g.nodes > g[role="button"]:focus > circle:first-of-type {
+  stroke-width: 5px;
+}
+
 /* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -268,6 +273,19 @@ input:focus, textarea:focus, select:focus {
 
   /* Status page grid */
   .status-grid { grid-template-columns: 1fr !important; }
+
+  /* Keep graph node details inside narrow viewports. */
+  .graph-layout { position: relative; }
+  .graph-detail-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto !important;
+    max-height: 65%;
+    z-index: 20;
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.14);
+  }
 }
 
 /* Small mobile: ≤ 480px */
@@ -275,6 +293,19 @@ input:focus, textarea:focus, select:focus {
   .grid-responsive { grid-template-columns: 1fr !important; }
   .grid-responsive-5 { grid-template-columns: 1fr !important; }
   .grid-responsive-3 { grid-template-columns: 1fr !important; }
+
+  .graph-search-overlay {
+    right: 12px !important;
+    max-width: none !important;
+  }
+
+  .graph-view-switcher {
+    top: 56px !important;
+    left: 12px !important;
+    right: auto !important;
+    max-width: calc(100% - 24px);
+    overflow-x: auto;
+  }
 }
 
 /* ── StreamingMarkdown 排版样式 ────────────────────────────── */
@@ -366,4 +397,3 @@ input:focus, textarea:focus, select:focus {
 .streaming-markdown input[type="checkbox"] {
   margin-right: 0.5em;
 }
-

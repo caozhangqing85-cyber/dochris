@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Search, Upload, FileText, RefreshCw, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { formatBytes, statusLabel, withMinDelay } from '@/lib/utils'
 import { getManifests, uploadFiles, resetFailedFiles } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import type { ManifestItem } from '@/types'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 
 const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
   ingested: { color: 'var(--status-info)', bg: 'var(--status-info-bg)' },
@@ -44,14 +46,38 @@ export default function FilesPage() {
   const [dragOver, setDragOver] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [resetMsg, setResetMsg] = useState('')
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const detailsDialogRef = useRef<HTMLDivElement>(null)
+  const detailsCloseRef = useRef<HTMLButtonElement>(null)
+  const selectedTriggerRef = useRef<HTMLElement | null>(null)
+
+  const loadFiles = useCallback(async (isCancelled: () => boolean = () => false) => {
+    try {
+      const nextFiles = await withMinDelay(getManifests())
+      if (isCancelled()) return
+      setFiles(nextFiles)
+      setLoadError(null)
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
+    }
+    finally {
+      if (!isCancelled()) setLoading(false)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setFiles(await withMinDelay(getManifests())) } catch { /* */ }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+    await loadFiles()
+  }, [loadFiles])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void loadFiles(() => cancelled)
+    })
+    return () => { cancelled = true }
+  }, [loadFiles])
 
   const filtered = files.filter((f) => {
     if (filter && f.status !== filter) return false
@@ -61,9 +87,63 @@ export default function FilesPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const failedCount = files.filter((file) => file.status === 'failed').length
 
-  // Reset page on filter/search change
-  useEffect(() => { setPage(1) }, [search, filter])
+  const closeDetails = useCallback(() => {
+    setSelected(null)
+    queueMicrotask(() => selectedTriggerRef.current?.focus())
+  }, [])
+
+  const openDetails = (file: ManifestItem, trigger: HTMLElement) => {
+    selectedTriggerRef.current = trigger
+    setSelected(file)
+  }
+
+  useEffect(() => {
+    if (!selected) return
+
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeDetails()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const dialog = detailsDialogRef.current
+      if (!dialog) return
+
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hasAttribute('hidden'))
+
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleKeyDown)
+    queueMicrotask(() => detailsCloseRef.current?.focus())
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [closeDetails, selected])
 
   const doUpload = async (fileList: FileList | File[]) => {
     if (!fileList.length) return
@@ -76,6 +156,12 @@ export default function FilesPage() {
   }
 
   const handleResetFailed = async () => {
+    if (failedCount === 0) {
+      setResetMsg('当前没有失败文件需要重置')
+      return
+    }
+    if (!window.confirm(`将 ${failedCount} 个失败文件重置为待编译状态？此操作不会删除源文件。`)) return
+
     setResetting(true); setResetMsg('')
     try {
       const res = await resetFailedFiles()
@@ -101,26 +187,48 @@ export default function FilesPage() {
     if (e.dataTransfer.files?.length) doUpload(e.dataTransfer.files)
   }
 
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  const handleFilterChange = (value: string) => {
+    setFilter(value)
+    setPage(1)
+  }
+
+  const pageHeader = (
+    <PageHeader title="文件管理" description="管理知识库中的源文件"
+      actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <button onClick={handleUpload} disabled={uploading}
+            style={{ ...btnPrimary, opacity: uploading ? 0.5 : 1 }}>
+            <Upload size={15} /> {uploading ? '上传中...' : '上传文件'}
+          </button>
+          <button onClick={handleResetFailed} disabled={resetting || failedCount === 0}
+            style={{ ...btnGhost, opacity: resetting || failedCount === 0 ? 0.45 : 1, padding: '6px 10px', fontSize: 'var(--text-sm)', fontWeight: 500, border: '1px solid var(--border-default)', borderRadius: '4px' }}
+            title={failedCount === 0 ? '当前没有失败文件' : `将 ${failedCount} 个失败文件重置为待编译状态`}>
+            <RotateCcw size={13} className={resetting ? 'animate-spin' : ''} /> 重置失败 ({failedCount})
+          </button>
+          <button onClick={load} disabled={loading} aria-label="刷新文件列表"
+            style={{ ...btnGhost, opacity: loading ? 0.5 : 1 }}>
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      }
+    />
+  )
+
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
+      {pageHeader}
+      <RequestErrorState error={loadError} onRetry={load} retrying={loading} />
+    </div>
+  )
+
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
-      <PageHeader title="文件管理" description="管理知识库中的源文件"
-        actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <button onClick={handleUpload} disabled={uploading}
-              style={{ ...btnPrimary, opacity: uploading ? 0.5 : 1 }}>
-              <Upload size={15} /> {uploading ? '上传中...' : '上传文件'}
-            </button>
-            <button onClick={handleResetFailed} disabled={resetting}
-              style={{ ...btnGhost, opacity: resetting ? 0.5 : 1, padding: '6px 10px', fontSize: 'var(--text-sm)', fontWeight: 500, border: '1px solid var(--border-default)', borderRadius: '4px' }}
-              title="将所有失败文件重置为待编译状态">
-              <RotateCcw size={13} className={resetting ? 'animate-spin' : ''} /> 重置失败
-            </button>
-            <button onClick={load} disabled={loading} style={{ ...btnGhost, opacity: loading ? 0.5 : 1 }}>
-              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        }
-      />
+      {pageHeader}
 
       {/* Hidden file input for accessibility */}
       <input ref={fileInputRef} type="file" multiple
@@ -158,13 +266,13 @@ export default function FilesPage() {
             fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
             background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none',
             lineHeight: 1.5,
-          }} placeholder="搜索文件名..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          }} placeholder="搜索文件名..." value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <select style={{
           padding: '6px 10px', borderRadius: '4px', fontSize: 'var(--text-sm)',
           border: '1px solid var(--border-default)', background: 'var(--bg-input)',
           color: 'var(--text-primary)', outline: 'none', cursor: 'pointer',
-        }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+        }} value={filter} onChange={(e) => handleFilterChange(e.target.value)}>
           <option value="">全部状态</option>
           <option value="ingested">已摄入</option>
           <option value="compiled">已编译</option>
@@ -192,7 +300,15 @@ export default function FilesPage() {
               {paged.map((f) => {
                 const sc = STATUS_COLORS[f.status] || { color: 'var(--text-muted)', bg: 'var(--bg-elevated)' }
                 return (
-                  <tr key={f.id} onClick={() => setSelected(f)}
+                  <tr key={f.id} onClick={(event) => openDetails(f, event.currentTarget)}
+                    tabIndex={0}
+                    aria-haspopup="dialog"
+                    aria-label={`查看 ${f.title} 详情`}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      openDetails(f, event.currentTarget)
+                    }}
                     style={{ borderTop: '1px solid var(--border-subtle)', cursor: 'pointer' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
@@ -286,23 +402,28 @@ export default function FilesPage() {
           position: 'fixed', inset: 0, zIndex: 50,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'var(--bg-overlay)',
-        }} onClick={() => setSelected(null)}>
-          <div className="modal-content" style={{
+        }} onClick={closeDetails}>
+          <div ref={detailsDialogRef} className="modal-content" style={{
             width: '100%', maxWidth: '480px',
             borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)',
             background: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)',
-          }} onClick={(e) => e.stopPropagation()}>
+          }} onClick={(e) => e.stopPropagation()}
+            role="dialog" aria-modal="true"
+            aria-labelledby="file-details-title" aria-describedby="file-details-description">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-5)' }}>
-              <h3 style={{
+              <h3 id="file-details-title" style={{
                 fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)',
                 margin: 0, letterSpacing: '-0.25px',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>{selected.title}</h3>
-              <button onClick={() => setSelected(null)}
+              <button ref={detailsCloseRef} onClick={closeDetails} aria-label="关闭文件详情"
                 style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)' }}>
                 <X size={16} />
               </button>
             </div>
+            <p id="file-details-description" style={{ margin: 'calc(var(--space-3) * -1) 0 var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
+              文件只读详情。按 Escape 关闭并返回文件列表。
+            </p>
             <div>
               {[
                 ['ID', selected.id], ['类型', selected.type], ['状态', statusLabel(selected.status)],

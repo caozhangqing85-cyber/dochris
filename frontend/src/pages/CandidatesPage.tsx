@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, MessageSquare } from 'lucide-react'
 import { getCandidates, promoteCandidate, discardCandidate } from '@/lib/api'
 import type { CandidateMeta } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 
 const STATUS_META: Record<string, { color: string; label: string }> = {
   candidate: { color: 'var(--status-info)', label: '待审核' },
@@ -15,23 +17,42 @@ const STATUS_META: Record<string, { color: string; label: string }> = {
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<CandidateMeta[]>([])
   const [filter, setFilter] = useState<'candidate' | 'promoted' | 'discarded' | 'all'>('candidate')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const loadCandidates = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
       const status = filter === 'all' ? undefined : filter
       const res = await withMinDelay(getCandidates(status as 'candidate' | 'promoted' | 'discarded'))
+      if (isCancelled()) return
       setCandidates(res.candidates)
+      setLoadError(null)
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
     } finally {
-      setLoading(false)
+      if (!isCancelled()) setLoading(false)
     }
   }, [filter])
 
-  useEffect(() => { load() }, [load])
+  const load = useCallback(async () => {
+    setLoading(true)
+    await loadCandidates()
+  }, [loadCandidates])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void loadCandidates(() => cancelled)
+    })
+    return () => { cancelled = true }
+  }, [loadCandidates])
 
   const handlePromote = async (id: string) => {
+    const candidate = candidates.find((item) => item.id === id)
+    const candidateLabel = candidate?.query || candidate?.title || id
+    if (!window.confirm(`将“${candidateLabel}”写入 wiki 摘要和概念文件，并把候选状态改为已晋升？`)) return
+
     try {
       const res = await promoteCandidate(id)
       setMsg(res.success ? `已晋升 ${id}` : `失败: ${res.reason}`)
@@ -43,6 +64,10 @@ export default function CandidatesPage() {
   }
 
   const handleDiscard = async (id: string) => {
+    const candidate = candidates.find((item) => item.id === id)
+    const candidateLabel = candidate?.query || candidate?.title || id
+    if (!window.confirm(`丢弃“${candidateLabel}”？候选内容文件会被永久删除，元数据将保留为已丢弃状态。`)) return
+
     try {
       const res = await discardCandidate(id)
       setMsg(res.success ? `已丢弃 ${id}` : `失败: ${res.reason}`)
@@ -53,21 +78,32 @@ export default function CandidatesPage() {
     setTimeout(() => setMsg(''), 2000)
   }
 
+  const pageHeader = (
+    <PageHeader
+      title="候选知识管理"
+      description="管理 Query-as-Contribution 生成的候选知识（查看 / 确认 / 丢弃）"
+      actions={(
+        <button onClick={load} disabled={loading}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+            borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
+            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+            opacity: loading ? 0.5 : 1 }}>
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
+        </button>
+      )}
+    />
+  )
+
+  if (loadError) return (
+    <>
+      {pageHeader}
+      <RequestErrorState error={loadError} onRetry={load} retrying={loading} />
+    </>
+  )
+
   return (
     <>
-      <PageHeader
-        title="候选知识管理"
-        description="管理 Query-as-Contribution 生成的候选知识（查看 / 确认 / 丢弃）"
-        actions={(
-          <button onClick={load} disabled={loading}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-              borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-              opacity: loading ? 0.5 : 1 }}>
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
-          </button>
-        )}
-      />
+      {pageHeader}
 
       {msg && (
         <div style={{ padding: '8px 12px', marginBottom: '12px', borderRadius: '4px',
@@ -79,7 +115,7 @@ export default function CandidatesPage() {
       {/* 过滤器 */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         {(['candidate', 'promoted', 'discarded', 'all'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
+          <button key={f} onClick={() => { setFilter(f); setLoading(true) }}
             style={{
               padding: '4px 12px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 500,
               border: '1px solid', cursor: 'pointer',

@@ -1,15 +1,31 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   PlayCircle, RefreshCw, Loader2, CheckCircle2, XCircle,
   Clock, FileCheck, AlertTriangle, Search, ChevronDown,
   ChevronRight, ChevronLeft, RotateCcw, ArrowUpRight, FileText, Tag,
   Shield, ShieldAlert, ShieldCheck, ShieldQuestion,
 } from 'lucide-react'
-import { getStatus, startCompile, getManifests, promoteFile, recompileStale } from '@/lib/api'
+import {
+  ApiError,
+  cancelCompileJob,
+  getCompileJob,
+  getCompileJobs,
+  getCurrentCompileJob,
+  getManifests,
+  getRecompileStatus,
+  getStatus,
+  promoteFile,
+  recompileStale,
+  retryCompileJob,
+  startCompile,
+} from '@/lib/api'
+import { compileJobPercent, isCompileJobActive } from '@/lib/compileJob'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay, formatBytes, statusLabel } from '@/lib/utils'
 import type { StatusResponse, CompileResponse, ManifestItem } from '@/types'
 import StatCard from '@/components/ui/StatCard'
 import PageHeader from '@/components/ui/PageHeader'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 import SectionHeader from '@/components/ui/SectionHeader'
 import ErrorBoundary from '@/components/ui/ErrorBoundary'
 
@@ -23,6 +39,29 @@ const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
 }
 
 const PAGE_SIZE = 20
+const JOB_STATUS_LABELS: Record<string, string> = {
+  accepted: '已提交',
+  queued: '排队中',
+  running: '进行中',
+  cancelling: '取消中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+  interrupted: '服务中断',
+}
+
+function formatJobTime(value: string | null) {
+  if (!value) return '时间未知'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date)
+}
 
 export default function CompilePage() {
   const [status, setStatus] = useState<StatusResponse | null>(null)
@@ -32,19 +71,16 @@ export default function CompilePage() {
   const [dryRun, setDryRun] = useState(false)
   const [compiling, setCompiling] = useState(false)
   const [recompiling, setRecompiling] = useState(false)
+  const [staleCount, setStaleCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const [result, setResult] = useState<CompileResponse | null>(null)
+  const [compileJob, setCompileJob] = useState<CompileResponse | null>(null)
+  const [compileHistory, setCompileHistory] = useState<CompileResponse[]>([])
+  const [cancellingCompile, setCancellingCompile] = useState(false)
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [refreshMsg, setRefreshMsg] = useState('')
-
-  // 编译进度追踪
-  const [compileProgress, setCompileProgress] = useState<{
-    isRunning: boolean
-    total: number
-    done: number
-    failed: number
-  }>({ isRunning: false, total: 0, done: 0, failed: 0 })
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
 
   // File list state
   const [search, setSearch] = useState('')
@@ -54,24 +90,111 @@ export default function CompilePage() {
   const [promoteMsg, setPromoteMsg] = useState('')
   const [page, setPage] = useState(1)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isCancelled: () => boolean = () => false) => {
+    if (!isCancelled()) setRefreshing(true)
     try {
-      const [s, files] = await Promise.all([
+      const [s, files, recompileStatus] = await Promise.all([
         withMinDelay(getStatus()),
         getManifests(),
+        getRecompileStatus(),
       ])
+      if (isCancelled()) return false
       setStatus(s)
       setAllFiles(files)
-    } catch { /* */ }
+      setStaleCount(
+        'stale_count' in recompileStatus && typeof recompileStatus.stale_count === 'number'
+          ? recompileStatus.stale_count
+          : 0,
+      )
+      setLoadError(null)
+      return true
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
+      return false
+    } finally {
+      if (!isCancelled()) setRefreshing(false)
+    }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  const loadCompileHistory = useCallback(async (
+    isCancelled: () => boolean = () => false,
+  ) => {
+    try {
+      const jobs = await getCompileJobs(10)
+      if (isCancelled()) return false
+      setCompileHistory(jobs)
+      return true
+    } catch (e) {
+      if (!isCancelled()) setError(`无法加载编译历史：${(e as Error).message}`)
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void (async () => {
+        await Promise.all([
+          loadData(() => cancelled),
+          loadCompileHistory(() => cancelled),
+        ])
+        try {
+          const job = await getCurrentCompileJob()
+          if (cancelled) return
+          setCompileJob(job)
+          setResult(job)
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 404) return
+          if (!cancelled) setError(`无法恢复编译任务：${(e as Error).message}`)
+        }
+      })()
+    })
+    return () => { cancelled = true }
+  }, [loadCompileHistory, loadData])
+
+  useEffect(() => {
+    if (!compileJob?.job_id || !isCompileJobActive(compileJob.status)) return
+
+    let cancelled = false
+    const jobId = compileJob.job_id
+    const poll = async () => {
+      try {
+        const next = await getCompileJob(jobId)
+        if (cancelled) return
+        if (!isCompileJobActive(next.status)) {
+          await Promise.all([
+            loadData(() => cancelled),
+            loadCompileHistory(() => cancelled),
+          ])
+          if (cancelled) return
+        }
+        setCompileJob(next)
+        setResult(next)
+        setError('')
+      } catch (e) {
+        if (cancelled) return
+        if (e instanceof ApiError && e.status === 404) {
+          setCompileJob(null)
+          setResult(null)
+          setError('编译任务已不在当前服务进程中，请重新提交')
+          return
+        }
+        setError(`同步编译进度失败，正在重试：${(e as Error).message}`)
+      }
+    }
+
+    const timer = window.setInterval(() => { void poll() }, 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [compileJob?.job_id, compileJob?.status, loadCompileHistory, loadData])
 
   const handleRefresh = async () => {
-    setRefreshing(true)
-    await loadData()
-    setRefreshing(false)
-    setRefreshMsg('已刷新'); setTimeout(() => setRefreshMsg(''), 2000)
+    const [dataOk, historyOk] = await Promise.all([loadData(), loadCompileHistory()])
+    const ok = dataOk && historyOk
+    setRefreshMsg(ok ? '已刷新' : '刷新失败')
+    setTimeout(() => setRefreshMsg(''), 2000)
   }
 
   const handleCompile = async () => {
@@ -79,56 +202,58 @@ export default function CompilePage() {
     try {
       const res = await startCompile({ limit, concurrency, dry_run: dryRun })
       setResult(res)
-      await loadData()
-
-      // 如果提交了后台任务，启动轮询
-      if (res.status === 'accepted' && res.total > 0) {
-        setCompileProgress({ isRunning: true, total: res.total, done: 0, failed: 0 })
-        startPolling(res.total)
+      setCompileJob(res.job_id ? res : null)
+      if (res.job_id) {
+        setCompileHistory((jobs) => [
+          res,
+          ...jobs.filter((job) => job.job_id !== res.job_id),
+        ].slice(0, 10))
       }
+      if (!res.job_id || !isCompileJobActive(res.status)) await loadData()
     } catch (e) { setError((e as Error).message) }
     finally { setCompiling(false) }
   }
 
-  const startPolling = (totalToCompile: number) => {
-    stopPolling()
-    pollRef.current = setInterval(async () => {
-      try {
-        const files = await getManifests()
-        setAllFiles(files)
-
-        // 统计进度：计算本轮提交的任务中，已编译和失败的数量
-        const stillIngested = files.filter(f => f.status === 'ingested').length
-        const stillCompiling = files.filter(f => f.status === 'compiling').length
-        const currentFailed = files.filter(f => f.status === 'failed').length
-
-        // 估算已完成数 = 原始总数 - 还在等待/编译中的
-        // 用全局统计近似：ingested 减少说明有文件完成了
-        const done = totalToCompile - stillIngested - stillCompiling
-        const allResolved = stillIngested === 0 && stillCompiling === 0
-
-        if (allResolved) {
-          // 编译全部完成，刷新完整状态
-          setCompileProgress({ isRunning: false, total: totalToCompile, done, failed: currentFailed })
-          stopPolling()
-          const s = await getStatus()
-          setStatus(s)
-        } else {
-          setCompileProgress({ isRunning: true, total: totalToCompile, done: Math.max(0, done), failed: currentFailed })
-        }
-      } catch { /* polling error, continue */ }
-    }, 3000)
+  const handleCancelCompile = async () => {
+    if (!compileJob?.job_id) return
+    setCancellingCompile(true); setError('')
+    try {
+      const next = await cancelCompileJob(compileJob.job_id)
+      setCompileJob(next)
+      setResult(next)
+      setCompileHistory((jobs) => jobs.map((job) => (
+        job.job_id === next.job_id ? next : job
+      )))
+    } catch (e) {
+      setError(`取消编译失败：${(e as Error).message}`)
+    } finally {
+      setCancellingCompile(false)
+    }
   }
 
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
+  const handleRetryCompile = async (job: CompileResponse) => {
+    if (!job.job_id || !job.retryable || compileRunning) return
+    setRetryingJobId(job.job_id); setError('')
+    try {
+      const next = await retryCompileJob(job.job_id)
+      setResult(next)
+      setCompileJob(next.job_id ? next : null)
+      await loadCompileHistory()
+      if (!next.job_id || !isCompileJobActive(next.status)) await loadData()
+    } catch (e) {
+      setError(`重试编译失败：${(e as Error).message}`)
+    } finally {
+      setRetryingJobId(null)
     }
   }
 
   // 重编译过时/失败文档（recompile stale）
   const handleRecompileStale = async () => {
+    if (staleCount === 0) {
+      setRefreshMsg('当前没有需要重编译的过时文档')
+      setTimeout(() => setRefreshMsg(''), 2000)
+      return
+    }
     setRecompiling(true); setError('')
     try {
       const res = await recompileStale(limit)
@@ -142,10 +267,11 @@ export default function CompilePage() {
     }
   }
 
-  // 组件卸载时清理轮询
-  useEffect(() => () => stopPolling(), [])
-
   const handlePromote = async (fileId: string) => {
+    const file = allFiles.find((item) => item.id === fileId)
+    const fileLabel = file?.title || fileId
+    if (!window.confirm(`将“${fileLabel}”晋升到 wiki？系统会写入知识文件并更新 manifest 状态。`)) return
+
     setPromoting(true); setPromoteMsg('')
     try {
       const res = await promoteFile(fileId)
@@ -156,6 +282,8 @@ export default function CompilePage() {
   }
 
   const m = status?.manifests
+  const qualityThreshold = status?.config?.min_quality_score ?? 85
+  const selectedFilePromotable = (selectedFile?.quality_score ?? 0) >= qualityThreshold
 
   // Filter files for the compile view
   const filteredFiles = allFiles.filter((f) => {
@@ -166,25 +294,48 @@ export default function CompilePage() {
 
   const compiledFiles = allFiles.filter(f => f.status === 'compiled')
   const ingestedFiles = allFiles.filter(f => f.status === 'ingested')
+  const compileRunning = Boolean(compileJob && isCompileJobActive(compileJob.status))
+  const resultIsPositive = Boolean(
+    result && !['failed', 'cancelled', 'interrupted'].includes(result.status),
+  )
 
   const totalPages = Math.max(1, Math.ceil(filteredFiles.length / PAGE_SIZE))
   const pagedFiles = filteredFiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  useEffect(() => { setPage(1) }, [search, filter])
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+
+  const handleFilterChange = (value: string) => {
+    setFilter(value)
+    setPage(1)
+  }
+
+  const pageHeader = (
+    <PageHeader title="编译控制" description="将源文件编译为结构化知识"
+      actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {refreshMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-success)', fontWeight: 500 }}>{refreshMsg}</span>}
+          <button onClick={handleRefresh} disabled={refreshing}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, opacity: refreshing ? 0.5 : 1 }}>
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> 刷新
+          </button>
+        </div>
+      }
+    />
+  )
+
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
+      {pageHeader}
+      <RequestErrorState error={loadError} onRetry={loadData} retrying={refreshing} />
+    </div>
+  )
 
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto' }}>
-      <PageHeader title="编译控制" description="将源文件编译为结构化知识"
-        actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            {refreshMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-success)', fontWeight: 500 }}>{refreshMsg}</span>}
-            <button onClick={handleRefresh} disabled={refreshing}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px', fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, opacity: refreshing ? 0.5 : 1 }}>
-              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> 刷新
-            </button>
-          </div>
-        }
-      />
+      {pageHeader}
 
       {/* ── Stats Overview ── */}
       <SectionHeader title="编译概览" />
@@ -193,7 +344,7 @@ export default function CompilePage() {
         <StatCard label="待编译" value={m?.ingested ?? '-'} color="var(--status-info)" icon={<Clock size={18} />} />
         <StatCard label="已编译" value={m?.compiled ?? '-'} color="var(--status-success)" icon={<FileCheck size={18} />} />
         <StatCard label="失败" value={m?.failed ?? '-'} color="var(--status-error)" icon={<AlertTriangle size={18} />} />
-        <StatCard label="质量阈值" value={status?.config?.min_quality_score ?? 85} color="var(--status-warning)" />
+        <StatCard label="质量阈值" value={qualityThreshold} color="var(--status-warning)" />
       </div>
 
       {/* ── Compile Controls ── */}
@@ -225,30 +376,30 @@ export default function CompilePage() {
           <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }} />
           模拟运行
         </label>
-        <button onClick={handleCompile} disabled={compiling || compileProgress.isRunning || ingestedFiles.length === 0}
+        <button onClick={handleCompile} disabled={compiling || compileRunning || ingestedFiles.length === 0}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '8px 20px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
             color: '#fff', background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
-            opacity: compiling || compileProgress.isRunning || ingestedFiles.length === 0 ? 0.4 : 1,
+            opacity: compiling || compileRunning || ingestedFiles.length === 0 ? 0.4 : 1,
             whiteSpace: 'nowrap',
           }}>
-          {compiling || compileProgress.isRunning ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
-          {compiling ? '提交中...' : compileProgress.isRunning ? '编译进行中...' : dryRun ? '模拟编译' : '开始编译'}
-          {!compiling && !compileProgress.isRunning && ingestedFiles.length > 0 && (
+          {compiling || compileRunning ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
+          {compiling ? '提交中...' : compileRunning ? '编译进行中...' : dryRun ? '模拟编译' : '开始编译'}
+          {!compiling && !compileRunning && ingestedFiles.length > 0 && (
             <span style={{ fontSize: '12px', opacity: 0.8 }}>({ingestedFiles.length} 待编译)</span>
           )}
         </button>
 
         {/* 重编译过时文档 */}
-        <button onClick={handleRecompileStale} disabled={recompiling}
-          title="重新编译质量分过低或失败的文档（recompile stale）"
+        <button onClick={handleRecompileStale} disabled={recompiling || staleCount === 0}
+          title={staleCount === 0 ? '当前没有需要重编译的过时文档' : `重新编译 ${staleCount} 个配置已过时的文档`}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '8px 20px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
             color: 'var(--text-primary)', background: 'var(--bg-elevated)',
             border: '1px solid var(--border-default)', cursor: 'pointer',
-            opacity: recompiling ? 0.4 : 1, whiteSpace: 'nowrap',
+            opacity: recompiling || staleCount === 0 ? 0.4 : 1, whiteSpace: 'nowrap',
           }}>
           {recompiling ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           {recompiling ? '提交中...' : '重编译过时'}
@@ -259,24 +410,26 @@ export default function CompilePage() {
       {result && (
         <div style={{
           borderRadius: '4px', padding: 'var(--space-4)', marginBottom: 'var(--space-6)',
-          background: result.status === 'accepted' || result.status === 'no_work' ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
-          border: `1px solid ${result.status === 'accepted' || result.status === 'no_work' ? 'var(--status-success-border)' : 'var(--status-error-border)'}`,
+          background: resultIsPositive ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
+          border: `1px solid ${resultIsPositive ? 'var(--status-success-border)' : 'var(--status-error-border)'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-            {result.status === 'accepted' || result.status === 'no_work'
+            {resultIsPositive
               ? <CheckCircle2 size={14} style={{ color: 'var(--status-success)' }} />
               : <XCircle size={14} style={{ color: 'var(--status-error)' }} />}
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{result.message}</span>
           </div>
-          {result.total > 0 && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0, fontWeight: 400 }}>总计 {result.total}，已编译 {result.compiled}，失败 {result.failed}</p>}
+          {result.total > 0 && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0, fontWeight: 400 }}>总计 {result.total}，已处理 {result.processed}，成功 {result.compiled}，失败 {result.failed}</p>}
+          {result.error && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-error)', margin: 'var(--space-2) 0 0' }}>{result.error}</p>}
         </div>
       )}
 
       {error && <div style={{ borderRadius: '4px', padding: 'var(--space-4)', marginBottom: 'var(--space-6)', fontSize: 'var(--text-sm)', background: 'var(--status-error-bg)', color: 'var(--status-error)' }}>{error}</div>}
 
       {/* ── Compile Progress Bar ── */}
-      {compileProgress.isRunning && (() => {
-        const pct = compileProgress.total > 0 ? Math.round((compileProgress.done / compileProgress.total) * 100) : 0
+      {compileJob && compileRunning && (() => {
+        const pct = compileJobPercent(compileJob)
+        const cancelling = compileJob.status === 'cancelling' || compileJob.cancel_requested
         return (
           <div style={{
             borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
@@ -286,10 +439,12 @@ export default function CompilePage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                 <Loader2 size={16} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-primary)' }}>编译进行中</span>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-primary)' }}>
+                  {cancelling ? '正在取消编译' : '编译进行中'}
+                </span>
               </div>
               <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-primary)' }}>
-                {compileProgress.done} / {compileProgress.total} ({pct}%)
+                {compileJob.processed} / {compileJob.total} ({pct}%)
               </span>
             </div>
             {/* 进度条 */}
@@ -305,12 +460,23 @@ export default function CompilePage() {
               }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)' }}>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
-                {compileProgress.failed > 0 ? `${compileProgress.failed} 个失败` : '每 3 秒自动刷新...'}
-              </span>
-              <button onClick={() => { stopPolling(); setCompileProgress(p => ({ ...p, isRunning: false })) }}
-                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, textDecoration: 'underline' }}>
-                停止刷新
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
+                <div>成功 {compileJob.compiled} · 失败 {compileJob.failed}</div>
+                {compileJob.current_files.length > 0 && (
+                  <div style={{ marginTop: '4px' }}>当前：{compileJob.current_files.join('、')}</div>
+                )}
+              </div>
+              <button
+                onClick={handleCancelCompile}
+                disabled={cancellingCompile || cancelling}
+                style={{
+                  alignSelf: 'flex-start', padding: '4px 10px', borderRadius: '4px',
+                  fontSize: 'var(--text-xs)', color: 'var(--status-error)',
+                  background: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)',
+                  cursor: cancellingCompile || cancelling ? 'not-allowed' : 'pointer', fontWeight: 600,
+                  opacity: cancellingCompile || cancelling ? 0.55 : 1,
+                }}>
+                {cancellingCompile || cancelling ? '取消中...' : '取消编译'}
               </button>
             </div>
           </div>
@@ -318,30 +484,104 @@ export default function CompilePage() {
       })()}
 
       {/* ── Compile Complete Summary ── */}
-      {!compileProgress.isRunning && compileProgress.total > 0 && compileProgress.done > 0 && (
+      {compileJob && !compileRunning && ['completed', 'failed', 'cancelled', 'interrupted'].includes(compileJob.status) && (
         <div style={{
           borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)',
-          border: '1px solid var(--status-success-border)', marginBottom: 'var(--space-6)',
-          background: 'var(--status-success-bg)',
+          border: `1px solid ${compileJob.status === 'completed' ? 'var(--status-success-border)' : 'var(--status-error-border)'}`, marginBottom: 'var(--space-6)',
+          background: compileJob.status === 'completed' ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
           display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
         }}>
-          <CheckCircle2 size={18} style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+          {compileJob.status === 'completed'
+            ? <CheckCircle2 size={18} style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+            : <XCircle size={18} style={{ color: 'var(--status-error)', flexShrink: 0 }} />}
           <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--status-success)' }}>
-              编译完成：{compileProgress.done} 个成功
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: compileJob.status === 'completed' ? 'var(--status-success)' : 'var(--status-error)' }}>
+              {compileJob.message}：{compileJob.compiled} 个成功
             </span>
-            {compileProgress.failed > 0 && (
+            {compileJob.failed > 0 && (
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--status-error)', marginLeft: 'var(--space-3)' }}>
-                {compileProgress.failed} 个失败
+                {compileJob.failed} 个失败
               </span>
             )}
           </div>
-          <button onClick={() => setCompileProgress({ isRunning: false, total: 0, done: 0, failed: 0 })}
+          <button onClick={() => { setCompileJob(null); setResult(null) }}
             style={{ padding: '2px 6px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)', fontSize: 'var(--text-xs)' }}>
             关闭
           </button>
         </div>
       )}
+
+      {/* ── Durable Compile History ── */}
+      <SectionHeader title="编译历史"
+        action={<span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>保留于当前工作区</span>}
+      />
+      <div style={{
+        border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)',
+        background: 'var(--bg-card)', marginBottom: 'var(--space-8)', overflow: 'hidden',
+      }}>
+        {compileHistory.length === 0 ? (
+          <div style={{ padding: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
+            尚无编译历史。提交任务后，即使服务重启也可在这里查看结果。
+          </div>
+        ) : compileHistory.map((job, index) => {
+          const unsuccessful = ['failed', 'cancelled', 'interrupted'].includes(job.status)
+          const busyRetry = retryingJobId === job.job_id
+          return (
+            <div key={job.job_id ?? `${job.created_at}-${index}`} style={{
+              padding: 'var(--space-4) var(--space-5)',
+              borderTop: index === 0 ? 'none' : '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+              gap: 'var(--space-4)', flexWrap: 'wrap',
+            }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: 'var(--text-xs)', fontWeight: 700,
+                    color: unsuccessful ? 'var(--status-error)' : 'var(--status-success)',
+                    background: unsuccessful ? 'var(--status-error-bg)' : 'var(--status-success-bg)',
+                    borderRadius: 'var(--radius-full)', padding: '2px 8px',
+                  }}>
+                    {JOB_STATUS_LABELS[job.status] ?? job.status}
+                  </span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {job.compiled}/{job.total} 成功 · 第 {job.attempt} 次尝试
+                  </span>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
+                    {formatJobTime(job.finished_at ?? job.started_at ?? job.created_at)}
+                  </span>
+                </div>
+                <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                  并发 {job.concurrency} · 限制 {job.limit ?? '全部'}
+                  {job.retry_of && <> · 重试自 {job.retry_of.slice(0, 8)}</>}
+                  {job.job_id && <> · ID {job.job_id.slice(0, 8)}</>}
+                </div>
+                {job.error && (
+                  <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-error)', wordBreak: 'break-word' }}>
+                    {job.error}
+                  </div>
+                )}
+              </div>
+              {job.retryable && job.job_id && (
+                <button
+                  onClick={() => { void handleRetryCompile(job) }}
+                  disabled={busyRetry || compileRunning}
+                  aria-label={`重试编译任务 ${job.job_id.slice(0, 8)}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 10px', borderRadius: '4px', fontSize: 'var(--text-xs)',
+                    color: 'var(--color-primary)', background: 'var(--color-primary-bg)',
+                    border: '1px solid var(--color-primary)', fontWeight: 600,
+                    cursor: busyRetry || compileRunning ? 'not-allowed' : 'pointer',
+                    opacity: busyRetry || compileRunning ? 0.5 : 1,
+                  }}>
+                  {busyRetry ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                  {busyRetry ? '重试提交中...' : '重试任务'}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
 
       {/* ── File List ── */}
       <SectionHeader title={`文件列表 (${filteredFiles.length})`}
@@ -362,13 +602,13 @@ export default function CompilePage() {
             width: '100%', padding: '6px 10px 6px 32px', borderRadius: '4px',
             fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
             background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none', lineHeight: 1.5,
-          }} placeholder="搜索文件名..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          }} placeholder="搜索文件名..." value={search} onChange={(e) => handleSearchChange(e.target.value)} />
         </div>
         <select style={{
           padding: '6px 10px', borderRadius: '4px', fontSize: 'var(--text-sm)',
           border: '1px solid var(--border-default)', background: 'var(--bg-input)',
           color: 'var(--text-primary)', outline: 'none', cursor: 'pointer',
-        }} value={filter} onChange={(e) => setFilter(e.target.value)}>
+        }} value={filter} onChange={(e) => handleFilterChange(e.target.value)}>
           <option value="">全部状态</option>
           <option value="ingested">待编译</option>
           <option value="compiled">已编译</option>
@@ -396,6 +636,7 @@ export default function CompilePage() {
             <tbody>
               {pagedFiles.map((f) => {
                 const sc = STATUS_COLORS[f.status] || { color: 'var(--text-muted)', bg: 'var(--bg-elevated)' }
+                const promotable = (f.quality_score ?? 0) >= qualityThreshold
                 return (
                   <tr key={f.id} style={{ borderTop: '1px solid var(--border-subtle)', cursor: 'pointer' }}
                     onClick={() => setSelectedFile(f)}
@@ -422,7 +663,7 @@ export default function CompilePage() {
                     <td style={{ padding: '8px 16px', fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 400 }}>{formatBytes(f.size_bytes)}</td>
                     <td style={{
                       padding: '8px 16px', fontSize: 'var(--text-sm)', fontWeight: 600,
-                      color: (f.quality_score ?? 0) >= 85 ? 'var(--status-success)' : (f.quality_score ?? 0) >= 60 ? 'var(--status-warning)' : 'var(--text-dimmed)',
+                      color: promotable ? 'var(--status-success)' : (f.quality_score ?? 0) >= 60 ? 'var(--status-warning)' : 'var(--text-dimmed)',
                     }}>
                       {f.quality_score ?? '-'}
                     </td>
@@ -435,8 +676,17 @@ export default function CompilePage() {
                           </button>
                         )}
                         {f.status === 'compiled' && (
-                          <button onClick={() => handlePromote(f.id)} disabled={promoting} title="晋升到 Wiki"
-                            style={{ padding: '4px 6px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-primary)' }}>
+                          <button
+                            onClick={() => handlePromote(f.id)}
+                            disabled={promoting || !promotable}
+                            aria-label={promotable ? `晋升 ${f.title} 到 Wiki` : `${f.title} 未达到质量门槛 ${qualityThreshold}`}
+                            title={promotable ? '晋升到 Wiki' : `质量分 ${f.quality_score ?? 0}，低于晋升门槛 ${qualityThreshold}`}
+                            style={{
+                              padding: '4px 6px', borderRadius: '4px', border: 'none', background: 'transparent',
+                              cursor: promotable ? 'pointer' : 'not-allowed',
+                              color: promotable ? 'var(--color-primary)' : 'var(--text-dimmed)',
+                              opacity: promoting || !promotable ? 0.45 : 1,
+                            }}>
                             <ArrowUpRight size={14} />
                           </button>
                         )}
@@ -579,7 +829,7 @@ export default function CompilePage() {
                   <div style={{
                     fontSize: 'var(--text-sm)', fontWeight: 600,
                     color: item.highlight
-                      ? (selectedFile.quality_score ?? 0) >= 85 ? 'var(--status-success)' : (selectedFile.quality_score ?? 0) >= 60 ? 'var(--status-warning)' : 'var(--text-dimmed)'
+                      ? selectedFilePromotable ? 'var(--status-success)' : (selectedFile.quality_score ?? 0) >= 60 ? 'var(--status-warning)' : 'var(--text-dimmed)'
                       : 'var(--text-primary)',
                   }}>{item.value}</div>
                 </div>
@@ -758,16 +1008,28 @@ export default function CompilePage() {
             {/* Actions */}
             <div style={{ display: 'flex', gap: 'var(--space-2)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-4)' }}>
               {selectedFile.status === 'compiled' && (
-                <button onClick={() => handlePromote(selectedFile.id)} disabled={promoting}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '8px 16px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
-                    color: '#fff', background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
-                    opacity: promoting ? 0.5 : 1,
-                  }}>
-                  {promoting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
-                  晋升到 Wiki
-                </button>
+                <>
+                  <button
+                    onClick={() => handlePromote(selectedFile.id)}
+                    disabled={promoting || !selectedFilePromotable}
+                    title={selectedFilePromotable ? '晋升到 Wiki' : `质量分 ${selectedFile.quality_score ?? 0}，低于晋升门槛 ${qualityThreshold}`}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '8px 16px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
+                      color: selectedFilePromotable ? '#fff' : 'var(--text-dimmed)',
+                      background: selectedFilePromotable ? 'var(--color-primary)' : 'var(--bg-elevated)',
+                      border: 'none', cursor: selectedFilePromotable ? 'pointer' : 'not-allowed',
+                      opacity: promoting ? 0.5 : 1,
+                    }}>
+                    {promoting ? <Loader2 size={14} className="animate-spin" /> : <ArrowUpRight size={14} />}
+                    晋升到 Wiki
+                  </button>
+                  {!selectedFilePromotable && (
+                    <span role="note" style={{ alignSelf: 'center', fontSize: 'var(--text-xs)', color: 'var(--status-warning)' }}>
+                      当前质量分 {selectedFile.quality_score ?? 0}，需达到 {qualityThreshold}
+                    </span>
+                  )}
+                </>
               )}
               {selectedFile.status === 'failed' && (
                 <div style={{

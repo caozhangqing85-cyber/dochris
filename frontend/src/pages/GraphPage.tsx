@@ -4,6 +4,7 @@ import {
   ZoomIn, Maximize2, ChevronRight, Tag, FileText, BookOpen,
 } from 'lucide-react'
 import { getGraph, getManifests, getGraphNode } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import type {
   SemanticNode, ViewMode,
@@ -16,6 +17,7 @@ import type { SemanticGraph } from '@/lib/graphBuilder'
 import { createForceGraph } from '@/lib/graphRenderer'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 
 const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof Tag }[] = [
   { value: 'concept', label: '概念视图', icon: Tag },
@@ -24,8 +26,8 @@ const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof Tag }[] = [
 ]
 
 export default function GraphPage() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
   const [graph, setGraph] = useState<SemanticGraph | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('concept')
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,15 +42,18 @@ export default function GraphPage() {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const detailCloseRef = useRef<HTMLButtonElement>(null)
   const rendererRef = useRef<ReturnType<typeof createForceGraph> | null>(null)
   const graphRef = useRef<SemanticGraph | null>(null)
+  const highlightedIdsRef = useRef<Set<string>>(new Set())
 
   // Keep graphRef in sync
   useEffect(() => { graphRef.current = graph }, [graph])
+  useEffect(() => { highlightedIdsRef.current = highlightedIds }, [highlightedIds])
 
   // Load graph data
   const loadGraph = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true); setLoadError(null)
     try {
       const [graphRes, manifests] = await Promise.all([
         withMinDelay(getGraph()),
@@ -60,15 +65,46 @@ export default function GraphPage() {
         manifests,
       )
       setGraph(built)
+      setLoadError(null)
+      if (searchQuery) {
+        const ids = searchNodes(built.nodes, searchQuery)
+        setHighlightedIds(ids)
+        rendererRef.current?.highlight(ids)
+      }
     } catch (e) {
-      setError((e as Error).message)
+      setLoadError(classifyRequestError(e))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [searchQuery])
 
   // Auto-load graph on mount
-  useEffect(() => { loadGraph() }, [loadGraph])
+  useEffect(() => {
+    let cancelled = false
+    const loadInitialGraph = async () => {
+      try {
+        const [graphRes, manifests] = await Promise.all([
+          withMinDelay(getGraph()),
+          getManifests(),
+        ])
+        const built = buildSemanticGraph(
+          graphRes.data?.nodes || [],
+          graphRes.data?.edges || [],
+          manifests,
+        )
+        if (!cancelled) {
+          setGraph(built)
+          setLoadError(null)
+        }
+      } catch (e) {
+        if (!cancelled) setLoadError(classifyRequestError(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void loadInitialGraph()
+    return () => { cancelled = true }
+  }, [])
 
   // Handle node click (using ref to avoid stale closure)
   const handleNodeClick = useCallback(async (node: SemanticNode) => {
@@ -125,6 +161,36 @@ export default function GraphPage() {
     rendererRef.current?.focusNode(node.id)
   }, [])
 
+  const closeNodeDetail = useCallback(() => {
+    const nodeId = selectedNode?.id
+    setSelectedNode(null)
+    setNodeDetail(null)
+    setHighlightedIds(new Set())
+    rendererRef.current?.highlight(new Set())
+    if (nodeId) {
+      requestAnimationFrame(() => {
+        const node = Array.from(svgRef.current?.querySelectorAll<SVGGElement>('g.nodes > g') || [])
+          .find((element) => element.dataset.nodeId === nodeId)
+        node?.focus()
+      })
+    }
+  }, [selectedNode])
+
+  useEffect(() => {
+    if (!selectedNode) return
+    const focusTimer = requestAnimationFrame(() => detailCloseRef.current?.focus())
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeNodeDetail()
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      cancelAnimationFrame(focusTimer)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [selectedNode, closeNodeDetail])
+
   // Apply view filter and render
   useEffect(() => {
     if (!graph || !containerRef.current || !svgRef.current) return
@@ -173,8 +239,8 @@ export default function GraphPage() {
     const fitTimer = setTimeout(() => renderer.fitToView(), 800)
 
     // Re-apply current highlight state after re-render
-    if (highlightedIds.size > 0) {
-      renderer.highlight(highlightedIds)
+    if (highlightedIdsRef.current.size > 0) {
+      renderer.highlight(highlightedIdsRef.current)
     }
 
     return () => {
@@ -183,13 +249,17 @@ export default function GraphPage() {
     }
   }, [graph, viewMode, filterTypes, handleNodeClick, handleNodeDoubleClick])
 
-  // Handle search highlight
-  useEffect(() => {
-    if (!graph) return
-    const ids = searchNodes(graph.nodes, searchQuery)
+  const applySearchHighlight = useCallback((query: string) => {
+    const currentGraph = graphRef.current
+    const ids = currentGraph ? searchNodes(currentGraph.nodes, query) : new Set<string>()
     setHighlightedIds(ids)
     rendererRef.current?.highlight(ids)
-  }, [searchQuery, graph])
+  }, [])
+
+  const handleSearchQueryChange = (value: string) => {
+    setSearchQuery(value)
+    applySearchHighlight(value)
+  }
 
   // Handle window resize
   useEffect(() => {
@@ -216,23 +286,15 @@ export default function GraphPage() {
   }
 
   // Error state with retry
-  if (error && !graph) {
-    return (
-      <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <PageHeader title="知识图谱" description="概念语义网络 · 基于 Karpathy LLM-Wiki 三层架构" />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-lg)', minHeight: '480px', border: '1px solid var(--status-error-border)', background: 'var(--status-error-bg)' }}>
-          <EmptyState icon={<Share2 size={28} />} title="加载失败"
-            description={error} />
-          <button onClick={loadGraph} style={{ ...primaryBtnStyle(false), marginTop: 'var(--space-4)' }}>
-            重试
-          </button>
-        </div>
-      </div>
-    )
-  }
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <PageHeader title="知识图谱" description="概念语义网络 · 基于 Karpathy LLM-Wiki 三层架构" />
+      <RequestErrorState error={loadError} onRetry={loadGraph} retrying={loading} />
+    </div>
+  )
 
   // No data state
-  if (!graph) {
+  if (!graph || graph.stats.totalNodes === 0) {
     return (
       <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '100%', margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <PageHeader title="知识图谱" description="概念语义网络 · 基于 Karpathy LLM-Wiki 三层架构"
@@ -245,8 +307,8 @@ export default function GraphPage() {
           }
         />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-lg)', minHeight: '480px', border: '1px solid var(--border-default)' }}>
-          <EmptyState icon={<Share2 size={28} />} title="概念语义图谱"
-            description="加载知识库中的概念关系网络，可视化概念间的语义关联" />
+          <EmptyState icon={<Share2 size={28} />} title="知识图谱为空"
+            description="请先上传并编译文档，Dochris 会从已编译内容中生成可探索的概念关系" />
         </div>
       </div>
     )
@@ -266,14 +328,8 @@ export default function GraphPage() {
         }
       />
 
-      {error && (
-        <div style={{ borderRadius: '4px', padding: 'var(--space-4)', marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', background: 'var(--status-error-bg)', color: 'var(--status-error)' }}>
-          {error}
-        </div>
-      )}
-
       {graph && (
-        <div style={{ flex: 1, display: 'flex', gap: 'var(--space-4)', minHeight: '480px' }}>
+        <div className="graph-layout" style={{ flex: 1, display: 'flex', gap: 'var(--space-4)', minHeight: '480px' }}>
           {/* ── Toolbar ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '44px', flexShrink: 0 }}>
             {/* View mode switcher */}
@@ -307,13 +363,13 @@ export default function GraphPage() {
           {/* ── Main graph area ── */}
           <div style={{ flex: 1, position: 'relative', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)', overflow: 'hidden', background: 'var(--bg-elevated)' }}>
             {/* Search bar overlay */}
-            <div style={{
+            <div className="graph-search-overlay" style={{
               position: 'absolute', top: '12px', left: '12px', right: selectedNode ? '340px' : '12px',
               zIndex: 10, maxWidth: '320px',
             }}>
               <div style={{ position: 'relative' }}>
                 <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dimmed)' }} />
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                <input value={searchQuery} onChange={e => handleSearchQueryChange(e.target.value)}
                   placeholder="搜索概念或文档..."
                   style={{
                     width: '100%', padding: '6px 10px 6px 30px', borderRadius: '4px',
@@ -323,7 +379,7 @@ export default function GraphPage() {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                   }} />
                 {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} style={{
+                  <button onClick={() => { setSearchQuery(''); applySearchHighlight('') }} style={{
                     position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
                     padding: '2px', border: 'none', background: 'transparent',
                     cursor: 'pointer', color: 'var(--text-dimmed)',
@@ -343,7 +399,7 @@ export default function GraphPage() {
             </div>
 
             {/* View mode indicator */}
-            <div style={{
+            <div className="graph-view-switcher" style={{
               position: 'absolute', top: '12px', right: '12px', zIndex: 10,
               display: 'flex', alignItems: 'center', gap: '2px',
               background: 'var(--bg-card)', borderRadius: '4px',
@@ -472,7 +528,7 @@ export default function GraphPage() {
 
           {/* ── Detail panel ── */}
           {selectedNode && (
-            <div style={{
+            <div className="graph-detail-panel" role="region" aria-label="节点详情" style={{
               width: '320px', flexShrink: 0,
               borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)',
               background: 'var(--bg-card)', overflow: 'auto',
@@ -506,7 +562,8 @@ export default function GraphPage() {
                     </span>
                   </div>
                 </div>
-                <button onClick={() => { setSelectedNode(null); setNodeDetail(null); setHighlightedIds(new Set()); rendererRef.current?.highlight(new Set()) }}
+                <button ref={detailCloseRef} type="button" aria-label="关闭节点详情"
+                  onClick={closeNodeDetail}
                   style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)' }}>
                   <X size={14} />
                 </button>

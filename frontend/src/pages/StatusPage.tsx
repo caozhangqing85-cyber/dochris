@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { getStatus } from '@/lib/api'
+import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import type { StatusResponse } from '@/types'
 import PageHeader from '@/components/ui/PageHeader'
+import RequestErrorState from '@/components/ui/RequestErrorState'
 import SectionHeader from '@/components/ui/SectionHeader'
 
 // Row 提到组件外，避免每次父渲染重建组件类型导致子树重挂（React 反模式）
@@ -28,18 +30,36 @@ export default function StatusPage() {
   const [status, setStatus] = useState<StatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshMsg, setRefreshMsg] = useState('')
-  const load = useCallback(async () => {
-    setLoading(true)
+  const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
+
+  const loadStatus = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
-      setStatus(await withMinDelay(getStatus()))
+      const nextStatus = await withMinDelay(getStatus())
+      if (isCancelled()) return false
+      setStatus(nextStatus)
+      setLoadError(null)
       return true
-    } catch {
+    } catch (e) {
+      if (!isCancelled()) setLoadError(classifyRequestError(e))
       return false
     } finally {
-      setLoading(false)
+      if (!isCancelled()) setLoading(false)
     }
   }, [])
-  useEffect(() => { load() }, [load])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    return loadStatus()
+  }, [loadStatus])
+
+  useEffect(() => {
+    let cancelled = false
+    queueMicrotask(() => {
+      void loadStatus(() => cancelled)
+    })
+    return () => { cancelled = true }
+  }, [loadStatus])
+
   const handleRefresh = async () => {
     const ok = await load()
     setRefreshMsg(ok ? '已刷新' : '刷新失败')
@@ -53,26 +73,36 @@ export default function StatusPage() {
     return `${(bytes / 1e3).toFixed(1)} KB`
   }
 
+  const pageHeader = (
+    <PageHeader title="系统状态" description="系统配置与运行状态"
+      actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {refreshMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-success)', fontWeight: 500 }}>{refreshMsg}</span>}
+          <button onClick={handleRefresh} disabled={loading}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '6px 12px', borderRadius: '4px',
+              fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
+              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500,
+              opacity: loading ? 0.5 : 1,
+            }}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
+          </button>
+        </div>
+      }
+    />
+  )
+
+  if (loadError) return (
+    <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
+      {pageHeader}
+      <RequestErrorState error={loadError} onRetry={load} retrying={loading} />
+    </div>
+  )
+
   return (
     <div className="page-container" style={{ padding: 'var(--space-12) var(--space-10)', maxWidth: '1200px', margin: '0 auto' }}>
-      <PageHeader title="系统状态" description="系统配置与运行状态"
-        actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            {refreshMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-success)', fontWeight: 500 }}>{refreshMsg}</span>}
-            {/* Notion ghost button: 4px radius, 8px 12px padding */}
-            <button onClick={handleRefresh} disabled={loading}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '6px 12px', borderRadius: '4px',
-                fontSize: 'var(--text-sm)', border: '1px solid var(--border-default)',
-                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 500,
-                opacity: loading ? 0.5 : 1,
-              }}>
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 刷新
-            </button>
-          </div>
-        }
-      />
+      {pageHeader}
       {status ? (
         <div className="status-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
           <div>
@@ -101,8 +131,8 @@ export default function StatusPage() {
               <Row label="Wiki" value={String(status.manifests.promoted_to_wiki)} />
               <Row label="Curated" value={String(status.manifests.promoted)} />
               <Row label="失败" value={String(status.manifests.failed)} />
-              <Row label="概念数" value={String(status.manifests.concepts_count ?? 0)} />
-              <Row label="摘要数" value={String(status.manifests.summaries_count ?? 0)} />
+              <Row label="概念文件" value={String(status.manifests.concepts_count ?? 0)} />
+              <Row label="摘要文件" value={String(status.manifests.summaries_count ?? 0)} />
               {Object.keys(status.manifests.by_type).length > 0 && (
                 <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-6)', borderTop: '1px solid var(--border-default)' }}>
                   <SectionHeader title="文件类型分布" />

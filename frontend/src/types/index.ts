@@ -65,11 +65,24 @@ export interface CompileRequest {
 }
 
 export interface CompileResponse {
+  job_id: string | null
   status: string
   message: string
   total: number
+  processed: number
   compiled: number
   failed: number
+  current_files: string[]
+  cancel_requested: boolean
+  concurrency: number
+  limit: number | null
+  attempt: number
+  retry_of: string | null
+  retryable: boolean
+  error: string | null
+  created_at: string | null
+  started_at: string | null
+  finished_at: string | null
 }
 
 export interface PromoteRequest {

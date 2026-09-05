@@ -5,7 +5,8 @@ import {
   MessageSquare, Tag, Zap, ToggleLeft, ToggleRight,
   X, History, Star, Download,
 } from 'lucide-react'
-import { queryKnowledge, queryKnowledgeStream, getManifests } from '@/lib/api'
+import { queryKnowledge, queryKnowledgeStream, contributeQueryResult, getManifests, ApiError } from '@/lib/api'
+import type { ContributionMeta, PhaseTimings, StreamErrorEvent } from '@/lib/api'
 import type { QueryResponse, ManifestItem, SearchResult, VectorResult } from '@/types'
 import ErrorBoundary from '@/components/ui/ErrorBoundary'
 import StreamingMarkdown from '@/components/StreamingMarkdown'
@@ -23,6 +24,108 @@ const MODES = [
 const HISTORY_KEY = 'dochris-query-history'
 const FAVORITES_KEY = 'dochris-query-favorites'
 const MAX_HISTORY = 30
+
+type QueryErrorKind = 'OFFLINE' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'TIMEOUT' | 'ABORTED' | 'HTTP' | 'UNKNOWN'
+
+interface QueryErrorView {
+  kind: QueryErrorKind
+  title: string
+  message: string
+  diagnostic: string
+  retryable: boolean
+}
+
+function formatQueryError(error: unknown): QueryErrorView {
+  if (error instanceof ApiError) {
+    if (error.code === 'OFFLINE') {
+      return {
+        kind: 'OFFLINE',
+        title: '无法连接后端 API',
+        message: error.message,
+        diagnostic: '请确认后端服务已启动，或检查前端代理配置。',
+        retryable: true,
+      }
+    }
+    if (error.code === 'TIMEOUT') {
+      return {
+        kind: 'TIMEOUT',
+        title: '查询超时',
+        message: error.message,
+        diagnostic: '本次生成耗时过长。可以减少检索数量，或稍后重试。',
+        retryable: true,
+      }
+    }
+    if (error.code === 'ABORTED') {
+      return {
+        kind: 'ABORTED',
+        title: '查询已取消',
+        message: '已停止当前流式回答。',
+        diagnostic: '可以调整问题后重新查询。',
+        retryable: true,
+      }
+    }
+    if (error.status === 401 || error.code === 'UNAUTHORIZED') {
+      return {
+        kind: 'UNAUTHORIZED',
+        title: '未授权',
+        message: error.message,
+        diagnostic: '请检查本地 API Key 设置。',
+        retryable: false,
+      }
+    }
+    if (error.status === 403 || error.code === 'FORBIDDEN') {
+      return {
+        kind: 'FORBIDDEN',
+        title: '没有访问权限',
+        message: error.message,
+        diagnostic: '当前 API Key 没有执行该查询的权限。',
+        retryable: false,
+      }
+    }
+    return {
+      kind: 'HTTP',
+      title: error.status && error.status >= 500 ? '后端服务异常' : '查询失败',
+      message: error.message,
+      diagnostic: error.status ? `HTTP ${error.status}` : '后端返回了非预期错误。',
+      retryable: !error.status || error.status >= 500,
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+  return {
+    kind: 'UNKNOWN',
+    title: '查询失败',
+    message,
+    diagnostic: '前端无法识别该错误类型，请查看后端日志。',
+    retryable: true,
+  }
+}
+
+function phaseLabel(key: string): string {
+  const labels: Record<string, string> = {
+    retrieval: '检索',
+    retrieval_seconds: '检索',
+    search: '检索',
+    rerank: '重排序',
+    rerank_seconds: '重排序',
+    generation: '生成',
+    generation_seconds: '生成',
+    contribution: '贡献写入',
+    contribution_seconds: '贡献写入',
+    total: '总计',
+    total_seconds: '总计',
+    first_token_seconds: '首字',
+  }
+  return labels[key] ?? key
+}
+
+function streamErrorCodeToApiCode(error: StreamErrorEvent): string {
+  const code = error.code?.toUpperCase()
+  if (code === 'TIMEOUT' || code === 'TIMEOUT_ERROR') return 'TIMEOUT'
+  if (code === 'UNAUTHORIZED' || code === 'AUTH_REQUIRED') return 'UNAUTHORIZED'
+  if (code === 'FORBIDDEN') return 'FORBIDDEN'
+  return code ?? 'HTTP'
+}
 
 // ── Local Storage Helpers ─────────────────────────────
 
@@ -186,8 +289,13 @@ export default function QueryPage() {
   // AbortController：新查询取消上一次流式请求，防竞态
   const abortRef = useRef<AbortController | null>(null)
   const [error, setError] = useState('')
+  const [queryError, setQueryError] = useState<QueryErrorView | null>(null)
   const [files, setFiles] = useState<ManifestItem[]>([])
+  const [filesLoaded, setFilesLoaded] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [contributionReceipt, setContributionReceipt] = useState<ContributionMeta | null>(null)
+  const [phaseTimings, setPhaseTimings] = useState<PhaseTimings | null>(null)
+  const [cancellable, setCancellable] = useState(false)
 
   // UI state
   const [activeTab, setActiveTab] = useState<ResultTab>('answer')
@@ -195,21 +303,44 @@ export default function QueryPage() {
   const [history, setHistory] = useState<HistoryEntry[]>(loadHistory())
   const [favorites, setFavorites] = useState<FavoriteEntry[]>(loadFavorites())
   const [showModeDropdown, setShowModeDropdown] = useState(false)
+  const [focusedModeIndex, setFocusedModeIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modeRef = useRef<HTMLDivElement>(null)
+  const modeTriggerRef = useRef<HTMLButtonElement>(null)
+  const modeOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
 
-  // Load files
-  const loadFiles = useCallback(async () => {
-    try { setFiles(await getManifests()) } catch { /* */ }
+  useEffect(() => {
+    let cancelled = false
+    const loadInitialFiles = async () => {
+      try {
+        const nextFiles = await getManifests()
+        if (!cancelled) setFiles(nextFiles)
+      } catch { /* */ }
+      finally {
+        if (!cancelled) setFilesLoaded(true)
+      }
+    }
+    void loadInitialFiles()
+    return () => { cancelled = true }
   }, [])
-  useEffect(() => { loadFiles() }, [loadFiles])
 
   // filter 包进 useMemo（compiledFiles 每次渲染新引用会破坏下游 memo）
   const compiledFiles = useMemo(
     () => files.filter(f => f.status === 'compiled' || f.status === 'promoted' || f.status === 'promoted_to_wiki'),
     [files]
   )
+  const availabilityText = !filesLoaded
+    ? '正在读取可查询文档…'
+    : compiledFiles.length > 0
+      ? `${compiledFiles.length} 个已编译文档可查询`
+      : '暂无已编译文档，请先前往文件编译页'
   const quickQuestions = useMemo(() => generateQuickQuestions(compiledFiles), [compiledFiles])
+  const phaseTimingItems = useMemo(
+    () => Object.entries(phaseTimings ?? {})
+      .filter(([, value]) => Number.isFinite(value))
+      .map(([key, value]) => ({ key, label: phaseLabel(key), value })),
+    [phaseTimings],
+  )
 
   // Click outside to close mode dropdown
   useEffect(() => {
@@ -222,12 +353,103 @@ export default function QueryPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  useEffect(() => {
+    if (!showModeDropdown) return
+    const focusOption = requestAnimationFrame(() => modeOptionRefs.current[focusedModeIndex]?.focus())
+    return () => cancelAnimationFrame(focusOption)
+  }, [focusedModeIndex, showModeDropdown])
+
+  const closeModeDropdown = useCallback((restoreFocus = true) => {
+    setShowModeDropdown(false)
+    if (restoreFocus) requestAnimationFrame(() => modeTriggerRef.current?.focus())
+  }, [])
+
+  const selectMode = useCallback((nextMode: string, index: number) => {
+    setMode(nextMode)
+    setFocusedModeIndex(index)
+    closeModeDropdown()
+  }, [closeModeDropdown])
+
+  const openModeDropdown = () => {
+    const selectedIndex = Math.max(0, MODES.findIndex((item) => item.value === mode))
+    setFocusedModeIndex(selectedIndex)
+    setShowModeDropdown(true)
+  }
+
+  const toggleModeDropdown = () => {
+    if (showModeDropdown) setShowModeDropdown(false)
+    else openModeDropdown()
+  }
+
+  const handleModeTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    event.preventDefault()
+    openModeDropdown()
+  }
+
+  const handleModeOptionKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeModeDropdown()
+      return
+    }
+    if (event.key === 'Tab') {
+      setShowModeDropdown(false)
+      return
+    }
+
+    const direction = event.key === 'ArrowDown'
+      ? 1
+      : event.key === 'ArrowUp'
+        ? -1
+        : 0
+    if (direction === 0) return
+
+    event.preventDefault()
+    const nextIndex = (index + direction + MODES.length) % MODES.length
+    setFocusedModeIndex(nextIndex)
+    modeOptionRefs.current[nextIndex]?.focus()
+  }
+
   // Query execution
+  const showQueryError = useCallback((nextError: unknown) => {
+    const view = formatQueryError(nextError)
+    setQueryError(view)
+    setError(view.message)
+  }, [])
+
+  const persistContribution = useCallback(async (queryResult: QueryResponse) => {
+    if (!contribute || !queryResult.answer) return
+    try {
+      const receipt = await contributeQueryResult(queryResult)
+      setContributionReceipt(receipt)
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : String(nextError)
+      setError(`回答已生成，但贡献写入失败：${message}`)
+    }
+  }, [contribute])
+
+  const handleCancelQuery = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setCancellable(false)
+    setLoading(false)
+    setQueryError(null)
+    setError('')
+    setResult(null)
+    setElapsed(0)
+    setContributionReceipt(null)
+    setPhaseTimings(null)
+  }, [])
+
   const handleQuery = useCallback(async (q?: string, overrideMode?: string) => {
     const queryText = q || query
     if (!queryText.trim()) return
     const useMode = overrideMode || mode
-    setLoading(true); setError(''); setResult(null); setElapsed(0); setActiveTab('answer')
+    setLoading(true); setError(''); setQueryError(null); setResult(null); setElapsed(0); setContributionReceipt(null); setPhaseTimings(null); setCancellable(false); setActiveTab('answer')
     if (!q) setQuery(queryText)
     const start = Date.now()
 
@@ -235,67 +457,94 @@ export default function QueryPage() {
     if (useMode === 'combined' || useMode === 'all') {
       let fullAnswer = ''
       let streamResult: QueryResponse | null = null
+      let ctrl: AbortController | null = null
 
       try {
         // 取消上一次流式请求，防竞态
         abortRef.current?.abort()
-        const ctrl = new AbortController()
+        ctrl = new AbortController()
         abortRef.current = ctrl
-        await queryKnowledgeStream(queryText, useMode, topK, {
-          onMeta: (meta) => {
-            streamResult = {
-              query: meta.query, mode: meta.mode,
-              concepts: [], summaries: [], vector_results: [],
-              search_sources: meta.search_sources,
-              answer: '', time_seconds: meta.time_seconds,
-            }
-          },
-          onResults: (data) => {
-            if (streamResult) {
-              streamResult.concepts = data.concepts
-              streamResult.summaries = data.summaries
-              streamResult.vector_results = data.vector_results as VectorResult[]
-              setResult({ ...streamResult, answer: fullAnswer || '' })
-            }
-          },
-          onChunk: (text) => {
-            fullAnswer += text
-            if (streamResult) {
-              setResult({ ...streamResult, answer: fullAnswer })
-            }
-          },
-          onDone: (finalTime) => {
-            const elapsedSec = (Date.now() - start) / 1000
-            setElapsed(Math.round(elapsedSec * 10) / 10)
-            if (streamResult) {
-              const finalRes = { ...streamResult, answer: fullAnswer, time_seconds: finalTime || elapsedSec }
-              setResult(finalRes)
-              const entry: HistoryEntry = {
-                query: queryText, mode: useMode, timestamp: Date.now(),
-                answerPreview: fullAnswer.slice(0, 80),
+        setCancellable(true)
+        const isActiveRequest = () => abortRef.current === ctrl
+        await queryKnowledgeStream(queryText, {
+          mode: useMode,
+          topK,
+          rerank,
+          signal: ctrl.signal,
+          callbacks: {
+            onMeta: (meta) => {
+              if (!isActiveRequest()) return
+              streamResult = {
+                query: meta.query, mode: meta.mode,
+                concepts: [], summaries: [], vector_results: [],
+                search_sources: meta.search_sources,
+                answer: '', time_seconds: meta.time_seconds,
               }
-              // 函数式更新：避免依赖 history 闭包（防快速连查时旧闭包覆盖新历史）
-              setHistory(prev => {
-                const newHistory = [entry, ...prev.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
-                saveHistory(newHistory)
-                return newHistory
-              })
-            }
-            setLoading(false)
+            },
+            onResults: (data) => {
+              if (!isActiveRequest()) return
+              if (streamResult) {
+                streamResult.concepts = data.concepts
+                streamResult.summaries = data.summaries
+                streamResult.vector_results = data.vector_results as VectorResult[]
+                setResult({ ...streamResult, answer: fullAnswer || '' })
+              }
+            },
+            onChunk: (text) => {
+              if (!isActiveRequest()) return
+              fullAnswer += text
+              if (streamResult) {
+                setResult({ ...streamResult, answer: fullAnswer })
+              }
+            },
+            onDone: (finalTime, _traceId, _legacyContributionMeta, donePhaseTimings) => {
+              if (!isActiveRequest()) return
+              const elapsedSec = finalTime || (Date.now() - start) / 1000
+              setElapsed(Math.round(elapsedSec * 10) / 10)
+              setPhaseTimings(donePhaseTimings ?? null)
+              if (streamResult) {
+                const finalRes = { ...streamResult, answer: fullAnswer, time_seconds: finalTime || elapsedSec }
+                setResult(finalRes)
+                void persistContribution(finalRes)
+                const entry: HistoryEntry = {
+                  query: queryText, mode: useMode, timestamp: Date.now(),
+                  answerPreview: fullAnswer.slice(0, 80),
+                }
+                // 函数式更新：避免依赖 history 闭包（防快速连查时旧闭包覆盖新历史）
+                setHistory(prev => {
+                  const newHistory = [entry, ...prev.filter(h => h.query !== queryText)].slice(0, MAX_HISTORY)
+                  saveHistory(newHistory)
+                  return newHistory
+                })
+              }
+              setLoading(false)
+              setCancellable(false)
+              abortRef.current = null
+            },
+            onError: (error, detail) => {
+              if (!isActiveRequest()) return
+              if (detail?.phase_timings) setPhaseTimings(detail.phase_timings)
+              showQueryError(new ApiError(error, { code: detail ? streamErrorCodeToApiCode(detail) : 'HTTP' }))
+              setLoading(false)
+              setCancellable(false)
+              abortRef.current = null
+            },
           },
-          onError: (error) => {
-            setError(error)
-            setLoading(false)
-          },
-        }, rerank, contribute, ctrl.signal)
+        })
       } catch (e) {
+        const wasCurrentRequest = ctrl !== null && abortRef.current === ctrl
         // stream 端点不可用（404），自动降级到传统查询
         if ((e as Error).message === 'STREAM_NOT_AVAILABLE') {
+          if (wasCurrentRequest) {
+            setCancellable(false)
+            abortRef.current = null
+          }
           try {
-            const res = await queryKnowledge(queryText, useMode, topK, contribute)
+            const res = await queryKnowledge(queryText, useMode, topK)
             const elapsedSec = (Date.now() - start) / 1000
             setElapsed(Math.round(elapsedSec * 10) / 10)
             setResult(res)
+            await persistContribution(res)
             const entry: HistoryEntry = {
               query: queryText, mode: useMode, timestamp: Date.now(),
               answerPreview: res.answer?.slice(0, 80) || '',
@@ -305,20 +554,27 @@ export default function QueryPage() {
               saveHistory(newHistory)
               return newHistory
             })
-          } catch (fallbackErr) { setError((fallbackErr as Error).message) }
-          finally { setLoading(false) }
+          } catch (fallbackErr) { showQueryError(fallbackErr) }
+          finally { setLoading(false); setCancellable(false) }
         } else {
-          setError((e as Error).message)
+          if (e instanceof ApiError && e.code === 'ABORTED') return
+          showQueryError(e)
           setLoading(false)
+          setCancellable(false)
+          if (wasCurrentRequest) abortRef.current = null
         }
       }
     } else {
+      abortRef.current?.abort()
+      abortRef.current = null
+      setCancellable(false)
       // 非 combined 模式使用传统查询
       try {
-        const res = await queryKnowledge(queryText, useMode, topK, contribute)
+        const res = await queryKnowledge(queryText, useMode, topK)
         const elapsedSec = (Date.now() - start) / 1000
         setElapsed(Math.round(elapsedSec * 10) / 10)
         setResult(res)
+        await persistContribution(res)
         const entry: HistoryEntry = {
           query: queryText, mode: useMode, timestamp: Date.now(),
           answerPreview: res.answer?.slice(0, 80) || '',
@@ -328,10 +584,10 @@ export default function QueryPage() {
           saveHistory(newHistory)
           return newHistory
         })
-      } catch (e) { setError((e as Error).message) }
+      } catch (e) { showQueryError(e) }
       finally { setLoading(false) }
     }
-  }, [query, mode, topK, contribute, rerank])
+  }, [query, mode, topK, rerank, showQueryError, persistContribution])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery() }
@@ -405,11 +661,14 @@ export default function QueryPage() {
             <Brain size={22} style={{ color: 'var(--color-primary)' }} />
             <div>
               <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.25px', margin: 0 }}>知识查询</h1>
-              {compiledFiles.length > 0 && (
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', fontWeight: 400 }}>
-                  {compiledFiles.length} 个已编译文档可查询
-                </span>
-              )}
+              <span
+                id="query-availability-status"
+                role="status"
+                aria-live="polite"
+                style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', fontWeight: 400 }}
+              >
+                {availabilityText}
+              </span>
             </div>
           </div>
           <button onClick={() => setShowHistory(!showHistory)} title="查询历史"
@@ -449,8 +708,10 @@ export default function QueryPage() {
                 {history.length === 0 ? (
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', textAlign: 'center', padding: 'var(--space-4)' }}>暂无查询历史</p>
                 ) : history.map((h) => (
-                  <div key={h.timestamp} onClick={() => { setQuery(h.query); setMode(h.mode); handleQuery(h.query, h.mode) }}
-                    style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', cursor: 'pointer', marginBottom: '1px' }}
+                  <button key={h.timestamp} type="button"
+                    aria-label={`重新运行历史查询：${h.query}`}
+                    onClick={() => { setQuery(h.query); setMode(h.mode); handleQuery(h.query, h.mode) }}
+                    style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', marginBottom: '1px', textAlign: 'left' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                   >
@@ -462,7 +723,7 @@ export default function QueryPage() {
                       <span style={{ fontSize: '10px', color: 'var(--text-dimmed)' }}>{new Date(h.timestamp).toLocaleDateString()}</span>
                       <span style={{ fontSize: '10px', padding: '0 4px', borderRadius: 'var(--radius-full)', background: 'var(--bg-elevated)', color: 'var(--text-dimmed)' }}>{h.mode}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -476,13 +737,15 @@ export default function QueryPage() {
                 </div>
                 <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
                   {favorites.map((f) => (
-                    <div key={`${f.query}-${f.mode || ''}-${f.timestamp}`} onClick={() => { setQuery(f.query); handleQuery(f.query, f.mode) }}
-                      style={{ padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', cursor: 'pointer', marginBottom: '1px' }}
+                    <button key={`${f.query}-${f.mode || ''}-${f.timestamp}`} type="button"
+                      aria-label={`运行收藏查询：${f.query}`}
+                      onClick={() => { setQuery(f.query); if (f.mode) setMode(f.mode); handleQuery(f.query, f.mode) }}
+                      style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', marginBottom: '1px', textAlign: 'left' }}
                       onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
                       <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{f.query}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -498,6 +761,8 @@ export default function QueryPage() {
         }}>
           <textarea
             ref={textareaRef}
+            aria-label="查询知识库"
+            aria-describedby="query-availability-status"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -516,7 +781,12 @@ export default function QueryPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
               {/* Mode selector — dropdown opens DOWNWARD below the button */}
               <div ref={modeRef} style={{ position: 'relative' }}>
-                <button onClick={() => setShowModeDropdown(!showModeDropdown)}
+                <button ref={modeTriggerRef} id="query-mode-trigger" type="button"
+                  aria-label={`选择查询模式，当前${currentModeConfig.label}`}
+                  aria-haspopup="listbox" aria-expanded={showModeDropdown}
+                  aria-controls="query-mode-listbox"
+                  onClick={toggleModeDropdown}
+                  onKeyDown={handleModeTriggerKeyDown}
                   style={{
                     padding: '4px 10px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 500,
                     border: '1px solid var(--border-default)', background: 'var(--bg-elevated)',
@@ -527,14 +797,18 @@ export default function QueryPage() {
                   <ChevronDown size={10} style={{ transform: showModeDropdown ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 150ms' }} />
                 </button>
                 {showModeDropdown && (
-                  <div style={{
+                  <div id="query-mode-listbox" role="listbox" aria-labelledby="query-mode-trigger" style={{
                     position: 'absolute', top: '100%', left: 0, marginTop: '4px',
                     background: 'var(--bg-card)', border: '1px solid var(--border-default)',
                     borderRadius: 'var(--radius-lg)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                     minWidth: '240px', zIndex: 50, overflow: 'hidden',
                   }}>
-                    {MODES.map((m) => (
-                      <button key={m.value} onClick={() => { setMode(m.value); setShowModeDropdown(false) }}
+                    {MODES.map((m, index) => (
+                      <button key={m.value} ref={(element) => { modeOptionRefs.current[index] = element }}
+                        type="button" role="option" aria-selected={mode === m.value}
+                        tabIndex={focusedModeIndex === index ? 0 : -1}
+                        onClick={() => selectMode(m.value, index)}
+                        onKeyDown={(event) => handleModeOptionKeyDown(event, index)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
                           padding: 'var(--space-3) var(--space-4)', width: '100%', border: 'none',
@@ -587,18 +861,34 @@ export default function QueryPage() {
               </button>
             </div>
 
-            {/* Search button */}
-            <button onClick={() => handleQuery()} disabled={loading || !query.trim() || compiledFiles.length === 0}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '8px 20px', borderRadius: '4px',
-                fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--bg-card)',
-                background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
-                opacity: loading || !query.trim() || compiledFiles.length === 0 ? 0.4 : 1,
-              }}>
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              查询
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              {loading && cancellable && (
+                <button onClick={handleCancelQuery}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 14px', borderRadius: '4px',
+                    fontSize: 'var(--text-sm)', fontWeight: 600,
+                    color: 'var(--status-error)', background: 'var(--status-error-bg)',
+                    border: '1px solid rgba(220,38,38,0.18)', cursor: 'pointer',
+                  }}>
+                  <X size={14} />
+                  <span>取消</span>
+                </button>
+              )}
+
+              {/* Search button */}
+              <button onClick={() => handleQuery()} disabled={loading || !query.trim() || compiledFiles.length === 0}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 20px', borderRadius: '4px',
+                  fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--bg-card)',
+                  background: 'var(--color-primary)', border: 'none', cursor: 'pointer',
+                  opacity: loading || !query.trim() || compiledFiles.length === 0 ? 0.4 : 1,
+                }}>
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                查询
+              </button>
+            </div>
           </div>
         </div>
 
@@ -639,6 +929,18 @@ export default function QueryPage() {
             </div>
             <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-primary)', fontWeight: 600, margin: 0 }}>AI 正在检索知识库并生成回答...</p>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dimmed)', marginTop: 'var(--space-1)' }}>使用 {currentModeConfig.label} 模式检索中</p>
+            {cancellable && (
+              <button onClick={handleCancelQuery}
+                style={{
+                  marginTop: 'var(--space-4)', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 14px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,
+                  color: 'var(--status-error)', background: 'var(--status-error-bg)',
+                  border: '1px solid rgba(220,38,38,0.18)', cursor: 'pointer',
+                }}>
+                <X size={14} />
+                <span>取消</span>
+              </button>
+            )}
           </div>
         )}
         {/* Streaming: result 正在逐步接收 */}
@@ -723,13 +1025,37 @@ export default function QueryPage() {
         )}
 
         {/* ── Error ── */}
-        {error && (
+        {queryError && (
           <div style={{
             padding: 'var(--space-4)', borderRadius: '4px', marginBottom: 'var(--space-4)',
             background: 'var(--status-error-bg)', color: 'var(--status-error)', fontSize: 'var(--text-sm)',
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
+          }}>
+            <X size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>{queryError.title}</div>
+              <div style={{ marginTop: '2px' }}>{queryError.message}</div>
+              <div style={{ marginTop: '4px', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>
+                {queryError.diagnostic}
+                {queryError.retryable ? ' · 可重试' : ''}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {contributionReceipt && !loading && (
+          <div style={{
+            padding: 'var(--space-4)', borderRadius: '4px', marginBottom: 'var(--space-4)',
+            background: 'var(--status-success-bg)', color: 'var(--status-success)', fontSize: 'var(--text-sm)',
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
           }}>
-            <X size={14} /> {error}
+            <BookmarkCheck size={14} />
+            <span>
+              {contributionReceipt.auto_promoted ? '回答已自动提升到知识库' : '回答已写入候选区'}
+              {' · '}质量分 {contributionReceipt.quality_score}
+              {contributionReceipt.needs_review ? ' · 等待审核' : ''}
+              {' · '}{contributionReceipt.id}
+            </span>
           </div>
         )}
 
@@ -745,6 +1071,16 @@ export default function QueryPage() {
                 <span style={{ fontSize: 'var(--text-xs)', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontWeight: 600 }}>
                   {elapsed}s
                 </span>
+                {phaseTimingItems.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', fontWeight: 600 }}>阶段耗时</span>
+                    {phaseTimingItems.map(item => (
+                      <span key={item.key} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--bg-elevated)', color: 'var(--text-dimmed)', fontWeight: 600 }}>
+                        {item.label} {Math.round(item.value * 10) / 10}s
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {result.search_sources?.length > 0 && (
                   <div style={{ display: 'flex', gap: '2px' }}>
                     {result.search_sources.map(s => <SourceBadge key={s} source={s} />)}

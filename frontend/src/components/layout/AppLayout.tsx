@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, FolderOpen, PlayCircle, Search,
@@ -21,23 +21,90 @@ const toolNav = [
 ]
 
 export default function AppLayout() {
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [mobileMenuState, setMobileMenuState] = useState({ open: false, pathname: '' })
   const location = useLocation()
+  const mobileOpen = mobileMenuState.open && mobileMenuState.pathname === location.pathname
+  const mobileSidebarRef = useRef<HTMLElement>(null)
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
+  const mainContentRef = useRef<HTMLElement>(null)
+  const previousPathRef = useRef(location.pathname)
+  const wasMobileOpenRef = useRef(false)
 
-  // Route change closes mobile menu
-  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuState({ open: false, pathname: location.pathname })
+  }, [location.pathname])
 
-  // Escape closes mobile menu
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') setMobileOpen(false)
-  }, [])
+  const openMobileMenu = useCallback(() => {
+    setMobileMenuState({ open: true, pathname: location.pathname })
+  }, [location.pathname])
+
   useEffect(() => {
+    if (!mobileOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    const focusCloseButton = requestAnimationFrame(() => mobileCloseButtonRef.current?.focus())
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeMobileMenu()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const sidebar = mobileSidebarRef.current
+      if (!sidebar) return
+      const focusable = Array.from(sidebar.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ))
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      } else if (!sidebar.contains(document.activeElement)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+    return () => {
+      cancelAnimationFrame(focusCloseButton)
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [closeMobileMenu, mobileOpen])
+
+  useEffect(() => {
+    if (wasMobileOpenRef.current && !mobileOpen) {
+      requestAnimationFrame(() => mobileMenuButtonRef.current?.focus())
+    }
+    wasMobileOpenRef.current = mobileOpen
+  }, [mobileOpen])
+
+  useEffect(() => {
+    if (previousPathRef.current === location.pathname) return
+    previousPathRef.current = location.pathname
+
+    const focusHeading = requestAnimationFrame(() => {
+      const heading = mainContentRef.current?.querySelector<HTMLElement>('h1')
+      if (!heading) return
+      heading.tabIndex = -1
+      heading.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(focusHeading)
+  }, [location.pathname])
 
   const renderNavLink = (item: { to: string; icon: typeof LayoutDashboard; label: string }) => (
     <NavLink key={item.to} to={item.to} end={item.to === '/'}
+      onClick={closeMobileMenu}
       style={({ isActive }) => ({
         display: 'flex', alignItems: 'center', gap: '10px',
         padding: '6px 8px', fontSize: '14px',
@@ -110,11 +177,14 @@ export default function AppLayout() {
         <div style={{
           position: 'fixed', inset: 0, zIndex: 40,
           background: 'var(--bg-overlay)',
-        }} onClick={() => setMobileOpen(false)} />
+        }} onClick={closeMobileMenu} />
       )}
 
       {/* Mobile sidebar */}
-      <aside className="sidebar-mobile" style={{
+      <aside ref={mobileSidebarRef} id="mobile-navigation-dialog" className="sidebar-mobile"
+        role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen ? 'true' : undefined}
+        aria-label={mobileOpen ? '主导航菜单' : undefined} aria-hidden={!mobileOpen} inert={!mobileOpen}
+        style={{
         position: 'fixed', left: 0, top: 0, bottom: 0,
         width: '260px', zIndex: 50,
         display: 'flex', flexDirection: 'column',
@@ -125,7 +195,7 @@ export default function AppLayout() {
       }}>
         {/* Mobile close button */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 8px 0' }}>
-          <button onClick={() => setMobileOpen(false)}
+          <button ref={mobileCloseButtonRef} onClick={closeMobileMenu} aria-label="关闭导航菜单"
             style={{
               padding: '6px', borderRadius: '4px', border: 'none',
               background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)',
@@ -136,7 +206,7 @@ export default function AppLayout() {
         {sidebarContent}
       </aside>
 
-      <main style={{ flex: 1, overflowY: 'auto' }}>
+      <main ref={mainContentRef} inert={mobileOpen} style={{ flex: 1, overflowY: 'auto' }}>
         {/* Mobile top bar */}
         <div className="mobile-header" style={{
           display: 'none',
@@ -145,7 +215,8 @@ export default function AppLayout() {
           borderBottom: '1px solid var(--border-subtle)',
           background: 'var(--bg-sidebar)',
         }}>
-          <button onClick={() => setMobileOpen(true)}
+          <button ref={mobileMenuButtonRef} onClick={openMobileMenu}
+            aria-label="打开导航菜单" aria-controls="mobile-navigation-dialog" aria-expanded={mobileOpen}
             style={{
               padding: '6px', borderRadius: '4px', border: 'none',
               background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)',

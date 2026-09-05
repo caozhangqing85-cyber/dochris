@@ -96,6 +96,13 @@ export function createForceGraph(opts: GraphRendererOptions) {
   const node = nodeGroup.selectAll<SVGGElement, D3Node>('g')
     .data(nodes, d => d.id)
     .join('g')
+    .attr('tabindex', (_d, index) => index === 0 ? 0 : -1)
+    .attr('role', 'button')
+    .attr('data-node-id', d => d.id)
+    .attr('aria-label', d => {
+      const typeLabel = NODE_STYLES[d.node_type]?.label || d.node_type
+      return `${d.label}，${typeLabel}，${d.degree} 个连接`
+    })
     .style('cursor', 'pointer')
     .call(d3.drag<SVGGElement, D3Node>()
       .on('start', (event, d) => {
@@ -195,6 +202,37 @@ export function createForceGraph(opts: GraphRendererOptions) {
   node.on('click', (event, d) => {
     event.stopPropagation()
     onNodeClick(d)
+  })
+
+  node.on('focus', function () {
+    node.attr('tabindex', -1)
+    d3.select(this).attr('tabindex', 0)
+  })
+
+  node.on('keydown', function (event, d) {
+    const keyboardEvent = event as KeyboardEvent
+    if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+      keyboardEvent.preventDefault()
+      keyboardEvent.stopPropagation()
+      onNodeClick(d)
+      return
+    }
+
+    const step = keyboardEvent.key === 'ArrowRight' || keyboardEvent.key === 'ArrowDown'
+      ? 1
+      : keyboardEvent.key === 'ArrowLeft' || keyboardEvent.key === 'ArrowUp'
+        ? -1
+        : 0
+    if (step === 0) return
+
+    keyboardEvent.preventDefault()
+    const elements = node.nodes()
+    const currentIndex = elements.indexOf(this)
+    const nextIndex = (currentIndex + step + elements.length) % elements.length
+    const nextNode = elements[nextIndex]
+    node.attr('tabindex', -1)
+    d3.select(nextNode).attr('tabindex', 0)
+    nextNode.focus()
   })
 
   node.on('dblclick', (event, d) => {
