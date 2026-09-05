@@ -10,7 +10,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from dochris.api.compile_jobs import CompileJobManager
-from dochris.api.schemas import CompileRequest, CompileResponse, ErrorResponse
+from dochris.api.schemas import (
+    CompileJobFailuresResponse,
+    CompileRequest,
+    CompileResponse,
+    ErrorResponse,
+)
 from dochris.manifest import get_all_manifests
 from dochris.phases.phase2_compilation import compile_all as do_compile_all
 from dochris.settings import get_default_workspace
@@ -111,6 +116,28 @@ async def get_compile_job(job_id: str, request: Request) -> CompileResponse:
     if job is None:
         raise HTTPException(status_code=404, detail="编译任务不存在")
     return job.as_response()
+
+
+@router.get(
+    "/compile/jobs/{job_id}/failures",
+    response_model=CompileJobFailuresResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_compile_job_failures(job_id: str, request: Request) -> CompileJobFailuresResponse:
+    """Return the sanitized per-document failure report for one compile job.
+
+    错误文本已统一脱敏（无 API key / 本机路径），可直接下载归档。
+    """
+    job = _get_compile_job_manager(request).get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="编译任务不存在")
+    return CompileJobFailuresResponse(
+        job_id=job.job_id,
+        status=job.status,
+        failed=job.failed,
+        failed_files=list(job.failed_files),
+        failure_details=[dict(item) for item in job.failure_details],
+    )
 
 
 @router.post(

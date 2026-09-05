@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 # ── 查询 ─────────────────────────────────────────────────────
@@ -31,6 +33,28 @@ class SearchResult(BaseModel):
     """排序来源: keyword / vector / rerank"""
 
 
+class Citation(BaseModel):
+    """结构化引用：把回答中的 [Sn] 映射回可验证的来源。"""
+
+    ref: str
+    """引用编号，如 "S1" """
+
+    manifest_id: str | None = None
+    """来源 manifest ID（如 SRC-0001）"""
+
+    source: str = ""
+    """来源文件路径或标识（wiki/outputs/vector + 文件名）"""
+
+    channel: str = ""
+    """检索通道：concept / summary / vector"""
+
+    text_hash: str = ""
+    """被引用文本的内容哈希，用于版本追踪"""
+
+    score: float = 0.0
+    """检索分数"""
+
+
 class QueryResponse(BaseModel):
     """查询响应"""
 
@@ -45,8 +69,20 @@ class QueryResponse(BaseModel):
     reranked: bool = False
     """是否经过 Reranker 重排序"""
 
+    citations: list[Citation] = []
+    """回答中 [Sn] 引用到来源的结构化映射"""
+
+    unresolved_refs: list[str] = []
+    """回答中出现但无法映射到来源的引用编号"""
+
+    warnings: list[str] = []
+    """非致命降级信息（如向量检索不可用）"""
+
+    timings: dict[str, float] = {}
+    """阶段耗时（秒）：retrieval/rerank/first_token/generation/total"""
+
     trace_id: str = ""
-    """请求追踪 ID，用于关联后端日志"""
+    """请求追踪 ID，用于关联后端日志与 citations"""
 
 
 class QueryContributionRequest(BaseModel):
@@ -94,6 +130,10 @@ class CompileResponse(BaseModel):
     compiled: int = 0
     failed: int = 0
     current_files: list[str] = Field(default_factory=list)
+    failed_files: list[str] = Field(default_factory=list)
+    """编译失败（或异常终止）的文档 ID 列表"""
+    failure_details: list[dict[str, Any]] = Field(default_factory=list)
+    """失败明细：[{src_id, error}]，error 已脱敏"""
     cancel_requested: bool = False
     concurrency: int = 1
     limit: int | None = None
@@ -104,6 +144,16 @@ class CompileResponse(BaseModel):
     created_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
+
+
+class CompileJobFailuresResponse(BaseModel):
+    """单次编译任务的失败明细（已脱敏）。"""
+
+    job_id: str
+    status: str
+    failed: int = 0
+    failed_files: list[str] = Field(default_factory=list)
+    failure_details: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ── 状态 ─────────────────────────────────────────────────────

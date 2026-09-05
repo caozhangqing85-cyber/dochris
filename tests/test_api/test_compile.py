@@ -141,6 +141,8 @@ class TestCompileEndpoint:
                 compiled=1,
                 failed=1,
                 current_files=[],
+                failed_files=["SRC-0002"],
+                failures=[{"src_id": "SRC-0002", "error": "RuntimeError: provider unavailable"}],
             )
 
         with (
@@ -153,26 +155,30 @@ class TestCompileEndpoint:
             data = response.json()
 
             assert "job_id" in data
-            job = _wait_for_job(client, data["job_id"], "completed")
+            job = _wait_for_job(client, data["job_id"], "completed_with_errors")
 
         assert job["created_at"]
         assert job["started_at"]
         assert job["finished_at"]
         assert job == {
             "job_id": data["job_id"],
-            "status": "completed",
-            "message": "编译完成",
+            "status": "completed_with_errors",
+            "message": "编译完成，1 个文档失败",
             "total": 2,
             "processed": 2,
             "compiled": 1,
             "failed": 1,
             "current_files": [],
+            "failed_files": ["SRC-0002"],
+            "failure_details": [
+                {"src_id": "SRC-0002", "error": "RuntimeError: provider unavailable"},
+            ],
             "cancel_requested": False,
             "concurrency": 1,
             "limit": None,
             "attempt": 1,
             "retry_of": None,
-            "retryable": False,
+            "retryable": True,
             "error": None,
             "created_at": job["created_at"],
             "started_at": job["started_at"],

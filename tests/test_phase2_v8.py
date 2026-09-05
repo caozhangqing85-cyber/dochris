@@ -121,6 +121,8 @@ class TestPhase2ProgressBranch:
             "compiled": 1,
             "failed": 1,
             "current_files": [],
+            "failed_files": ["SRC-0002"],
+            "failures": [{"src_id": "SRC-0002", "error": "编译返回空结果"}],
         }
         assert any(item["current_files"] == ["SRC-0001"] for item in snapshots)
         assert any(item["current_files"] == ["SRC-0002"] for item in snapshots)

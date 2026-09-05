@@ -175,6 +175,8 @@ async def compile_all(
     processed_count = 0
     success_count = 0
     fail_count = 0
+    failed_files: list[str] = []
+    failure_details: list[dict[str, Any]] = []
 
     logger.info(f"🚀 开始编译 (并发数: {max_concurrent})")
 
@@ -186,6 +188,20 @@ async def compile_all(
             compiled=success_count,
             failed=fail_count,
             current_files=sorted(active_files),
+            failed_files=sorted(failed_files),
+            failures=list(failure_details),
+        )
+
+    def record_failure(src_id: str, exc: BaseException | None, reason: str) -> None:
+        """记录单个失败文档，附脱敏错误摘要。"""
+        from dochris.core.error_sanitizer import error_summary
+
+        failed_files.append(src_id)
+        failure_details.append(
+            {
+                "src_id": src_id,
+                "error": error_summary(exc) if exc is not None else reason,
+            }
         )
 
     async def compile_one(src_id: str) -> dict[str, Any] | None:
@@ -202,6 +218,7 @@ async def compile_all(
             except Exception as exc:
                 fail_count += 1
                 completed = True
+                record_failure(src_id, exc, "编译异常")
                 logger.error(f"文档 {src_id} 编译异常: {type(exc).__name__}: {exc}")
                 return None
             else:
@@ -209,6 +226,7 @@ async def compile_all(
                     success_count += 1
                 else:
                     fail_count += 1
+                    record_failure(src_id, None, "编译返回空结果")
                 completed = True
                 return result
             finally:
@@ -256,10 +274,15 @@ async def compile_all(
 
     # 打印最终报告
     logger.info(f"\n{'=' * 60}")
-    logger.info("✅ 编译完成")
+    if fail_count:
+        logger.info("⚠️ 编译完成（部分失败）")
+    else:
+        logger.info("✅ 编译完成")
     logger.info(f"{'=' * 60}")
     logger.info(f"成功: {success_count} 个")
     logger.info(f"失败: {fail_count} 个")
+    if failed_files:
+        logger.warning(f"失败文档: {', '.join(sorted(failed_files))}")
     logger.info(f"总计: {len(all_manifests)} 个")
 
     # 打印详细报告

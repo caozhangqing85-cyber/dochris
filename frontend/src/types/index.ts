@@ -34,15 +34,31 @@ export interface StatusResponse {
   system: SystemInfo
 }
 
+export interface Citation {
+  ref: string
+  manifest_id?: string | null
+  source: string
+  channel: string
+  text_hash: string
+  score: number
+}
+
 export interface QueryResponse {
   query: string
   mode: string
   concepts: SearchResult[]
   summaries: SearchResult[]
-  vector_results: VectorResult[]
+  vector_results: SearchResult[]
   search_sources: string[]
-  answer: string
+  /** 后端可能返回 null（无回答），消费方必须判空 */
+  answer: string | null
   time_seconds: number
+  reranked?: boolean
+  citations?: Citation[]
+  unresolved_refs?: string[]
+  warnings?: string[]
+  timings?: Record<string, number>
+  trace_id?: string
 }
 
 export interface SearchResult {
@@ -64,6 +80,11 @@ export interface CompileRequest {
   dry_run: boolean
 }
 
+export interface CompileFailureDetail {
+  src_id: string
+  error: string
+}
+
 export interface CompileResponse {
   job_id: string | null
   status: string
@@ -73,6 +94,8 @@ export interface CompileResponse {
   compiled: number
   failed: number
   current_files: string[]
+  failed_files: string[]
+  failure_details: CompileFailureDetail[]
   cancel_requested: boolean
   concurrency: number
   limit: number | null

@@ -32,8 +32,8 @@ async def test_completed_job_survives_manager_recreation(tmp_path: Path) -> None
     async def runner(*, progress_callback: Callable[..., None]) -> None:
         progress_callback(
             processed=2,
-            compiled=1,
-            failed=1,
+            compiled=2,
+            failed=0,
             current_files=[],
         )
 
@@ -45,8 +45,72 @@ async def test_completed_job_survives_manager_recreation(tmp_path: Path) -> None
     assert restored is not None
     assert restored.status == "completed"
     assert restored.processed == 2
-    assert restored.compiled == 1
-    assert restored.failed == 1
+    assert restored.compiled == 2
+    assert restored.failed == 0
+
+
+@pytest.mark.asyncio
+async def test_partial_failures_mark_job_completed_with_errors(tmp_path: Path) -> None:
+    """部分文档失败时任务不能伪装成完全成功。"""
+    store_path = tmp_path / "compile-jobs.json"
+    manager = CompileJobManager(store_path=store_path)
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        progress_callback(
+            processed=2,
+            compiled=1,
+            failed=1,
+            current_files=[],
+            failed_files=["SRC-0002"],
+            failures=[{"src_id": "SRC-0002", "error": "RuntimeError: provider 502"}],
+        )
+
+    job = manager.start(total=2, runner=runner)
+    await _wait_for_status(job, "completed_with_errors")
+
+    restored = CompileJobManager(store_path=store_path).get(job.job_id)
+
+    assert restored is not None
+    assert restored.status == "completed_with_errors"
+    assert restored.retryable is True
+    assert restored.failed_files == ["SRC-0002"]
+    assert restored.failure_details == [
+        {"src_id": "SRC-0002", "error": "RuntimeError: provider 502"}
+    ]
+    assert "1 个文档失败" in restored.message
+
+    response = restored.as_response()
+    assert response.status == "completed_with_errors"
+    assert response.failed_files == ["SRC-0002"]
+    assert response.failure_details[0]["src_id"] == "SRC-0002"
+
+
+@pytest.mark.asyncio
+async def test_progress_without_failure_details_keeps_existing_values(tmp_path: Path) -> None:
+    """旧回调签名（不含 failed_files）不能清空已有失败明细。"""
+    manager = CompileJobManager()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        progress_callback(
+            processed=1,
+            compiled=0,
+            failed=1,
+            current_files=[],
+            failed_files=["SRC-0001"],
+            failures=[{"src_id": "SRC-0001", "error": "ValueError: bad input"}],
+        )
+        progress_callback(
+            processed=2,
+            compiled=1,
+            failed=1,
+            current_files=[],
+        )
+
+    job = manager.start(total=2, runner=runner)
+    await _wait_for_status(job, "completed_with_errors")
+
+    assert job.failed_files == ["SRC-0001"]
+    assert job.failure_details[0]["error"] == "ValueError: bad input"
 
 
 @pytest.mark.asyncio

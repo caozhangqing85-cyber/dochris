@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field, fields
@@ -22,18 +21,9 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[..., None]
 CompileRunner = Callable[..., Awaitable[None]]
 ACTIVE_STATUSES = frozenset({"queued", "running", "cancelling"})
-RETRYABLE_STATUSES = frozenset({"failed", "cancelled", "interrupted"})
+RETRYABLE_STATUSES = frozenset({"failed", "cancelled", "interrupted", "completed_with_errors"})
+PARTIAL_STATUSES = frozenset({"completed_with_errors"})
 DEFAULT_MAX_HISTORY = 200
-_SECRET_FIELD_RE = re.compile(
-    r"(?i)\b(?:authorization|(?:[a-z0-9]+_)?api[_-]?key|access[_-]?token|token|secret|password)"
-    r"\b\s*[:=]\s*(?:bearer\s+)?[^\s,;]+"
-)
-_BEARER_TOKEN_RE = re.compile(r"(?i)\bbearer\s+[^\s,;]+")
-_PROVIDER_KEY_RE = re.compile(r"\bsk-[a-zA-Z0-9_-]{8,}\b")
-_POSIX_PRIVATE_PATH_RE = re.compile(
-    r"(?<![:\w])/(?:Users|home|private|tmp|var|etc|opt|srv|mnt|Volumes)(?:/[^\s,;]+)+"
-)
-_WINDOWS_PRIVATE_PATH_RE = re.compile(r"\b[a-zA-Z]:\\(?:[^\\\s,;]+\\)+[^\\\s,;]+")
 
 
 def _utc_now() -> str:
@@ -52,6 +42,8 @@ class CompileJob:
     compiled: int = 0
     failed: int = 0
     current_files: list[str] = field(default_factory=list)
+    failed_files: list[str] = field(default_factory=list)
+    failure_details: list[dict[str, Any]] = field(default_factory=list)
     cancel_requested: bool = False
     concurrency: int = 1
     limit: int | None = None
@@ -86,6 +78,8 @@ class CompileJob:
             compiled=self.compiled,
             failed=self.failed,
             current_files=list(self.current_files),
+            failed_files=list(self.failed_files),
+            failure_details=[dict(item) for item in self.failure_details],
             cancel_requested=self.cancel_requested,
             concurrency=self.concurrency,
             limit=self.limit,
@@ -169,10 +163,15 @@ class CompileJobManager:
                 extra={"job_id": job.job_id},
             )
         else:
-            job.status = "completed"
-            job.message = "编译完成"
             job.current_files = []
+            job.failed_files = sorted(job.failed_files)
             job.finished_at = _utc_now()
+            if job.failed > 0:
+                job.status = "completed_with_errors"
+                job.message = f"编译完成，{job.failed} 个文档失败"
+            else:
+                job.status = "completed"
+                job.message = "编译完成"
         finally:
             self._tasks.pop(job.job_id, None)
             self._persist()
@@ -185,12 +184,18 @@ class CompileJobManager:
         compiled: int,
         failed: int,
         current_files: list[str],
+        failed_files: list[str] | None = None,
+        failures: list[dict[str, Any]] | None = None,
         **_extra: Any,
     ) -> None:
         job.processed = processed
         job.compiled = compiled
         job.failed = failed
         job.current_files = list(current_files)
+        if failed_files is not None:
+            job.failed_files = list(failed_files)
+        if failures is not None:
+            job.failure_details = [dict(item) for item in failures]
         self._persist()
 
     def get(self, job_id: str) -> CompileJob | None:
@@ -318,10 +323,6 @@ class CompileJobManager:
 
 
 def _error_summary(exc: Exception) -> str:
-    detail = str(exc).strip() or "未提供错误详情"
-    detail = _SECRET_FIELD_RE.sub("[REDACTED]", detail)
-    detail = _BEARER_TOKEN_RE.sub("[REDACTED]", detail)
-    detail = _PROVIDER_KEY_RE.sub("[REDACTED]", detail)
-    detail = _POSIX_PRIVATE_PATH_RE.sub("<path>", detail)
-    detail = _WINDOWS_PRIVATE_PATH_RE.sub("<path>", detail)
-    return f"{type(exc).__name__}: {detail}"[:1000]
+    from dochris.core.error_sanitizer import error_summary
+
+    return error_summary(exc)

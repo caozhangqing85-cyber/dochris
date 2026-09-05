@@ -45,6 +45,7 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   running: '进行中',
   cancelling: '取消中',
   completed: '已完成',
+  completed_with_errors: '部分失败',
   failed: '失败',
   cancelled: '已取消',
   interrupted: '服务中断',
@@ -296,8 +297,9 @@ export default function CompilePage() {
   const ingestedFiles = allFiles.filter(f => f.status === 'ingested')
   const compileRunning = Boolean(compileJob && isCompileJobActive(compileJob.status))
   const resultIsPositive = Boolean(
-    result && !['failed', 'cancelled', 'interrupted'].includes(result.status),
+    result && !['failed', 'cancelled', 'interrupted', 'completed_with_errors'].includes(result.status),
   )
+  const resultIsPartial = Boolean(result && result.status === 'completed_with_errors')
 
   const totalPages = Math.max(1, Math.ceil(filteredFiles.length / PAGE_SIZE))
   const pagedFiles = filteredFiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -410,13 +412,19 @@ export default function CompilePage() {
       {result && (
         <div style={{
           borderRadius: '4px', padding: 'var(--space-4)', marginBottom: 'var(--space-6)',
-          background: resultIsPositive ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
-          border: `1px solid ${resultIsPositive ? 'var(--status-success-border)' : 'var(--status-error-border)'}`,
+          background: resultIsPositive
+            ? 'var(--status-success-bg)'
+            : resultIsPartial ? 'var(--status-warning-bg)' : 'var(--status-error-bg)',
+          border: `1px solid ${resultIsPositive
+            ? 'var(--status-success-border)'
+            : resultIsPartial ? 'var(--status-warning-border)' : 'var(--status-error-border)'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
             {resultIsPositive
               ? <CheckCircle2 size={14} style={{ color: 'var(--status-success)' }} />
-              : <XCircle size={14} style={{ color: 'var(--status-error)' }} />}
+              : resultIsPartial
+                ? <AlertTriangle size={14} style={{ color: 'var(--status-warning)' }} />
+                : <XCircle size={14} style={{ color: 'var(--status-error)' }} />}
             <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{result.message}</span>
           </div>
           {result.total > 0 && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', margin: 0, fontWeight: 400 }}>总计 {result.total}，已处理 {result.processed}，成功 {result.compiled}，失败 {result.failed}</p>}
@@ -484,32 +492,52 @@ export default function CompilePage() {
       })()}
 
       {/* ── Compile Complete Summary ── */}
-      {compileJob && !compileRunning && ['completed', 'failed', 'cancelled', 'interrupted'].includes(compileJob.status) && (
-        <div style={{
-          borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)',
-          border: `1px solid ${compileJob.status === 'completed' ? 'var(--status-success-border)' : 'var(--status-error-border)'}`, marginBottom: 'var(--space-6)',
-          background: compileJob.status === 'completed' ? 'var(--status-success-bg)' : 'var(--status-error-bg)',
-          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        }}>
-          {compileJob.status === 'completed'
-            ? <CheckCircle2 size={18} style={{ color: 'var(--status-success)', flexShrink: 0 }} />
-            : <XCircle size={18} style={{ color: 'var(--status-error)', flexShrink: 0 }} />}
-          <div style={{ flex: 1 }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: compileJob.status === 'completed' ? 'var(--status-success)' : 'var(--status-error)' }}>
-              {compileJob.message}：{compileJob.compiled} 个成功
-            </span>
-            {compileJob.failed > 0 && (
-              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--status-error)', marginLeft: 'var(--space-3)' }}>
-                {compileJob.failed} 个失败
+      {compileJob && !compileRunning && ['completed', 'completed_with_errors', 'failed', 'cancelled', 'interrupted'].includes(compileJob.status) && (() => {
+        const partial = compileJob.status === 'completed_with_errors'
+        const ok = compileJob.status === 'completed'
+        const tone = partial ? 'warning' : ok ? 'success' : 'error'
+        const toneColor = `var(--status-${tone})`
+        const toneBg = `var(--status-${tone}-bg)`
+        const toneBorder = `var(--status-${tone}-border)`
+        const failedDocs = compileJob.failure_details?.length
+          ? compileJob.failure_details
+          : (compileJob.failed_files ?? []).map((srcId) => ({ src_id: srcId, error: '编译失败' }))
+        return (
+          <div style={{
+            borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-5)',
+            border: `1px solid ${toneBorder}`, marginBottom: 'var(--space-6)',
+            background: toneBg,
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)',
+          }}>
+            {ok
+              ? <CheckCircle2 size={18} style={{ color: toneColor, flexShrink: 0, marginTop: 2 }} />
+              : partial
+                ? <AlertTriangle size={18} style={{ color: toneColor, flexShrink: 0, marginTop: 2 }} />
+                : <XCircle size={18} style={{ color: toneColor, flexShrink: 0, marginTop: 2 }} />}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: toneColor }}>
+                {compileJob.message}：{compileJob.compiled} 个成功
+                {compileJob.failed > 0 && `，${compileJob.failed} 个失败`}
               </span>
-            )}
+              {partial && failedDocs.length > 0 && (
+                <ul style={{ margin: 'var(--space-2) 0 0', paddingInlineStart: '18px', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                  {failedDocs.slice(0, 10).map((f, i) => (
+                    <li key={`${f.src_id}-${i}`} style={{ wordBreak: 'break-word' }}>
+                      <span style={{ fontWeight: 600 }}>{f.src_id}</span>
+                      {f.error && f.error !== '编译失败' && <>：{f.error}</>}
+                    </li>
+                  ))}
+                  {failedDocs.length > 10 && <li>… 共 {failedDocs.length} 个失败文档</li>}
+                </ul>
+              )}
+            </div>
+            <button onClick={() => { setCompileJob(null); setResult(null) }}
+              style={{ padding: '2px 6px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)', fontSize: 'var(--text-xs)' }}>
+              关闭
+            </button>
           </div>
-          <button onClick={() => { setCompileJob(null); setResult(null) }}
-            style={{ padding: '2px 6px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)', fontSize: 'var(--text-xs)' }}>
-            关闭
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Durable Compile History ── */}
       <SectionHeader title="编译历史"
@@ -524,6 +552,7 @@ export default function CompilePage() {
             尚无编译历史。提交任务后，即使服务重启也可在这里查看结果。
           </div>
         ) : compileHistory.map((job, index) => {
+          const partial = job.status === 'completed_with_errors'
           const unsuccessful = ['failed', 'cancelled', 'interrupted'].includes(job.status)
           const busyRetry = retryingJobId === job.job_id
           return (
@@ -537,12 +566,21 @@ export default function CompilePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                   <span style={{
                     fontSize: 'var(--text-xs)', fontWeight: 700,
-                    color: unsuccessful ? 'var(--status-error)' : 'var(--status-success)',
-                    background: unsuccessful ? 'var(--status-error-bg)' : 'var(--status-success-bg)',
+                    color: unsuccessful
+                      ? 'var(--status-error)'
+                      : partial ? 'var(--status-warning)' : 'var(--status-success)',
+                    background: unsuccessful
+                      ? 'var(--status-error-bg)'
+                      : partial ? 'var(--status-warning-bg)' : 'var(--status-success-bg)',
                     borderRadius: 'var(--radius-full)', padding: '2px 8px',
                   }}>
                     {JOB_STATUS_LABELS[job.status] ?? job.status}
                   </span>
+                  {partial && (
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-warning)' }} title={(job.failed_files ?? []).join('、')}>
+                      {job.compiled}/{job.total} 成功，失败：{(job.failed_files ?? []).slice(0, 3).join('、') || `${job.failed} 个`}{(job.failed_files?.length ?? 0) > 3 ? ' …' : ''}
+                    </span>
+                  )}
                   <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>
                     {job.compiled}/{job.total} 成功 · 第 {job.attempt} 次尝试
                   </span>
