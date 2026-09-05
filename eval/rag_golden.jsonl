@@ -1,0 +1,14 @@
+# RAG 评估 Golden Set 种子
+#
+# 格式：每行一个 JSON 对象
+#   {"id": "...", "question": "...", "expected_source_ids": ["SRC-NNNN"], "ground_truth": "..."}
+#
+# 这是种子集（RAG-01 的起点）：条目基于示例语料，用于验证评测链路。
+# 正式基线要求：至少 50 条、覆盖你知识库的主要领域；
+# expected_source_ids 必须指向当前工作区中真实存在的 SRC-NNNN。
+# 生成方法：从自己的知识库挑代表性文档，为每篇写 1-2 个"答案就在文中"的问题。
+{"id": "seed-01", "question": "什么是 soft landing（软着陆）", "expected_source_ids": ["SRC-0001"], "ground_truth": "房价通过长时间的价值回归实现缓慢下跌，而不是急跌。"}
+{"id": "seed-02", "question": "Dochris 的四阶段流水线分别是什么", "expected_source_ids": ["SRC-0002"], "ground_truth": "文档扫描 → Manifest/Hash → LLM 编译与摘要 → Wiki/知识图谱/向量索引。"}
+{"id": "seed-03", "question": "RetrievalCandidate 的 normalized_score 有什么作用", "expected_source_ids": ["SRC-0003"], "ground_truth": "归一化到 [0,1] 的分数，是排序和跨通道比较的唯一依据。"}
+{"id": "seed-04", "question": "知识库的信任分层有哪些", "expected_source_ids": ["SRC-0004"], "ground_truth": "raw → outputs（编译产物）→ wiki（已晋升）→ curated（人工精选）。"}
+{"id": "seed-05", "question": "如何触发后台编译任务", "expected_source_ids": ["SRC-0005"], "ground_truth": "POST /api/v1/compile 提交后台任务，返回 job_id，可查询进度、取消与重试。"}

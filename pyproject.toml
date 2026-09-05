@@ -203,6 +203,10 @@ markers = [
     "integration: Integration tests",
     "slow: Slow running tests",
 ]
+filterwarnings = [
+    # DEBT-02：FAISS 的 SWIG 绑定在 Python 3.13 上的弃用告警（上游问题，待 faiss 更新）
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["dochris"]

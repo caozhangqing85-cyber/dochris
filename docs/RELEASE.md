@@ -97,3 +97,24 @@ docker compose --profile api up -d --build
 - Tag 无法绕过测试直接发布（当前 release workflow 已满足）。
 
 此外：以当前认证模型（单机 `DOCHRIS_ALLOW_UNAUTHENTICATED=true`）**不应开放公网多用户访问**。
+
+## RAG 质量门槛（RAG-12）
+
+在默认开启 Reranker 或语义分块等"质量增强"能力之前，必须用真实语料基线证明收益。
+评测链路：`eval/`（`RAGEvaluator` + `eval/rag_golden.jsonl` golden set），每次报告自带
+模型/语料/commit 元数据，可直接对比。
+
+| 指标 | 建议门槛（相对基线） | 说明 |
+|---|---|---|
+| recall@5 | ≥ 基线 且 绝对值 ≥ 0.7 | 期望来源命中率；低于 0.7 优先修检索而非加增强 |
+| ndcg@5 | ≥ 基线 + 0.02 | 排序质量必须为正收益 |
+| faithfulness | ≥ 0.8 | 回答句子的证据支持率（启发式指标） |
+| citation_correctness | ≥ 0.9 | [Sn] 引用可映射到证据的比例 |
+| retrieval P95 延迟 | ≤ 1.5 s | 本地文件 + 向量检索阶段 |
+| 首 token 延迟 | ≤ 3 s（Provider 视情况） | 由 `QueryResponse.timings` / SSE `done.timings` 观测 |
+| 成本 | 记录但不设硬门槛 | 通过 observability cost 指标跟踪 |
+
+对比协议（RAG-07/10/11）：同一 golden set + 同一语料版本 + 同一模型，
+对比 无 reranker / cross-encoder / BGE reranker，以及 structure / recursive /
+semantic 分块；每轮保存 JSON 报告（含 commit SHA）后再决定是否切换默认配置。
+
