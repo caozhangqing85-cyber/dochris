@@ -156,7 +156,8 @@ class RAGEvaluator:
             meta["llm_provider"] = settings.llm_provider
             meta["embedding_model"] = settings.embedding_model
             meta["vector_store"] = settings.vector_store
-            meta["workspace"] = settings.workspace
+            # settings.workspace 是 Path，统一转 str 保证报告可 JSON 序列化
+            meta["workspace"] = str(settings.workspace)
         except Exception:
             logger.debug("无法读取 settings 元数据", exc_info=True)
 
