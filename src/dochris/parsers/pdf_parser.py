@@ -29,7 +29,10 @@ def parse_with_markitdown(file_path: Path) -> str | None:
 
         result = subprocess.run(
             # timeout 调大到 60s（10s 对大 PDF 过短几乎总是超时）
-            ["markitdown", str(file_path)], capture_output=True, text=True, timeout=60
+            ["markitdown", str(file_path)],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
 
         if result.returncode == 0:

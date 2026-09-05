@@ -152,6 +152,75 @@ class TestFromEnv:
         s = Settings.from_env()
         assert s.plugins_enabled == ["plugin_a", "plugin_b"]
 
+    def test_explicit_workspace_loads_its_own_env_before_home(self, tmp_path, monkeypatch):
+        """显式 WORKSPACE 只能优先读取该工作区的配置。"""
+        fake_home = tmp_path / "home"
+        home_workspace = fake_home / ".dochris" / "knowledge-base"
+        home_workspace.mkdir(parents=True)
+        (home_workspace / ".env").write_text(
+            "OPENAI_API_KEY=home-secret\nMODEL=home-model\n", encoding="utf-8"
+        )
+
+        workspace = tmp_path / "isolated-workspace"
+        workspace.mkdir()
+        (workspace / ".env").write_text(
+            "OPENAI_API_KEY=workspace-key\nMODEL=workspace-model\n", encoding="utf-8"
+        )
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+
+        for key in [
+            "OPENAI_API_KEY",
+            "BIGMODEL_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "MODEL",
+            "OPENAI_API_BASE",
+        ]:
+            monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.setenv("WORKSPACE", str(workspace))
+        monkeypatch.chdir(cwd)
+
+        settings = Settings.from_env()
+
+        assert settings.workspace == workspace
+        assert settings.api_key == "workspace-key"
+        assert settings.model == "workspace-model"
+
+    def test_explicit_workspace_without_env_never_falls_back_to_home_secret(
+        self, tmp_path, monkeypatch
+    ):
+        """显式工作区缺少 .env 时也不得继承默认 home 凭据。"""
+        fake_home = tmp_path / "home"
+        home_workspace = fake_home / ".dochris" / "knowledge-base"
+        home_workspace.mkdir(parents=True)
+        (home_workspace / ".env").write_text(
+            "OPENAI_API_KEY=home-secret\nMODEL=home-model\n", encoding="utf-8"
+        )
+
+        workspace = tmp_path / "empty-workspace"
+        workspace.mkdir()
+        cwd = tmp_path / "project"
+        cwd.mkdir()
+
+        for key in [
+            "OPENAI_API_KEY",
+            "BIGMODEL_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "MODEL",
+            "OPENAI_API_BASE",
+        ]:
+            monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.setenv("WORKSPACE", str(workspace))
+        monkeypatch.chdir(cwd)
+
+        settings = Settings.from_env()
+
+        assert settings.workspace == workspace
+        assert settings.api_key is None
+        assert settings.model == "glm-5.1"
+
 
 # ── validate_api_key ───────────────────────────────────────────
 

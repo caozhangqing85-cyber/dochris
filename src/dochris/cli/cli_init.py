@@ -31,10 +31,15 @@ def cmd_init(args: Any) -> int:
     api_key_arg = getattr(args, "api_key", None)
     path_arg = getattr(args, "path", None)
 
-    # 如果指定了路径，设置 WORKSPACE 环境变量
+    # 显式路径必须绕过可能已缓存的全局 Settings；否则同一进程中先加载过
+    # 默认配置后，`kb init PATH` 会错误地覆盖默认 home 工作区。
     if path_arg:
         workspace = Path(path_arg).expanduser().resolve()
         os.environ["WORKSPACE"] = str(workspace)
+    else:
+        from dochris.settings import get_default_workspace
+
+        workspace = get_default_workspace()
 
     print("\n" + "=" * 60)
     print("📚 Dochris 知识库初始化向导")
@@ -52,10 +57,6 @@ def cmd_init(args: Any) -> int:
     print(f"✅ Python 版本: {python_version.major}.{python_version.minor}.{python_version.micro}")
 
     # 2. 检查工作区
-    from dochris.settings import get_default_workspace
-
-    workspace = get_default_workspace()
-
     if workspace.exists():
         # 检查是否已初始化
         env_file = workspace / ".env"
@@ -133,7 +134,7 @@ def cmd_init(args: Any) -> int:
             print("   将使用占位符，请后续编辑 .env 文件配置 API Key")
             api_key = "your_api_key_here"
         else:
-            print(f"   使用 API Key: {api_key[:10]}...")
+            print("   使用已提供的 API Key（已隐藏）")
     elif existing_key:
         print(f"   检测到现有 API Key: {existing_key[:10]}...")
         use_existing = input("   是否使用现有 API Key？[Y/n]: ") if sys.stdin.isatty() else "y"
@@ -164,8 +165,9 @@ def cmd_init(args: Any) -> int:
     try:
         os.environ["WORKSPACE"] = str(workspace)
 
-        from dochris.settings import get_settings
+        from dochris.settings import get_settings, reset_settings
 
+        reset_settings()
         settings = get_settings()
         warnings = settings.validate()
 

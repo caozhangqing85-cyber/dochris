@@ -46,7 +46,7 @@ class TestGetDefaultWorkspace:
     def test_returns_path(self):
         ws = get_default_workspace()
         assert isinstance(ws, Path)
-        assert ".openclaw/knowledge-base" in str(ws)
+        assert ".dochris/knowledge-base" in str(ws)
 
 
 class TestAppendLogToFile:

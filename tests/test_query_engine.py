@@ -253,22 +253,22 @@ class TestSearchSummaries:
 class TestVectorSearch:
     """测试 vector_search 函数"""
 
-    def test_vector_search_without_chromadb(self, mock_workspace):
-        """测试没有 ChromaDB 时的行为"""
+    def test_vector_search_unavailable_backend_returns_empty_and_resets_cache(self, mock_workspace):
+        """ChromaDB 初始化失败时安全降级，且不保留坏缓存。"""
         import dochris.phases.query_engine as qe
         from dochris.phases.query_engine import vector_search
 
-        # Save and remove chromadb to simulate it not being installed
-        original_chroma = getattr(qe, "_chromadb_module", None)
-        # Force chromadb import to fail by patching import
-        qe._chromadb_module = None
-
-        try:
-            logger = MagicMock()
+        qe._chromadb_client_cache = None
+        logger = MagicMock()
+        with patch(
+            "chromadb.PersistentClient",
+            side_effect=Exception("attempt to write a readonly database"),
+        ):
             results = vector_search("测试查询", top_k=5, logger=logger)
-            assert isinstance(results, list)
-        finally:
-            qe._chromadb_module = original_chroma
+
+        assert results == []
+        assert qe._chromadb_client_cache is None
+        logger.error.assert_called_once()
 
 
 class TestGenerateAnswer:
@@ -333,7 +333,8 @@ class TestSearchAll:
         """测试 search_all 返回字典"""
         from dochris.phases.query_engine import search_all
 
-        result = search_all("测试", top_k=5)
+        with patch("dochris.phases.query_engine.vector_search", return_value=[]):
+            result = search_all("测试", top_k=5)
 
         assert isinstance(result, dict)
         assert "concepts" in result
@@ -345,7 +346,8 @@ class TestSearchAll:
         """测试 search_all 返回结构"""
         from dochris.phases.query_engine import search_all
 
-        result = search_all("测试", top_k=5)
+        with patch("dochris.phases.query_engine.vector_search", return_value=[]):
+            result = search_all("测试", top_k=5)
 
         assert isinstance(result["concepts"], list)
         assert isinstance(result["summaries"], list)

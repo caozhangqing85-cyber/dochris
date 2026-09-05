@@ -10,8 +10,14 @@ from fastapi.requests import Request
 
 from dochris.api.auth import verify_api_key
 
+pytestmark = pytest.mark.fast
 
-def _make_request(headers: dict | None = None, query_params: dict | None = None) -> Request:
+
+def _make_request(
+    headers: dict | None = None,
+    query_params: dict | None = None,
+    client_host: str = "127.0.0.1",
+) -> Request:
     """构造 FastAPI Request mock"""
     req = MagicMock(spec=Request)
     req.headers = headers or {}
@@ -19,7 +25,7 @@ def _make_request(headers: dict | None = None, query_params: dict | None = None)
     req.query_params.get = (query_params or {}).get
     # 模拟本地客户端地址（与 auth.py 的 allowed_hosts 匹配）
     req.client = MagicMock()
-    req.client.host = "127.0.0.1"
+    req.client.host = client_host
     req.url = MagicMock()
     req.url.path = "/api/v1/test"
     return req
@@ -45,6 +51,25 @@ class TestDevMode:
         req = _make_request()
         await verify_api_key(req)
 
+    @pytest.mark.asyncio
+    async def test_remote_request_rejected_without_explicit_dev_mode(self, monkeypatch):
+        """远程请求不能利用空 key 隐式绕过认证。"""
+        monkeypatch.delenv("DOCHRIS_API_KEY", raising=False)
+        monkeypatch.delenv("DOCHRIS_ALLOW_UNAUTHENTICATED", raising=False)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_api_key(_make_request(client_host="172.20.0.4"))
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_remote_request_allowed_in_explicit_local_compose_mode(self, monkeypatch):
+        """仅显式开启的本机 Compose 模式允许反向代理无 key 访问。"""
+        monkeypatch.delenv("DOCHRIS_API_KEY", raising=False)
+        monkeypatch.setenv("DOCHRIS_ALLOW_UNAUTHENTICATED", "true")
+
+        await verify_api_key(_make_request(client_host="172.20.0.4"))
+
 
 # ── 正确 key 通过 ─────────────────────────────────────────────
 
@@ -60,11 +85,13 @@ class TestValidKey:
         await verify_api_key(req)
 
     @pytest.mark.asyncio
-    async def test_query_param_key_valid(self, monkeypatch):
-        """通过 api_key 查询参数传递正确的 key"""
+    async def test_query_param_key_rejected(self, monkeypatch):
+        """api_key 查询参数不再被接受，避免 key 进入 URL 日志"""
         monkeypatch.setenv("DOCHRIS_API_KEY", "mykey456")
         req = _make_request(query_params={"api_key": "mykey456"})
-        await verify_api_key(req)
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_api_key(req)
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
     async def test_header_priority_over_query(self, monkeypatch):
@@ -130,7 +157,7 @@ class TestTimingSafety:
             req = _make_request(headers={"X-API-Key": "dcba4321"})
             with pytest.raises(HTTPException):
                 await verify_api_key(req)
-            mock_cd.assert_called_once_with("dcba4321", "abcd1234")
+            mock_cd.assert_called_once_with(b"dcba4321", b"abcd1234")
 
     @pytest.mark.asyncio
     async def test_same_length_correct_key_uses_compare_digest(self, monkeypatch):
@@ -139,4 +166,4 @@ class TestTimingSafety:
         with patch("dochris.api.auth.hmac.compare_digest", return_value=True) as mock_cd:
             req = _make_request(headers={"X-API-Key": "testkey1"})
             await verify_api_key(req)
-            mock_cd.assert_called_once_with("testkey1", "testkey1")
+            mock_cd.assert_called_once_with(b"testkey1", b"testkey1")

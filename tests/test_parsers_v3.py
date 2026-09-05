@@ -235,7 +235,7 @@ class TestParseDocument:
 
 
 class TestParseOfficeDocument:
-    def test_markitdown_not_installed(self):
+    def test_markitdown_not_installed(self, caplog):
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:
             f.write(b"fake")
             f.flush()
@@ -250,6 +250,7 @@ class TestParseOfficeDocument:
                 result = dp_mod.parse_office_document(Path(f.name))
         os.unlink(f.name)
         assert result is None
+        assert "dochris[documents]" in caplog.text
 
     def test_markitdown_returns_long_text(self):
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as f:

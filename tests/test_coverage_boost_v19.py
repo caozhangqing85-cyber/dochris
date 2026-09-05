@@ -55,7 +55,8 @@ class TestConfigFromEnv:
         monkeypatch.chdir(tmp_path)
         from dochris.settings.config import Settings
 
-        s = Settings.from_env()
+        with patch("dochris.settings.config.load_dotenv"):
+            s = Settings.from_env()
         assert s.workspace == tmp_path
 
     def test_from_env_workspace_from_parent_scripts(self, tmp_path, monkeypatch):
@@ -81,7 +82,8 @@ class TestConfigFromEnv:
         monkeypatch.chdir(child)
         from dochris.settings.config import Settings
 
-        s = Settings.from_env()
+        with patch("dochris.settings.config.load_dotenv"):
+            s = Settings.from_env()
         assert s.workspace == parent
 
 

@@ -106,6 +106,38 @@ class TestSearchConcepts(unittest.TestCase):
         self.assertEqual(mock_search.call_count, 2)
         self.assertEqual(len(result), 1)
 
+    def test_manifest_fallback_rejects_incidental_short_fragment(self):
+        """manifest 兜底也不能把随机多词查询中的 no 匹配到 CNOT。"""
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from dochris.phases.query_engine import _search_manifest_concepts
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifests = Path(tmpdir)
+            (manifests / "SRC-0001.json").write_text(
+                json.dumps(
+                    {
+                        "id": "SRC-0001",
+                        "compiled_summary": {
+                            "concepts": [
+                                {
+                                    "name": "量子门",
+                                    "explanation": "通过 CNOT 等基本门处理量子信息。",
+                                }
+                            ]
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            with patch("dochris.phases.query_engine.MANIFESTS_PATH", manifests):
+                result = _search_manifest_concepts("zzzz-no-match-01a0518d")
+
+        self.assertEqual(result, [])
+
 
 class TestSearchSummaries(unittest.TestCase):
     """测试摘要搜索"""
@@ -220,18 +252,23 @@ class TestVectorSearch(unittest.TestCase):
 
     @patch("dochris.phases.query_engine.get_settings")
     def test_vector_search_chromadb_import_error(self, mock_settings):
-        """测试 ChromaDB 未安装时返回空"""
+        """测试 ChromaDB 未安装时安静降级为关键词检索"""
         from dochris.phases.query_engine import vector_search
 
         mock_config = Mock()
         mock_config.vector_store = "chromadb"
         mock_settings.return_value = mock_config
+        logger = Mock()
 
         with patch("dochris.phases.query_engine.DATA_PATH", Path("/tmp/test")):
             with patch("chromadb.PersistentClient", side_effect=ImportError):
-                result = vector_search("test", 5, logger=None)
+                result = vector_search("test", 5, logger=logger)
 
         self.assertEqual(result, [])
+        logger.warning.assert_not_called()
+        logger.debug.assert_called_once_with(
+            "Vector search unavailable: install 'dochris[vector]' to enable it"
+        )
 
 
 class TestVectorSearchWithStore(unittest.TestCase):

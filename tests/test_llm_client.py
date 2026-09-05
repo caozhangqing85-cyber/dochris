@@ -54,7 +54,7 @@ class TestLLMClient(unittest.TestCase):
         self.assertIsNone(result)
 
 
-class TestLLMClientAsync(unittest.TestCase):
+class TestLLMClientAsync(unittest.IsolatedAsyncioTestCase):
     """测试 LLM 客户端异步功能"""
 
     @patch("dochris.core.llm_client.AsyncOpenAI")

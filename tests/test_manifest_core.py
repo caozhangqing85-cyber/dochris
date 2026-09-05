@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dochris.manifest import (
     create_manifest,
     get_all_manifests,
@@ -14,6 +16,8 @@ from dochris.manifest import (
     update_index_entry,
     update_manifest_status,
 )
+
+pytestmark = pytest.mark.fast
 
 
 def _write_manifest(path: Path, data: dict) -> None:

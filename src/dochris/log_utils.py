@@ -107,6 +107,7 @@ def append_log_to_file(workspace: Path | None, message: str, log_type: str = "sy
     # 用文件锁保证读-改-写的原子性，避免并发写丢失日志条目（fcntl 为 Unix 专有，Windows 回退无锁）
     try:
         import fcntl
+
         _has_fcntl = True
     except ImportError:
         _has_fcntl = False

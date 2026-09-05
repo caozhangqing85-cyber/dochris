@@ -1,7 +1,7 @@
 """测试 compensate/compensate_utils.py 模块"""
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 class TestCompensateError:
@@ -27,16 +27,14 @@ class TestCompensateError:
 class TestSetupLogging:
     """测试 setup_logging"""
 
-    @patch("dochris.compensate.compensate_utils.KB_PATH")
-    def test_returns_logger(self, mock_kb_path, tmp_path):
+    def test_returns_logger(self, tmp_path):
         from dochris.compensate.compensate_utils import setup_logging
 
-        mock_kb_path.__truediv__ = lambda self, other: tmp_path / other
-        mock_kb_path.mkdir = MagicMock()
-
         # 直接测试返回值类型
-        with patch("logging.basicConfig"):
-            logger = setup_logging()
+        with patch("logging.basicConfig") as basic_config:
+            logger = setup_logging(tmp_path)
+            for handler in basic_config.call_args.kwargs["handlers"]:
+                handler.close()
             assert isinstance(logger, logging.Logger)
 
 

@@ -4,6 +4,7 @@ CLI init 命令测试
 """
 
 from argparse import Namespace
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -159,6 +160,58 @@ class TestCmdInit:
         args = Namespace()
         ret = cmd_init(args)
         assert ret == 0
+
+    def test_explicit_path_ignores_cached_default_workspace_and_home_secret(
+        self, tmp_path, monkeypatch
+    ):
+        """显式路径必须只初始化目标目录，不能读取或改写 home 工作区凭据。"""
+        from dochris.cli.cli_init import cmd_init
+        from dochris.settings import get_settings, reset_settings
+
+        fake_home = tmp_path / "home"
+        default_workspace = fake_home / ".dochris" / "knowledge-base"
+        default_workspace.mkdir(parents=True)
+        home_env = default_workspace / ".env"
+        home_env.write_text("OPENAI_API_KEY=home-secret\n", encoding="utf-8")
+
+        monkeypatch.setenv("HOME", str(fake_home))
+        monkeypatch.delenv("WORKSPACE", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        reset_settings()
+        assert get_settings().workspace == Path(default_workspace)
+        monkeypatch.setenv("OPENAI_API_KEY", "explicit-environment-key")
+
+        target = tmp_path / "isolated-workspace"
+        try:
+            result = cmd_init(Namespace(path=str(target), non_interactive=True, api_key=None))
+
+            assert result == 0
+            assert (target / ".env").exists()
+            assert "OPENAI_API_KEY=explicit-environment-key" in (target / ".env").read_text(
+                encoding="utf-8"
+            )
+            assert home_env.read_text(encoding="utf-8") == "OPENAI_API_KEY=home-secret\n"
+        finally:
+            reset_settings()
+
+    def test_non_interactive_init_never_prints_api_key(self, tmp_path, monkeypatch, capsys):
+        """初始化日志不得泄露 API key 的前缀或完整值。"""
+        from dochris.cli.cli_init import cmd_init
+        from dochris.settings import reset_settings
+
+        secret = "secret-prefix-that-must-not-appear"
+        target = tmp_path / "redacted-workspace"
+        monkeypatch.delenv("WORKSPACE", raising=False)
+        reset_settings()
+        try:
+            result = cmd_init(Namespace(path=str(target), non_interactive=True, api_key=secret))
+            output = capsys.readouterr().out
+
+            assert result == 0
+            assert secret not in output
+            assert secret[:10] not in output
+        finally:
+            reset_settings()
 
 
 class TestPromptApiKey:

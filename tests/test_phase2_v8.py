@@ -75,6 +75,57 @@ class TestPhase2ProgressBranch:
     """覆盖非 TTY 进度条分支"""
 
     @pytest.mark.asyncio
+    async def test_reports_exact_progress_after_each_document(self, mock_workspace, monkeypatch):
+        """进度回调包含真实完成数、成功数、失败数和当前文件。"""
+        monkeypatch.setenv("WORKSPACE", str(mock_workspace))
+
+        mock_worker = MagicMock()
+        mock_worker.compile_document = AsyncMock(side_effect=[{"status": "compiled"}, None])
+        mock_monitor = MagicMock()
+        snapshots: list[dict[str, object]] = []
+
+        with patch(
+            "dochris.phases.phase2_compilation.get_all_manifests",
+            return_value=_make_manifests(2),
+        ):
+            with patch("dochris.phases.phase2_compilation.setup_logging"):
+                with patch(
+                    "dochris.phases.phase2_compilation.CompilerWorker",
+                    return_value=mock_worker,
+                ):
+                    with patch(
+                        "dochris.phases.phase2_compilation.MonitorWorker",
+                        return_value=mock_monitor,
+                    ):
+                        with patch(
+                            "dochris.phases.phase2_compilation.clear_cache",
+                            return_value=0,
+                        ):
+                            with patch("sys.stdout.isatty", return_value=False):
+                                from dochris.phases.phase2_compilation import compile_all
+
+                                try:
+                                    await compile_all(
+                                        limit=None,
+                                        max_concurrent=1,
+                                        dry_run=False,
+                                        progress_callback=lambda **progress: snapshots.append(
+                                            progress
+                                        ),
+                                    )
+                                except TypeError as exc:
+                                    pytest.fail(f"编译进度回调尚未实现: {exc}")
+
+        assert snapshots[-1] == {
+            "processed": 2,
+            "compiled": 1,
+            "failed": 1,
+            "current_files": [],
+        }
+        assert any(item["current_files"] == ["SRC-0001"] for item in snapshots)
+        assert any(item["current_files"] == ["SRC-0002"] for item in snapshots)
+
+    @pytest.mark.asyncio
     async def test_non_tty_batch_compilation(self, mock_workspace, monkeypatch):
         """非 TTY 模式使用简单日志"""
         monkeypatch.setenv("WORKSPACE", str(mock_workspace))

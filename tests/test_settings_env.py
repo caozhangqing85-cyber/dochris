@@ -8,6 +8,8 @@ import pytest
 from dochris.settings import Settings, reset_settings
 from dochris.settings.env import get_env_bool, get_env_int, get_env_list, get_env_path, get_env_str
 
+pytestmark = pytest.mark.fast
+
 
 class TestSettingsFromEnv:
     def test_from_env_reads_api_key(self, tmp_path: Path, monkeypatch) -> None:

@@ -20,19 +20,22 @@ class TestSetupLogging(unittest.TestCase):
         """测试返回 logger 实例"""
         from dochris.phases.query_utils import setup_logging
 
-        logger = setup_logging()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            logger = setup_logging(Path(tmp_dir) / "logs")
 
         self.assertIsNotNone(logger)
         self.assertEqual(logger.name, "phase3")
 
     def test_setup_logging_creates_log_file(self):
         """测试创建日志文件"""
-        from dochris.phases.query_utils import LOGS_PATH, setup_logging
+        from dochris.phases.query_utils import setup_logging
 
-        setup_logging()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            logs_path = Path(tmp_dir) / "logs"
+            setup_logging(logs_path)
 
-        # 验证日志目录存在
-        self.assertTrue(LOGS_PATH.exists())
+            self.assertTrue(logs_path.exists())
+            self.assertEqual(len(list(logs_path.glob("phase3_*.log"))), 1)
 
 
 class TestBuildManifestIndex(unittest.TestCase):
@@ -274,6 +277,23 @@ class TestKeywordSearch(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         self.assertGreater(result[0]["score"], 0)
+
+    def test_keyword_search_rejects_single_incidental_fragment_in_multi_term_query(self):
+        """多词查询仅偶然命中一个短片段时不得返回假相关结果。"""
+        from dochris.phases.query_utils import _keyword_search
+
+        test_file = self.search_dir / "量子门.md"
+        test_file.write_text("量子算法使用 Hadamard、Pauli-X 和 CNOT 门。", encoding="utf-8")
+
+        result = _keyword_search(
+            "zzzz-no-match-01a0518d",
+            self.search_dir,
+            5,
+            lambda p, t: {"title": p.stem},
+            "wiki",
+        )
+
+        self.assertEqual(result, [])
 
 
 class TestExtractConcept(unittest.TestCase):

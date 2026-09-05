@@ -71,27 +71,23 @@ def cleanup_all_clients() -> None:
         _client_instances.clear()
 
     try:
-        # 检测是否有运行中的事件循环
-        asyncio.get_running_loop()
-        # 有运行中的 loop：create_task 调度的清理在退出时可能不执行，
-        # 但此处是 atexit（程序退出），loop 通常已停止，回退到新建 loop 运行
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # 没有运行中的事件循环（常见于 atexit），创建临时 loop 完成清理。
+        close_coro = _close_all()
         try:
-            asyncio.run(_close_all())
-        except RuntimeError:
-            # loop 仍在运行无法 asyncio.run，调度后台 task 作为兜底
-            try:
-                loop = asyncio.get_event_loop()
-                loop.create_task(_close_all())
-            except RuntimeError:
-                _client_instances.clear()
+            asyncio.run(close_coro)
         except Exception as e:
+            close_coro.close()
             logger.debug(f"清理 LLMClient 时出错: {e}")
             _client_instances.clear()
-    except RuntimeError:
-        # 没有运行中的事件循环，安全使用 asyncio.run()
+    else:
+        # 已在异步上下文中时直接调度，避免 asyncio.run() 产生嵌套 loop 错误。
+        close_coro = _close_all()
         try:
-            asyncio.run(_close_all())
-        except Exception as e:
+            loop.create_task(close_coro)
+        except RuntimeError as e:
+            close_coro.close()
             logger.debug(f"清理 LLMClient 时出错: {e}")
             _client_instances.clear()
 

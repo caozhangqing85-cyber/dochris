@@ -57,7 +57,9 @@ class OpenAICompatProvider(BaseLLMProvider):
                 try:
                     from openai import AsyncOpenAI
                 except ImportError as e:
-                    raise ImportError("openai package not installed. Run: pip install openai") from e
+                    raise ImportError(
+                        "openai package not installed. Run: pip install openai"
+                    ) from e
 
                 import httpx
 
@@ -177,9 +179,7 @@ class OpenAICompatProvider(BaseLLMProvider):
             # 可观测性记录失败不应影响正常调用
             pass
 
-    def _record_usage_error(
-        self, latency_ms: float, operation: str, error_type: str
-    ) -> None:
+    def _record_usage_error(self, latency_ms: float, operation: str, error_type: str) -> None:
         """记录 LLM 调用错误。"""
         try:
             from dochris.observability import get_observability

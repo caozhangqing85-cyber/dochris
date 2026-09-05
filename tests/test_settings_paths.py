@@ -2,6 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+pytestmark = pytest.mark.fast
+
 
 class TestPathsModule:
     """测试 paths.py 所有路径函数"""

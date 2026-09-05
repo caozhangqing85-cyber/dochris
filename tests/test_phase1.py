@@ -125,18 +125,11 @@ class TestPhase1ProgressFile(unittest.TestCase):
     def test_progress_file_create_new(self):
         """测试创建新的进度文件"""
 
-        from dochris.phases.phase1_ingestion import PROGRESS_FILE, load_progress, save_progress
+        from dochris.phases import phase1_ingestion
+        from dochris.phases.phase1_ingestion import load_progress, save_progress
 
-        # 备份原有的 PROGRESS_FILE
-        original_backup = None
-        if PROGRESS_FILE.exists():
-            original_backup = PROGRESS_FILE.read_text(encoding="utf-8")
-
+        original_progress_file = phase1_ingestion.PROGRESS_FILE
         try:
-            # 临时覆盖 PROGRESS_FILE 为测试目录
-            from dochris.phases import phase1_ingestion
-
-            original_progress_file = phase1_ingestion.PROGRESS_FILE
             phase1_ingestion.PROGRESS_FILE = self.temp_path / "progress.json"
 
             test_data = {
@@ -150,13 +143,8 @@ class TestPhase1ProgressFile(unittest.TestCase):
             save_progress(test_data)
             loaded = load_progress()
             self.assertEqual(loaded.get("test"), "data")
-
-            # 恢复原有配置
-            phase1_ingestion.PROGRESS_FILE = original_progress_file
         finally:
-            # 恢复原有 PROGRESS_FILE 内容
-            if original_backup is not None:
-                PROGRESS_FILE.write_text(original_backup, encoding="utf-8")
+            phase1_ingestion.PROGRESS_FILE = original_progress_file
 
     def test_progress_file_update_stats(self):
         """测试更新统计信息"""

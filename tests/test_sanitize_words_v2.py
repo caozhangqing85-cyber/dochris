@@ -66,7 +66,8 @@ class TestSanitizeFilename:
 
 
 class TestSanitizePdfContent:
-    def test_replaces_sensitive_words(self):
+    def test_replaces_sensitive_words(self, monkeypatch):
+        monkeypatch.setenv("SANITIZE_CONTENT_ENABLED", "true")
         content = "这是一个色情暴力的内容"
         result = sanitize_pdf_content(content)
         assert "色情" not in result
@@ -77,7 +78,8 @@ class TestSanitizePdfContent:
         result = sanitize_pdf_content(content)
         assert result == content
 
-    def test_regex_replacement(self):
+    def test_regex_replacement(self, monkeypatch):
+        monkeypatch.setenv("SANITIZE_CONTENT_ENABLED", "true")
         content = "包含色情和暴力描述"
         result = sanitize_pdf_content(content)
         assert "不适当内容" in result

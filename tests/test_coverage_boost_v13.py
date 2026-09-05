@@ -342,7 +342,8 @@ class TestSettingsFromEnv:
         ]:
             monkeypatch.delenv(var, raising=False)
 
-        s = Settings.from_env(env_file=tmp_path / "nonexistent.env")
+        with patch("dochris.settings.config.load_dotenv"):
+            s = Settings.from_env(env_file=tmp_path / "nonexistent.env")
         assert s.model == "glm-5.1"
         assert s.api_key is None
         assert s.max_concurrency == 3
@@ -462,7 +463,7 @@ class TestSettingsValidate:
         monkeypatch.delenv("BIGMODEL_API_KEY", raising=False)
 
         warnings = s.validate()
-        assert any("OpenClaw" in w for w in warnings)
+        assert any(str(config_path) in warning for warning in warnings)
 
     def test_validate_api_key_missing_no_config(self, tmp_path, monkeypatch):
         from dochris.settings.config import Settings

@@ -3,6 +3,10 @@
 import argparse
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+pytestmark = pytest.mark.fast
+
 
 class TestCmdQuery:
     """测试 cmd_query 函数"""

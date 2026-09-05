@@ -11,8 +11,12 @@
 import hashlib
 from unittest import TestCase
 
+import pytest
+
 from dochris.phases.query_engine import build_answer_context, build_answer_prompt
 from dochris.rag.schemas import SourceRef
+
+pytestmark = pytest.mark.fast
 
 
 class TestBuildAnswerContextEmpty(TestCase):
@@ -26,9 +30,7 @@ class TestBuildAnswerContextEmpty(TestCase):
 
     def test_concepts_only(self) -> None:
         """只有 concepts 时正常输出"""
-        concepts = [
-            {"name": "机器学习", "definition": "AI 子领域", "score": 10, "source": "wiki"}
-        ]
+        concepts = [{"name": "机器学习", "definition": "AI 子领域", "score": 10, "source": "wiki"}]
         context, source_map = build_answer_context(concepts, [], [])
         self.assertIn("机器学习", context)
         self.assertIn("[S1]", context)
@@ -53,9 +55,7 @@ class TestBuildAnswerContextEmpty(TestCase):
 
     def test_vector_only(self) -> None:
         """只有 vector_results 时正常输出"""
-        vectors = [
-            {"text": "向量内容", "score": 0.3, "source": "test.md"}
-        ]
+        vectors = [{"text": "向量内容", "score": 0.3, "source": "test.md"}]
         context, source_map = build_answer_context([], [], vectors)
         self.assertIn("向量内容", context)
         self.assertEqual(source_map["S1"].channel, "vector")
@@ -128,7 +128,7 @@ class TestBuildAnswerContextMixed(TestCase):
         self.assertEqual(ref.source, "wiki")
         self.assertEqual(ref.channel, "concept")
         self.assertEqual(ref.score, 15.0)
-        expected_hash = hashlib.md5("定义文本".encode()).hexdigest()[:12]
+        expected_hash = hashlib.sha256("定义文本".encode()).hexdigest()[:12]
         self.assertEqual(ref.text_hash, expected_hash)
 
     def test_context_sections_separated(self) -> None:
@@ -149,7 +149,7 @@ class TestBuildAnswerContextMixed(TestCase):
         context, source_map = build_answer_context([], [], vectors)
 
         # SourceRef 的 text_hash 应基于截断后的文本
-        expected_hash = hashlib.md5(long_text[:300].encode()).hexdigest()[:12]
+        expected_hash = hashlib.sha256(long_text[:300].encode()).hexdigest()[:12]
         self.assertEqual(source_map["S1"].text_hash, expected_hash)
 
 
@@ -167,9 +167,7 @@ class TestBuildAnswerContextEdgeCases(TestCase):
 
     def test_definition_fallback_to_explanation(self) -> None:
         """concept 的 definition 字段缺失时回退到 explanation"""
-        concepts = [
-            {"name": "测试", "explanation": "解释文本", "score": 5, "source": "wiki"}
-        ]
+        concepts = [{"name": "测试", "explanation": "解释文本", "score": 5, "source": "wiki"}]
         context, _ = build_answer_context(concepts, [], [])
         self.assertIn("解释文本", context)
 
@@ -200,9 +198,7 @@ class TestBuildAnswerContextEdgeCases(TestCase):
 
     def test_summary_key_points_missing(self) -> None:
         """摘要无 key_points 时不崩溃"""
-        summaries = [
-            {"title": "测试", "one_line": "一句话", "score": 5, "source": "wiki"}
-        ]
+        summaries = [{"title": "测试", "one_line": "一句话", "score": 5, "source": "wiki"}]
         context, _ = build_answer_context([], summaries, [])
         self.assertIn("测试", context)
 
@@ -212,9 +208,7 @@ class TestBuildAnswerPrompt(TestCase):
 
     def test_empty_context(self) -> None:
         """空上下文时返回合理的 prompt"""
-        system_prompt, user_prompt, concepts_set = build_answer_prompt(
-            "", "测试问题", []
-        )
+        system_prompt, user_prompt, concepts_set = build_answer_prompt("", "测试问题", [])
         self.assertIsInstance(system_prompt, str)
         self.assertIsInstance(user_prompt, str)
         self.assertIn("测试问题", user_prompt)
@@ -222,9 +216,7 @@ class TestBuildAnswerPrompt(TestCase):
     def test_with_context(self) -> None:
         """有上下文时 prompt 包含查询"""
         context = "[S1] **测试**: 内容"
-        system_prompt, user_prompt, _ = build_answer_prompt(
-            context, "查询内容", []
-        )
+        system_prompt, user_prompt, _ = build_answer_prompt(context, "查询内容", [])
         self.assertIn("查询内容", user_prompt)
 
     def test_concepts_set_populated(self) -> None:

@@ -291,7 +291,7 @@ class TestIndexKnowledgeBatchIndexing:
 class TestIndexKnowledgeSearch:
     """测试搜索功能"""
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     def test_search_knowledge(self, mock_collection):
         """测试搜索知识库"""
         from dochris.admin.index_knowledge import search_knowledge
@@ -321,7 +321,7 @@ class TestIndexKnowledgeSearch:
 
         mock_collection.query.assert_called_once()
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     def test_search_knowledge_empty_results(self, mock_collection):
         """测试搜索空结果"""
         from dochris.admin.index_knowledge import search_knowledge
@@ -335,7 +335,7 @@ class TestIndexKnowledgeSearch:
 class TestIndexKnowledgeStats:
     """测试统计功能"""
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     def test_show_stats(self, mock_collection):
         """测试显示统计"""
         from dochris.admin.index_knowledge import show_stats
@@ -348,7 +348,7 @@ class TestIndexKnowledgeStats:
         # 应该不抛出异常
         show_stats()
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     def test_show_stats_empty(self, mock_collection):
         """测试显示空统计"""
         from dochris.admin.index_knowledge import show_stats
@@ -487,7 +487,7 @@ class TestIndexKnowledgeIDGeneration:
 class TestIndexKnowledgeMetadata:
     """测试元数据处理"""
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     @patch("dochris.admin.index_knowledge.extract_markdown_summary")
     def test_metadata_includes_timestamp(self, mock_extract, mock_collection, sample_markdown_file):
         """测试元数据包含时间戳"""
@@ -502,7 +502,7 @@ class TestIndexKnowledgeMetadata:
         metadata = call_args[1]["metadatas"][0]
         assert "indexed_at" in metadata
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     @patch("dochris.admin.index_knowledge.extract_markdown_summary")
     def test_metadata_includes_path(self, mock_extract, mock_collection, sample_markdown_file):
         """测试元数据包含路径"""
@@ -519,7 +519,7 @@ class TestIndexKnowledgeMetadata:
         assert "type" in metadata
         assert "source" in metadata
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     @patch("dochris.admin.index_knowledge.extract_markdown_summary")
     def test_metadata_markdown_type(self, mock_extract, mock_collection, sample_markdown_file):
         """测试 markdown 类型元数据"""
@@ -538,7 +538,7 @@ class TestIndexKnowledgeMetadata:
 class TestIndexKnowledgeEdgeCases:
     """测试边界情况"""
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     @patch("dochris.admin.index_knowledge.extract_markdown_summary")
     def test_unicode_content(self, mock_extract, mock_collection, tmp_path):
         """测试 Unicode 内容"""
@@ -554,7 +554,7 @@ class TestIndexKnowledgeEdgeCases:
         # 应该不抛出异常
         index_file(md_file, "obsidian")
 
-    @patch("dochris.admin.index_knowledge.collection")
+    @patch("dochris.admin.index_knowledge._collection")
     @patch("dochris.admin.index_knowledge.extract_markdown_summary")
     def test_large_file(self, mock_extract, mock_collection, tmp_path):
         """测试大文件处理"""

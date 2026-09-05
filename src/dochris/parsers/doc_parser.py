@@ -91,7 +91,9 @@ def parse_office_document(file_path: Path) -> str | None:
             return None
 
     except ImportError:
-        logger.warning("markitdown 未安装，无法解析 Office 文档。安装: pip install markitdown[all]")
+        logger.warning(
+            "markitdown 未安装，无法解析 Office 文档。安装: pip install 'dochris[documents]'"
+        )
         return None
     except (OSError, ValueError, RuntimeError, TextExtractionError) as e:
         logger.warning(f"markitdown 解析失败 {file_path.name}: {e}")

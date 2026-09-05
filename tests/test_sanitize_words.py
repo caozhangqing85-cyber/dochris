@@ -66,9 +66,10 @@ class TestSanitizeFilename:
 class TestSanitizePdfContent:
     """测试 sanitize_pdf_content"""
 
-    def test_replaces_sensitive_words(self):
+    def test_replaces_sensitive_words(self, monkeypatch):
         from dochris.admin.sanitize_sensitive_words import sanitize_pdf_content
 
+        monkeypatch.setenv("SANITIZE_CONTENT_ENABLED", "true")
         content = "这是一个关于政治的话题"
         result = sanitize_pdf_content(content)
         assert "政治" not in result
@@ -81,9 +82,10 @@ class TestSanitizePdfContent:
         result = sanitize_pdf_content(content)
         assert result == content
 
-    def test_regex_replacements(self):
+    def test_regex_replacements(self, monkeypatch):
         from dochris.admin.sanitize_sensitive_words import sanitize_pdf_content
 
+        monkeypatch.setenv("SANITIZE_CONTENT_ENABLED", "true")
         content = "这段色情暴力内容需要过滤"
         result = sanitize_pdf_content(content)
         assert "色情" not in result

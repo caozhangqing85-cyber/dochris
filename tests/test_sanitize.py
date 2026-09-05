@@ -6,6 +6,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 # 添加 scripts 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -25,11 +26,15 @@ class TestSanitize(unittest.TestCase):
         self.assertNotIn("女朋友", result)
 
     def test_sanitize_content(self):
-        """测试内容清洗"""
+        """内容清洗默认关闭，保留知识原文。"""
         from dochris.admin.sanitize_sensitive_words import sanitize_pdf_content
 
         content = "这是一个关于男朋友和女朋友的故事"
         result = sanitize_pdf_content(content)
+        self.assertEqual(content, result)
+
+        with patch.dict("os.environ", {"SANITIZE_CONTENT_ENABLED": "true"}):
+            result = sanitize_pdf_content(content)
         self.assertNotIn("男朋友", result)
 
     def test_should_skip_file(self):

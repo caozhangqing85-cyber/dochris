@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import logging
 import sys
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -89,6 +90,7 @@ async def compile_all(
     dry_run: bool = False,
     api_base: str | None = None,
     model: str | None = None,
+    progress_callback: Callable[..., None] | None = None,
 ) -> None:
     """编译所有待编译的文档
 
@@ -97,6 +99,7 @@ async def compile_all(
         limit: 限制编译数量（用于测试）
         use_openrouter: 是否使用 OpenRouter API
         dry_run: 模拟运行，只显示将要执行的操作
+        progress_callback: 编译进度更新回调
     """
     settings = get_settings()
     workspace = get_default_workspace()
@@ -168,17 +171,54 @@ async def compile_all(
 
     # 并发编译
     semaphore = asyncio.Semaphore(max_concurrent)
+    active_files: set[str] = set()
+    processed_count = 0
+    success_count = 0
+    fail_count = 0
 
     logger.info(f"🚀 开始编译 (并发数: {max_concurrent})")
 
+    def emit_progress() -> None:
+        if progress_callback is None:
+            return
+        progress_callback(
+            processed=processed_count,
+            compiled=success_count,
+            failed=fail_count,
+            current_files=sorted(active_files),
+        )
+
     async def compile_one(src_id: str) -> dict[str, Any] | None:
+        nonlocal processed_count, success_count, fail_count
+
         async with semaphore:
-            return await worker.compile_document(src_id)
+            active_files.add(src_id)
+            emit_progress()
+            completed = False
+            try:
+                result = await worker.compile_document(src_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                fail_count += 1
+                completed = True
+                logger.error(f"文档 {src_id} 编译异常: {type(exc).__name__}: {exc}")
+                return None
+            else:
+                if result:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                completed = True
+                return result
+            finally:
+                if completed:
+                    processed_count += 1
+                active_files.discard(src_id)
+                emit_progress()
 
     # 分批处理 (避免一次性创建太多任务)
     batch_size = BATCH_SIZE
-    success_count = 0
-    fail_count = 0
 
     # 使用 rich 进度条（仅在交互模式时）
     console = Console()
@@ -197,23 +237,10 @@ async def compile_all(
                 batch = all_manifests[i : i + batch_size]
 
                 tasks = [compile_one(m["id"]) for m in batch]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                # 统计结果
-                for j, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        fail_count += 1
-                        logger.error(
-                            f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}"
-                        )
-                    elif result:
-                        success_count += 1
-                    else:
-                        fail_count += 1
+                await asyncio.gather(*tasks, return_exceptions=True)
 
                 # 更新进度条
-                completed = min(i + batch_size, len(all_manifests))
-                pbar.update(task, completed=completed)
+                pbar.update(task, completed=processed_count)
     else:
         # 非交互模式：使用简单日志
         for i in range(0, len(all_manifests), batch_size):
@@ -221,24 +248,11 @@ async def compile_all(
             logger.info(f"📦 处理批次 {i // batch_size + 1}: {len(batch)} 个文档")
 
             tasks = [compile_one(m["id"]) for m in batch]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # 统计结果
-            for j, result in enumerate(results):
-                if isinstance(result, Exception):
-                    fail_count += 1
-                    logger.error(
-                        f"文档 {batch[j]['id']} 编译异常: {type(result).__name__}: {result}"
-                    )
-                elif result:
-                    success_count += 1
-                else:
-                    fail_count += 1
+            await asyncio.gather(*tasks, return_exceptions=True)
 
             # 打印进度
-            completed = min(i + len(batch), len(all_manifests))
-            percentage = (completed / len(all_manifests)) * 100
-            logger.info(f"📈 进度: {completed}/{len(all_manifests)} ({percentage:.1f}%)")
+            percentage = (processed_count / len(all_manifests)) * 100
+            logger.info(f"📈 进度: {processed_count}/{len(all_manifests)} ({percentage:.1f}%)")
 
     # 打印最终报告
     logger.info(f"\n{'=' * 60}")

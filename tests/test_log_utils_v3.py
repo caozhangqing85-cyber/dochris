@@ -162,10 +162,13 @@ class TestAppendLogToFile:
         assert isinstance(data, list)
         assert any(e["message"] == "recovery message" for e in data)
 
-    def test_none_workspace_uses_default(self):
+    def test_none_workspace_uses_default(self, tmp_path, monkeypatch):
         """workspace 为 None 时使用默认路径"""
-        # 不检查默认路径是否存在（可能不存在），只确保不抛异常
+        monkeypatch.setattr("dochris.log_utils.get_default_workspace", lambda: tmp_path)
+
         append_log_to_file(None, "test with none workspace", log_type="pytest")
+
+        assert len(list((tmp_path / "logs").glob("pytest_*.json"))) == 1
 
 
 # ── append_log_to_markdown ─────────────────────────────────────

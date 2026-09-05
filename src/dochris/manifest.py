@@ -63,6 +63,7 @@ def _atomic_write_json(path: Path, data: dict) -> None:
             pass
         raise
 
+
 # 保留向后兼容的别名
 append_log = append_log_to_file
 

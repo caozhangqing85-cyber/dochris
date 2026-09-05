@@ -140,6 +140,7 @@ class TestPhase2CompilationCLI:
             patch("sys.argv", ["phase2_compilation.py"]),
             patch("dochris.phases.phase2_compilation.DEFAULT_API_KEY", ""),
             patch("dochris.phases.phase2_compilation.get_settings") as mock_settings,
+            patch("dochris.phases.phase2_compilation.setup_logging"),
         ):
             mock_s = MagicMock()
             mock_s.api_key = ""
@@ -153,6 +154,7 @@ class TestPhase2CompilationCLI:
         with (
             patch("sys.argv", ["phase2_compilation.py", "--clear-cache"]),
             patch("dochris.phases.phase2_compilation.clear_cache", return_value=5),
+            patch("dochris.phases.phase2_compilation.setup_logging"),
             patch(
                 "dochris.phases.phase2_compilation.get_default_workspace",
                 return_value=Path("/tmp/ws"),
@@ -166,6 +168,7 @@ class TestPhase2CompilationCLI:
         with (
             patch("sys.argv", ["phase2_compilation.py", "--clear-all-cache"]),
             patch("dochris.phases.phase2_compilation.clear_cache", return_value=10),
+            patch("dochris.phases.phase2_compilation.setup_logging"),
             patch(
                 "dochris.phases.phase2_compilation.get_default_workspace",
                 return_value=Path("/tmp/ws"),
@@ -179,6 +182,7 @@ class TestPhase2CompilationCLI:
         with (
             patch("sys.argv", ["phase2_compilation.py", "--concurrency", "2", "--clear-cache"]),
             patch("dochris.phases.phase2_compilation.clear_cache", return_value=0),
+            patch("dochris.phases.phase2_compilation.setup_logging"),
             patch(
                 "dochris.phases.phase2_compilation.get_default_workspace",
                 return_value=Path("/tmp/ws"),

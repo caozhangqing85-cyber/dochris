@@ -10,12 +10,32 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def reset_global_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    """每个测试后重置全局状态（防止测试间状态泄漏）
+    """隔离宿主机配置，并在每个测试前后重置全局状态。
 
     Args:
         monkeypatch: pytest monkeypatch fixture
     """
     from dochris.settings import reset_settings
+
+    for env_name in (
+        "OPENAI_API_KEY",
+        "BIGMODEL_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "OPENAI_API_BASE",
+        "DOCHRIS_API_KEY",
+        "MODEL",
+        "WORKSPACE",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    reset_settings()
 
     yield
 

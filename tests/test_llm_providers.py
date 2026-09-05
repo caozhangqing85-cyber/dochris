@@ -454,7 +454,7 @@ class TestOllamaProviderIntegration:
         ollama_mod.aiohttp = None
         try:
             p = OllamaProvider(model="qwen")
-            with pytest.raises(ImportError, match="aiohttp"):
+            with pytest.raises(ImportError, match=r"dochris\[ollama\]"):
                 await p.generate("hello")
         finally:
             ollama_mod.aiohttp = original
@@ -468,7 +468,7 @@ class TestOllamaProviderIntegration:
         ollama_mod.aiohttp = None
         try:
             p = OllamaProvider(model="qwen")
-            with pytest.raises(ImportError, match="aiohttp"):
+            with pytest.raises(ImportError, match=r"dochris\[ollama\]"):
                 await p.generate_with_messages([{"role": "user", "content": "hi"}])
         finally:
             ollama_mod.aiohttp = original

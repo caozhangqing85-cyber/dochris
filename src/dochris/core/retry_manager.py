@@ -115,10 +115,10 @@ class RetryManager:
                     return await func(*args, **kwargs)
                 else:
                     return func(*args, **kwargs)
-            except (RuntimeError, ValueError, OSError, TimeoutError, ConnectionError) as e:
+            except Exception as e:
                 last_error = e
 
-                if not cls.should_retry(e, attempt):
+                if attempt >= max_attempts - 1 or not cls.should_retry(e, attempt):
                     logger.error(f"Max retries exceeded: {e}")
                     raise
 
@@ -158,7 +158,7 @@ class RetryManager:
             函数返回值，content filter 时返回 on_content_filter
 
         Raises:
-            最后一次错误（当所有重试都失败时）
+            Exception: 所有重试均失败时重新抛出最后一次错误
 
         重试策略:
             - 429 错误: 指数退避（30s, 60s, 120s...）

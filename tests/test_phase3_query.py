@@ -12,6 +12,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+
+@pytest.mark.fast
+@pytest.mark.asyncio
+async def test_query_async_uses_shared_retrieval_core() -> None:
+    """普通查询必须通过共享检索核心，避免与 SSE 漂移。"""
+    from dochris.phases import phase3_query
+
+    shared_result = {
+        "concepts": [],
+        "summaries": [],
+        "vector_results": [],
+        "search_sources": [],
+    }
+    with (
+        patch.object(
+            phase3_query,
+            "retrieve_query_context",
+            return_value=shared_result,
+            create=True,
+        ) as mock_retrieve,
+        patch.object(phase3_query, "search_concepts", return_value=[]),
+        patch.object(phase3_query, "search_summaries", return_value=[]),
+        patch.object(phase3_query, "vector_search", return_value=[]),
+    ):
+        result = await phase3_query.query_async("共享检索", mode="combined", top_k=7)
+
+    mock_retrieve.assert_called_once()
+    assert result["query"] == "共享检索"
+
+
 # 添加 src 目录到路径（如需要）
 # sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -221,7 +251,10 @@ class TestPhase3VectorSearch:
             results = vector_search("测试查询", top_k=5, logger=logger)
 
         assert results == []
-        logger.warning.assert_called()
+        logger.warning.assert_not_called()
+        logger.debug.assert_called_once_with(
+            "Vector search unavailable: install 'dochris[vector]' to enable it"
+        )
 
     def test_vector_search_no_collections(self):
         """测试没有 collection 时的处理"""

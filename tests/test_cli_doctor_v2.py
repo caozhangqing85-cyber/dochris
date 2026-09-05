@@ -124,6 +124,37 @@ class TestCmdDoctorDependency:
         output = " ".join(str(c) for c in mock_print.call_args_list)
         assert "openai" in output
 
+    @patch("dochris.cli.cli_doctor.print")
+    def test_missing_vector_dependency_is_optional_with_actionable_extra(
+        self, mock_print, mock_workspace
+    ):
+        """基础安装可通过 doctor；缺失向量能力必须给出准确的可选安装命令。"""
+        from dochris.cli.cli_doctor import cmd_doctor
+
+        original_import = __import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "chromadb":
+                raise ImportError("no chromadb")
+            return original_import(name, *args, **kwargs)
+
+        with (
+            patch("builtins.__import__", side_effect=mock_import),
+            patch("dochris.cli.cli_doctor.shutil.disk_usage") as mock_disk,
+        ):
+            disk = MagicMock()
+            disk.total = 500 * (1024**3)
+            disk.used = 50 * (1024**3)
+            disk.free = 450 * (1024**3)
+            mock_disk.return_value = disk
+            result = cmd_doctor(argparse.Namespace())
+
+        output = " ".join(str(call) for call in mock_print.call_args_list)
+        assert result == 0
+        assert "chromadb" in output
+        assert "dochris[vector]" in output
+        assert "未安装（可选）" in output
+
 
 class TestCmdDoctorSummaryBranches:
     """覆盖总结部分的各种 issue 分支"""

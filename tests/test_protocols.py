@@ -2,6 +2,7 @@
 测试 protocols.py 模块
 """
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -31,6 +32,25 @@ class TestProtocolsModule:
                 **kwargs: Any,
             ) -> str:
                 return "response"
+
+            async def generate_with_messages(
+                self,
+                messages: list[dict[str, str]],
+                max_tokens: int = 4000,
+                temperature: float = 0.7,
+                **kwargs: Any,
+            ) -> str:
+                return "response"
+
+            async def generate_stream(
+                self,
+                prompt: str,
+                system_prompt: str | None = None,
+                max_tokens: int = 4000,
+                temperature: float = 0.7,
+                **kwargs: Any,
+            ) -> AsyncIterator[str]:
+                yield "response"
 
             async def close(self) -> None:
                 pass

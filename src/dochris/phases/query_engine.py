@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from dochris.llm.openai_compat import OpenAICompatProvider
 from dochris.phases.query_utils import (
@@ -19,7 +19,9 @@ from dochris.phases.query_utils import (
     WIKI_SUMMARIES_PATH,
     _extract_concept,
     _extract_summary,
+    _has_strong_keyword_evidence,
     _keyword_search,
+    _split_query_terms,
 )
 from dochris.plugin import get_plugin_manager
 from dochris.rag.schemas import RetrievalCandidate, SourceRef
@@ -146,16 +148,10 @@ def _search_manifest_concepts(query: str, top_k: int = 5) -> list[dict]:
         return []
 
     import json
-    import re
 
     results: list[dict] = []
     query_lower = query.lower()
-    # 提取查询中的关键词（中文按 2-3 字切分，英文按空格分词）
-    query_terms = set()
-    for token in re.findall(r"[a-z0-9_]+|[一-鿿]+", query_lower):
-        query_terms.add(token)
-        if re.fullmatch(r"[一-鿿]+", token):
-            query_terms.update(token[i : i + 2] for i in range(len(token) - 1))
+    query_terms = _split_query_terms(query_lower)
 
     if not query_terms:
         return []
@@ -198,7 +194,12 @@ def _search_manifest_concepts(query: str, top_k: int = 5) -> list[dict]:
                 if term in expl_lower:
                     score += 2
 
-            if score > 0:
+            if score > 0 and _has_strong_keyword_evidence(
+                query_lower,
+                name_lower,
+                expl_lower,
+                query_terms,
+            ):
                 results.append(
                     {
                         "name": name,
@@ -320,7 +321,9 @@ def retrieve_candidates(
 
     _record_retrieval_obs(
         retriever="search_all",
-        candidate_count=sum(len(raw_results.get(k, [])) for k in ("concepts", "summaries", "vector_results")),
+        candidate_count=sum(
+            len(raw_results.get(k, [])) for k in ("concepts", "summaries", "vector_results")
+        ),
         latency_ms=_obs_elapsed_ms(_obs_start),
     )
 
@@ -368,7 +371,9 @@ def retrieve_candidates(
     for i, item in enumerate(raw_results.get("vector_results", [])):
         raw_score = float(item.get("score", 0))
         raw_distance = raw_score  # vector search returns distance as score
-        score_kind = "cosine_distance" if vector_store_type == "chromadb" else "l2_distance"
+        score_kind: Literal["cosine_distance", "l2_distance"] = (
+            "cosine_distance" if vector_store_type == "chromadb" else "l2_distance"
+        )
         c = RetrievalCandidate(
             id=f"vec_{item.get('manifest_id', 'unknown')}_{i}",
             text=item.get("text", ""),
@@ -562,9 +567,10 @@ def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = No
 
     except ImportError:
         if logger:
-            logger.warning("chromadb not installed")
+            logger.debug("Vector search unavailable: install 'dochris[vector]' to enable it")
         return []
-    except (OSError, RuntimeError) as e:
+    except Exception as e:
+        _chromadb_client_cache = None
         if logger:
             logger.error(f"Vector search failed: {e}")
         return []
@@ -1130,9 +1136,7 @@ def _obs_elapsed_ms(start: float) -> float:
     return (time.time() - start) * 1000
 
 
-def _record_retrieval_obs(
-    retriever: str, candidate_count: int, latency_ms: float
-) -> None:
+def _record_retrieval_obs(retriever: str, candidate_count: int, latency_ms: float) -> None:
     """记录检索可观测性指标（静默 fallback）。"""
     try:
         from dochris.observability import get_observability

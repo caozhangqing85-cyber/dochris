@@ -114,6 +114,7 @@ def _candidate_to_vector_dict(c: RetrievalCandidate) -> dict[str, Any]:
         "type": c.metadata.get("type", ""),
     }
 
+
 # LLM 相关：指向新的 async 函数
 create_query_provider = query_engine.create_query_provider
 generate_answer_async = query_engine.generate_answer_async
@@ -149,6 +150,109 @@ def search_all(query: str, top_k: int = 5) -> dict:
 def vector_search(query: str, top_k: int = 5, logger: logging.Logger | None = None) -> list:
     """向量搜索包装器，直接委托给 query_engine"""
     return cast(list, query_engine.vector_search(query, top_k, logger))
+
+
+def retrieve_query_context(
+    query_str: str,
+    mode: str,
+    top_k: int,
+    logger: logging.Logger | None = None,
+    *,
+    include_vector: bool = True,
+) -> dict[str, Any]:
+    """执行普通查询与 SSE 共用的只读检索阶段。"""
+    if mode == "all" and include_vector:
+        return cast(dict[str, Any], search_all(query_str, top_k))
+
+    concepts: list[dict[str, Any]] = []
+    summaries: list[dict[str, Any]] = []
+    vector_results: list[dict[str, Any]] = []
+    search_sources: set[str] = set()
+
+    if mode in ("concept", "combined", "all"):
+        concepts = cast(list[dict[str, Any]], search_concepts(query_str, top_k))
+        if concepts and concepts[0].get("source"):
+            search_sources.add(str(concepts[0]["source"]))
+
+    if mode in ("summary", "combined", "all"):
+        summaries = cast(list[dict[str, Any]], search_summaries(query_str, top_k))
+        if summaries and summaries[0].get("source"):
+            search_sources.add(str(summaries[0]["source"]))
+
+    if include_vector and mode in ("vector", "combined", "all"):
+        vector_results = cast(
+            list[dict[str, Any]],
+            vector_search(query_str, top_k, logger),
+        )
+        if vector_results:
+            search_sources.add("vector")
+
+    return {
+        "concepts": concepts,
+        "summaries": summaries,
+        "vector_results": vector_results,
+        "search_sources": sorted(search_sources),
+    }
+
+
+def rerank_query_context(
+    query_str: str,
+    result: dict[str, Any],
+    top_k: int,
+    logger: logging.Logger | None = None,
+) -> dict[str, Any]:
+    """对完整检索上下文应用普通查询与 SSE 共用的 Reranker。"""
+    if logger is None:
+        logger = logging.getLogger("phase3")
+
+    reranked_result = {
+        **result,
+        "search_sources": list(result.get("search_sources", [])),
+    }
+    if not (
+        reranked_result.get("concepts")
+        or reranked_result.get("summaries")
+        or reranked_result.get("vector_results")
+    ):
+        return reranked_result
+
+    try:
+        from dochris.settings import get_settings
+
+        settings = get_settings()
+        candidate_k = settings.reranker_candidate_k
+        final_k = settings.reranker_top_k
+        candidates = query_engine.retrieve_candidates(
+            query_str,
+            top_k=top_k,
+            candidate_k=candidate_k,
+        )
+        reranked = query_engine.rerank_candidates(query_str, candidates, top_k=final_k)
+
+        reranked_result["concepts"] = [
+            _candidate_to_concept_dict(c) for c in reranked if c.channel == "concept"
+        ]
+        reranked_result["summaries"] = [
+            _candidate_to_summary_dict(c) for c in reranked if c.channel == "summary"
+        ]
+        reranked_result["vector_results"] = [
+            _candidate_to_vector_dict(c) for c in reranked if c.channel in ("vector", "chunk")
+        ]
+        reranked_result["reranked_candidates"] = reranked
+        reranked_result["search_sources"] = sorted(
+            set(reranked_result["search_sources"]) | {"reranker"}
+        )
+        logger.info(
+            "Reranker 启用: %d 候选 → %d 精选 (candidate_k=%d, final_k=%d)",
+            len(candidates),
+            len(reranked),
+            candidate_k,
+            final_k,
+        )
+    except Exception as exc:
+        logger.warning("Reranker 处理失败，使用原始排序: %s", exc)
+
+    return reranked_result
 
 
 # ============================================================
@@ -197,53 +301,25 @@ async def query_async(
         "time_seconds": 0,
     }
 
-    # --- 搜索阶段（同步，本地文件 I/O） ---
-    if mode == "all":
-        all_result = search_all(query_str, top_k)
-        result["concepts"] = all_result["concepts"]
-        result["summaries"] = all_result["summaries"]
-        result["vector_results"] = all_result["vector_results"]
-        result["search_sources"] = all_result["search_sources"]
-    else:
-        if mode in ("concept", "combined"):
-            result["concepts"] = search_concepts(query_str, top_k)
-            if result["concepts"]:
-                result["search_sources"].append(result["concepts"][0]["source"])
-
-        if mode in ("summary", "combined"):
-            result["summaries"] = search_summaries(query_str, top_k)
-            if result["summaries"]:
-                result["search_sources"].append(result["summaries"][0]["source"])
-
-        if mode in ("vector", "combined"):
-            result["vector_results"] = vector_search(query_str, top_k, logger)
-            if result["vector_results"]:
-                result["search_sources"].append("vector")
+    # --- 搜索阶段（在线程中执行，避免阻塞 API 事件循环） ---
+    retrieval = await asyncio.to_thread(
+        retrieve_query_context,
+        query_str,
+        mode,
+        top_k,
+        logger,
+    )
+    result.update(retrieval)
 
     # --- Reranker 重排序阶段（可选） ---
-    if rerank and (result["concepts"] or result["summaries"] or result["vector_results"]):
-        try:
-            from dochris.settings import get_settings
-
-            settings = get_settings()
-            candidate_k = settings.reranker_candidate_k
-            final_k = settings.reranker_top_k
-
-            candidates = query_engine.retrieve_candidates(query_str, top_k=top_k, candidate_k=candidate_k)
-            reranked = query_engine.rerank_candidates(query_str, candidates, top_k=final_k)
-
-            # 将 reranked 候选转回 dict 格式供 build_answer_context 使用
-            result["concepts"] = [_candidate_to_concept_dict(c) for c in reranked if c.channel == "concept"]
-            result["summaries"] = [_candidate_to_summary_dict(c) for c in reranked if c.channel == "summary"]
-            result["vector_results"] = [_candidate_to_vector_dict(c) for c in reranked if c.channel in ("vector", "chunk")]
-            result["reranked_candidates"] = reranked
-            result["search_sources"].append("reranker")
-            logger.info(
-                "Reranker 启用: %d 候选 → %d 精选 (candidate_k=%d, final_k=%d)",
-                len(candidates), len(reranked), candidate_k, final_k,
-            )
-        except Exception as e:
-            logger.warning("Reranker 处理失败，使用原始排序: %s", e)
+    if rerank:
+        result = await asyncio.to_thread(
+            rerank_query_context,
+            query_str,
+            result,
+            top_k,
+            logger,
+        )
 
     # --- LLM 生成阶段（异步） ---
     if mode in ("combined", "all") and (

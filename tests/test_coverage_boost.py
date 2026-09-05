@@ -558,7 +558,6 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
         )
-
         from dochris.phases.phase2_compilation import compile_all
 
         # 模拟非交互模式
@@ -599,7 +598,6 @@ class TestPhase2CompilationBatchProcessing:
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
         )
-
         from dochris.phases.phase2_compilation import compile_all
 
         with patch("sys.stdout.isatty", return_value=False):
@@ -661,6 +659,10 @@ class TestPhase2ClearCache:
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
         )
+        monkeypatch.setattr(
+            "dochris.phases.phase2_compilation.setup_logging",
+            lambda: MagicMock(),
+        )
 
         from dochris.phases.phase2_compilation import main
 
@@ -680,6 +682,10 @@ class TestPhase2ClearCache:
         monkeypatch.setattr(
             "dochris.phases.phase2_compilation.cache_dir",
             lambda ws: tmp_path / "cache",
+        )
+        monkeypatch.setattr(
+            "dochris.phases.phase2_compilation.setup_logging",
+            lambda: MagicMock(),
         )
 
         from dochris.phases.phase2_compilation import main

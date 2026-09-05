@@ -84,7 +84,7 @@ class Settings:
         "embedding_model": ("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5", None),
         "vector_store": ("VECTOR_STORE", "chromadb", None),
         "max_concurrency": ("MAX_CONCURRENCY", "3", int),
-        "min_quality_score": ("MIN_QUALITY_SCORE", "70", int),
+        "min_quality_score": ("MIN_QUALITY_SCORE", "85", int),
         "max_content_chars": ("MAX_CONTENT_CHARS", "20000", int),
         "log_level": ("LOG_LEVEL", "INFO", None),
         "local_llm_base_url": ("LOCAL_LLM_BASE_URL", "", None),
@@ -224,7 +224,7 @@ class Settings:
     # ============================================================
 
     min_quality_score: int = field(
-        default_factory=lambda: int(os.environ.get("MIN_QUALITY_SCORE", "70"))
+        default_factory=lambda: int(os.environ.get("MIN_QUALITY_SCORE", "85"))
     )
     """最低质量分数（通过门槛）"""
 
@@ -355,14 +355,28 @@ class Settings:
         Returns:
             Settings 实例
         """
-        # 1. 先尝试从可能的 workspace 位置加载 .env
-        env_paths = [
-            Path.cwd() / ".env",
-            Path.home() / ".dochris" / "knowledge-base" / ".env",
-            Path.home() / ".openclaw" / "knowledge-base" / ".env",
-        ]
+        # 1. 先尝试从可能的 workspace 位置加载 .env。
+        # 显式 WORKSPACE 是隔离边界：优先读取它自己的配置；即使该文件
+        # 不存在，也不能回退到另一个默认 home 工作区并泄露其凭据。
+        workspace_env = (os.environ.get("WORKSPACE") or "").strip()
+        env_paths: list[Path] = []
         if env_file:
-            env_paths.insert(0, env_file)
+            env_paths.append(env_file)
+        if workspace_env:
+            env_paths.extend(
+                [
+                    Path(workspace_env).expanduser() / ".env",
+                    Path.cwd() / ".env",
+                ]
+            )
+        else:
+            env_paths.extend(
+                [
+                    Path.cwd() / ".env",
+                    Path.home() / ".dochris" / "knowledge-base" / ".env",
+                    Path.home() / ".openclaw" / "knowledge-base" / ".env",
+                ]
+            )
 
         for env_path in env_paths:
             if env_path.exists():

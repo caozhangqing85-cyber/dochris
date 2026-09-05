@@ -309,8 +309,14 @@ class TestProtocolMethodsParametrized:
         "protocol_cls,required_methods",
         [
             ("FileParser", ["supported_extensions", "parse"]),
-            ("LLMProvider", ["generate", "close"]),
-            ("VectorStore", ["add", "query", "delete", "list_collections"]),
+            (
+                "LLMProvider",
+                ["generate", "generate_with_messages", "generate_stream", "close"],
+            ),
+            (
+                "VectorStore",
+                ["add_documents", "query", "delete", "list_collections", "get_collection_count"],
+            ),
             ("QualityScorer", ["score"]),
         ],
     )

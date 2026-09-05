@@ -12,7 +12,6 @@ from typing import Any
 try:
     import aiohttp
 except ImportError:
-    logging.warning("aiohttp not installed. Ollama provider requires: pip install aiohttp")
     aiohttp = None  # type: ignore
 
 from .base import BaseLLMProvider
@@ -69,7 +68,7 @@ class OllamaProvider(BaseLLMProvider):
             生成的文本
         """
         if aiohttp is None:
-            raise ImportError("aiohttp package not installed. Run: pip install aiohttp")
+            raise ImportError("aiohttp package not installed. Run: pip install 'dochris[ollama]'")
 
         messages = []
         if system_prompt:
@@ -99,7 +98,7 @@ class OllamaProvider(BaseLLMProvider):
             生成的文本
         """
         if aiohttp is None:
-            raise ImportError("aiohttp package not installed. Run: pip install aiohttp")
+            raise ImportError("aiohttp package not installed. Run: pip install 'dochris[ollama]'")
 
         payload = {
             "model": self.model,

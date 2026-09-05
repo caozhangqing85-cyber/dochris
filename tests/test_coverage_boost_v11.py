@@ -30,12 +30,13 @@ class TestCleanInternalReferences:
         assert "正文内容" in result
 
     def test_multi_line_metadata_not_removed(self):
-        """多行元数据块不会被移除（正则限制）"""
+        """多字段 YAML frontmatter 会被完整移除。"""
         from dochris.vault.bridge import clean_internal_references
 
         content = "---\ncreated: 2024-01-01\nstatus: ok\n---\n正文内容"
         result = clean_internal_references(content)
-        assert "created:" in result  # 多行块不会被移除
+        assert "created:" not in result
+        assert "status:" not in result
         assert "正文内容" in result
 
     def test_remove_compile_timestamp(self):

@@ -10,6 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.fast
+
 # ============================================================
 # TestCLIMain
 # ============================================================
@@ -67,14 +69,26 @@ class TestCLIMain:
         mock_cmd.assert_called_once()
 
     def test_main_version_subcommand(self):
-        """version 子命令正确分发"""
+        """version 子命令正确分发，且不要求 LLM 配置"""
         from dochris.cli.main import main
 
-        with patch("dochris.cli.main.cmd_version", return_value=0) as mock_cmd:
-            with patch("sys.argv", ["kb", "version"]):
-                rc = main()
+        with (
+            patch("dochris.cli.main.cmd_version", return_value=0) as mock_cmd,
+            patch("dochris.cli.main.get_settings") as mock_get_settings,
+            patch("dochris.cli.main._setup_logging"),
+            patch("dochris.cli.main.logger.warning") as mock_warning,
+            patch("sys.argv", ["kb", "version"]),
+        ):
+            settings = MagicMock(log_level="INFO", max_concurrency=8)
+            settings.validate.return_value = ["OPENAI_API_KEY 未设置"]
+            mock_get_settings.return_value = settings
+
+            rc = main()
+
         assert rc == 0
         mock_cmd.assert_called_once()
+        settings.validate.assert_not_called()
+        mock_warning.assert_not_called()
 
     def test_main_ingest_subcommand(self):
         """ingest 子命令正确分发"""
@@ -619,7 +633,7 @@ class TestCLIQuery:
         """单次查询有结果时返回 0"""
         from dochris.cli.cli_query import cmd_query
 
-        args = MagicMock(query="测试", mode="combined", top_k=5)
+        args = MagicMock(query="测试", mode="combined", top_k=5, rerank=False, contribute=False)
 
         mock_logger = MagicMock()
         with patch("dochris.phases.phase3_query.setup_logging", return_value=mock_logger):
@@ -632,7 +646,14 @@ class TestCLIQuery:
                 with patch("dochris.phases.phase3_query.print_result"):
                     rc = cmd_query(args)
         assert rc == 0
-        mock_query.assert_called_once_with("测试", mode="combined", top_k=5, logger=mock_logger)
+        mock_query.assert_called_once_with(
+            "测试",
+            mode="combined",
+            top_k=5,
+            logger=mock_logger,
+            rerank=False,
+            contribute=False,
+        )
 
     def test_cmd_query_single_returns_one_without_answer(self):
         """单次查询无结果时返回 1"""

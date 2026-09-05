@@ -40,6 +40,7 @@ from dochris.cli.cli_plugin import cmd_plugin, setup_plugin_parser
 from dochris.cli.cli_query import cmd_query
 from dochris.cli.cli_review import cmd_promote, cmd_quality, cmd_status
 from dochris.cli.cli_serve import cmd_serve
+from dochris.cli.cli_storage import cmd_storage
 from dochris.cli.cli_utils import (
     EXIT_CONFIG_ERROR,
     EXIT_FAILURE,
@@ -105,14 +106,21 @@ def main() -> int:
     # 配置日志
     _setup_logging(settings, log_format=log_format)
 
-    # 验证配置
-    try:
-        warnings = settings.validate()
-        for warning in warnings:
-            logger.warning(f"配置警告: {warning}")
-    except ValueError as e:
-        print(format_error("配置验证", str(e), hint="运行 'kb init' 重新配置"))
-        return EXIT_CONFIG_ERROR
+    # 自举/信息命令必须能在尚未配置 LLM 时运行。
+    raw_args = sys.argv[1:]
+    skip_config_validation = (
+        not raw_args
+        or any(arg in {"-h", "--help", "--version", "--completion"} for arg in raw_args)
+        or any(arg in {"init", "doctor", "version"} for arg in raw_args)
+    )
+    if not skip_config_validation:
+        try:
+            warnings = settings.validate()
+            for warning in warnings:
+                logger.warning(f"配置警告: {warning}")
+        except ValueError as e:
+            print(format_error("配置验证", str(e), hint="运行 'kb init' 重新配置"))
+            return EXIT_CONFIG_ERROR
 
     parser = argparse.ArgumentParser(
         prog="kb",
@@ -131,6 +139,7 @@ def main() -> int:
   kb status                           # 显示系统状态
   kb promote SRC-0001 --to wiki       # 晋升到 wiki
   kb quality --report                 # 生成质量报告
+  kb storage audit                    # 审计存储重复文件
   kb vault seed "财富自由"            # 从 Obsidian 拉取笔记
   kb config                           # 显示当前配置
   kb version                          # 显示版本
@@ -267,9 +276,7 @@ def main() -> int:
     parser_status = subparsers.add_parser(
         "status", help="显示系统状态", description="显示工作区、manifest、API 配置等状态概览"
     )
-    parser_status.add_argument(
-        "--workspace", help="指定工作区路径（默认使用环境变量或默认路径）"
-    )
+    parser_status.add_argument("--workspace", help="指定工作区路径（默认使用环境变量或默认路径）")
 
     # promote 命令
     parser_promote = subparsers.add_parser(
@@ -401,6 +408,30 @@ def main() -> int:
     parser_graph_search = graph_subparsers.add_parser("search", help="搜索图谱节点")
     parser_graph_search.add_argument("query", help="搜索关键词")
 
+    # storage 命令
+    parser_storage = subparsers.add_parser(
+        "storage",
+        help="存储审计与安全迁移",
+        description="审计精确重复文件，默认 dry-run；应用迁移时生成可回滚备份",
+    )
+    storage_subparsers = parser_storage.add_subparsers(dest="storage_command")
+    parser_storage_audit = storage_subparsers.add_parser("audit", help="只读审计存储重复")
+    parser_storage_audit.add_argument("--workspace", help="指定工作区路径")
+    parser_storage_audit.add_argument("--json", action="store_true", help="输出 JSON")
+    parser_storage_migrate = storage_subparsers.add_parser("migrate", help="预览或应用安全迁移")
+    parser_storage_migrate.add_argument("--workspace", help="指定工作区路径")
+    parser_storage_migrate.add_argument(
+        "--apply", action="store_true", help="实际移动安全副本；省略时仅 dry-run"
+    )
+    parser_storage_migrate.add_argument("--backup-dir", help="指定备份目录")
+    parser_storage_migrate.add_argument("--json", action="store_true", help="输出 JSON")
+    parser_storage_rollback = storage_subparsers.add_parser(
+        "rollback", help="从迁移 manifest 恢复文件"
+    )
+    parser_storage_rollback.add_argument("manifest", help="迁移 manifest.json 路径")
+    parser_storage_rollback.add_argument("--workspace", help="指定工作区路径")
+    parser_storage_rollback.add_argument("--json", action="store_true", help="输出 JSON")
+
     # 解析参数
     args = parser.parse_args()
 
@@ -451,6 +482,8 @@ def main() -> int:
             return cmd_serve(args)
         elif args.command == "graph":
             return cmd_graph(args)
+        elif args.command == "storage":
+            return cmd_storage(args)
         elif args.command == "export":
             return cmd_export(args)
         elif args.command == "clean":

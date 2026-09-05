@@ -340,7 +340,7 @@ class TestCmdInit:
         mock_s.validate.return_value = []
         with patch("dochris.settings.get_settings", return_value=mock_s):
             monkeypatch.setenv("WORKSPACE", str(workspace))
-            args = MagicMock()
+            args = argparse.Namespace(path=None, non_interactive=False, api_key=None)
             result = cmd_init(args)
 
         assert result == 0

@@ -56,7 +56,7 @@ class TestSetupLogging:
         """测试返回 logger 实例"""
         from dochris.phases.query_utils import setup_logging
 
-        logger = setup_logging()
+        logger = setup_logging(mock_workspace / "logs")
 
         assert isinstance(logger, logging.Logger)
         assert logger.name == "phase3"
@@ -65,9 +65,10 @@ class TestSetupLogging:
         """测试创建日志文件（验证函数不崩溃）"""
         from dochris.phases.query_utils import setup_logging
 
-        logger = setup_logging()
+        logger = setup_logging(mock_workspace / "logs")
         assert logger is not None
         assert isinstance(logger, logging.Logger)
+        assert len(list((mock_workspace / "logs").glob("phase3_*.log"))) == 1
 
 
 class TestBuildManifestIndex:

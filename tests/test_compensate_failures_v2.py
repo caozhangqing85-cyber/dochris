@@ -1,8 +1,10 @@
 """补充测试 compensate/compensate_failures.py — 覆盖 ImportError fallback 函数"""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.fast
 
 
 class TestSanitizeFallbacks:
@@ -42,16 +44,22 @@ class TestCompileWithModelFallback:
 
     @pytest.mark.asyncio
     async def test_model_fallback_no_text(self):
-        """无文本时返回 None"""
+        """无文本时返回 None，且不得读取凭据或发起模型调用。"""
         from dochris.compensate.compensate_failures import compile_with_model_fallback
 
-        result = await compile_with_model_fallback("", "title", MagicMock(), ["model1"], 0.1)
+        with patch("dochris.settings.get_settings") as get_settings:
+            result = await compile_with_model_fallback("", "title", MagicMock(), ["model1"], 0.1)
+
         assert result is None
+        get_settings.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_model_fallback_no_models(self):
-        """无模型时返回 None"""
+        """无模型时返回 None，且不得读取凭据或发起模型调用。"""
         from dochris.compensate.compensate_failures import compile_with_model_fallback
 
-        result = await compile_with_model_fallback("some text", "title", MagicMock(), [], 0.1)
+        with patch("dochris.settings.get_settings") as get_settings:
+            result = await compile_with_model_fallback("some text", "title", MagicMock(), [], 0.1)
+
         assert result is None
+        get_settings.assert_not_called()

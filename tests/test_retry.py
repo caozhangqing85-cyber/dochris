@@ -6,6 +6,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 # 添加 scripts 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -55,10 +56,11 @@ class TestRetryManager(unittest.TestCase):
         self.assertLessEqual(delay_0, 60)  # 最大 60 秒
 
 
-class TestRetryAsync(unittest.TestCase):
+class TestRetryAsync(unittest.IsolatedAsyncioTestCase):
     """测试异步重试"""
 
-    async def test_retry_success(self):
+    @patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock)
+    async def test_retry_success(self, mock_sleep):
         """测试重试成功"""
         from dochris.core.retry_manager import RetryManager
 
@@ -73,8 +75,10 @@ class TestRetryAsync(unittest.TestCase):
         result = await RetryManager.retry(failing_function, max_attempts=3)
         self.assertEqual(result, "success")
         self.assertEqual(call_count[0], 2)
+        mock_sleep.assert_awaited_once()
 
-    async def test_retry_exhausted(self):
+    @patch("dochris.core.retry_manager.asyncio.sleep", new_callable=AsyncMock)
+    async def test_retry_exhausted(self, mock_sleep):
         """测试重试耗尽"""
         from dochris.core.retry_manager import RetryManager
 
@@ -83,6 +87,7 @@ class TestRetryAsync(unittest.TestCase):
 
         with self.assertRaises(Exception):
             await RetryManager.retry(always_failing, max_attempts=2)
+        mock_sleep.assert_awaited_once()
 
 
 if __name__ == "__main__":

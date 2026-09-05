@@ -26,16 +26,20 @@ class TestApiKeyAuth:
         await verify_api_key(request)
 
     @pytest.mark.asyncio
-    async def test_valid_api_key_query_param(self, monkeypatch):
-        """有效的 API Key 通过 query param 传递"""
+    async def test_api_key_query_param_is_rejected(self, monkeypatch):
+        """API Key 查询参数会进入 URL 日志，因此不再接受"""
         monkeypatch.setenv("DOCHRIS_API_KEY", "test-secret-key")
         from dochris.api.auth import verify_api_key
 
         request = MagicMock()
-        request.headers = {"X-API-Key": None}
+        request.headers = {}
         request.query_params = {"api_key": "test-secret-key"}
 
-        await verify_api_key(request)
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_api_key(request)
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
     async def test_invalid_api_key_raises_401(self, monkeypatch):

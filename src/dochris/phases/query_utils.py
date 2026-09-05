@@ -51,16 +51,24 @@ _manifest_index_cache: dict[str, str] | None = None  # file_path → src_id 映�
 _manifest_index_lock = threading.Lock()  # 保护 manifest 索引缓存的锁
 
 
-def setup_logging() -> logging.Logger:
+def setup_logging(logs_path: Path | None = None) -> logging.Logger:
     """设置日志系统
+
+    Args:
+        logs_path: 日志目录；未提供时从当前 Settings 调用时解析
 
     Returns:
         配置好的 logger 实例
     """
-    LOGS_PATH.mkdir(parents=True, exist_ok=True)
-    log_file = LOGS_PATH / f"phase3_{datetime.now().strftime(LOG_DATE_FORMAT)}.log"
+    resolved_logs_path = get_logs_dir() if logs_path is None else Path(logs_path)
+    resolved_logs_path.mkdir(parents=True, exist_ok=True)
+    log_file = resolved_logs_path / f"phase3_{datetime.now().strftime(LOG_DATE_FORMAT)}.log"
     logger = logging.getLogger("phase3")
     logger.setLevel(logging.DEBUG)
+    for handler in list(logger.handlers):
+        if getattr(handler, "_dochris_phase3_handler", False):
+            logger.removeHandler(handler)
+            handler.close()
     fh = logging.FileHandler(log_file, encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
@@ -68,8 +76,11 @@ def setup_logging() -> logging.Logger:
     fmt = logging.Formatter(LOG_FORMAT_SIMPLE)
     fh.setFormatter(fmt)
     ch.setFormatter(fmt)
+    fh._dochris_phase3_handler = True  # type: ignore[attr-defined]
+    ch._dochris_phase3_handler = True  # type: ignore[attr-defined]
     logger.addHandler(fh)
     logger.addHandler(ch)
+    logger.propagate = False
     return logger
 
 
@@ -110,7 +121,11 @@ def _build_manifest_index() -> dict[str, str]:
             compiled = m.get("compiled_summary") or {}
             if isinstance(compiled, dict):
                 for c in compiled.get("concepts", []):
-                    cname = c.get("name", "") if isinstance(c, dict) else (c if isinstance(c, str) else "")
+                    cname = (
+                        c.get("name", "")
+                        if isinstance(c, dict)
+                        else (c if isinstance(c, str) else "")
+                    )
                     if cname:
                         safe_cname = re.sub(r'[<>:"/\\|?*]', "", str(cname)).strip()[:60]
                         index[f"wiki/concepts/{safe_cname}.md"] = src_id
@@ -223,7 +238,12 @@ def _keyword_search(
             count = text_lower.count(term)
             score += min(count, 3)
 
-        if score > 0:
+        if score > 0 and _has_strong_keyword_evidence(
+            query_lower,
+            stem,
+            text_lower,
+            query_terms,
+        ):
             item = extract_fn(md_file, text)
             item["score"] = score
             item["source"] = source_label
@@ -244,6 +264,48 @@ def _split_query_terms(query: str) -> set[str]:
             terms.update(token[i : i + 2] for i in range(len(token) - 1))
             terms.update(token[i : i + 3] for i in range(len(token) - 2))
     return {term for term in terms if term}
+
+
+def _has_strong_keyword_evidence(
+    query: str,
+    name: str,
+    text: str,
+    query_terms: set[str] | None = None,
+) -> bool:
+    """过滤多词查询中仅命中一个偶然短片段的假相关结果。"""
+    terms = query_terms if query_terms is not None else _split_query_terms(query)
+    if not terms:
+        return False
+
+    query_tokens = re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]+", query.lower())
+    name_lower = name.lower()
+    text_lower = text.lower()
+    matched_terms = {term for term in terms if term in name_lower or term in text_lower}
+    if not matched_terms:
+        return False
+
+    compact_query = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", query.lower())
+    compact_name = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", name_lower)
+    compact_text = re.sub(r"\s+", "", text_lower)
+
+    filename_or_name_match = bool(
+        compact_name
+        and (compact_name in compact_query or any(term in name_lower for term in matched_terms))
+    )
+    full_phrase_match = bool(
+        len(compact_query) >= 2 and (compact_query in compact_name or compact_query in compact_text)
+    )
+    single_explicit_term = len(query_tokens) == 1
+    multiple_terms_match = len(matched_terms) >= 2
+    repeated_text_match = any(text_lower.count(term) >= 2 for term in matched_terms)
+
+    return (
+        filename_or_name_match
+        or full_phrase_match
+        or single_explicit_term
+        or multiple_terms_match
+        or repeated_text_match
+    )
 
 
 def _extract_concept(file_path: Path, text: str) -> dict:

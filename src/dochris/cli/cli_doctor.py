@@ -131,8 +131,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(f"\n{info('5. 核心依赖检查')}")
     dependencies = [
         ("openai", "OpenAI API 客户端"),
-        ("chromadb", "向量数据库"),
-        ("markitdown", "文档解析"),
     ]
 
     missing_deps = []
@@ -145,24 +143,29 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             missing_deps.append(module_name)
 
     if missing_deps:
-        print(f"   {dim('提示: pip install -e .[all] 安装所有依赖')}")
+        print(f"   {dim('提示: python -m pip install -e . 安装基础依赖')}")
         issues.append("dependencies")
 
     # 6. 可选依赖检查
     print(f"\n{info('6. 可选依赖检查')}")
     optional_deps = [
-        ("faster_whisper", "音频转录"),
-        ("fitz", "PDF 解析 (PyMuPDF)"),
-        ("pdfplumber", "PDF 解析 (pdfplumber)"),
-        ("PIL", "图像处理 (Pillow)"),
+        ("markitdown", "Office 文档解析", "pip install 'dochris[documents]'"),
+        ("chromadb", "Chroma 向量数据库", "pip install 'dochris[vector]'"),
+        ("sentence_transformers", "语义检索与重排序", "pip install 'dochris[vector]'"),
+        ("aiohttp", "Ollama provider", "pip install 'dochris[ollama]'"),
+        ("faster_whisper", "音频转录", "pip install 'dochris[audio]'"),
+        ("fitz", "PDF 解析 (PyMuPDF)", "pip install 'dochris[pdf]'"),
+        ("pdfplumber", "PDF 解析 (pdfplumber)", "pip install 'dochris[pdf]'"),
+        ("PIL", "图像处理 (Pillow)", "pip install 'dochris[ocr]'"),
     ]
 
-    for module_name, description in optional_deps:
+    for module_name, description, install_hint in optional_deps:
         try:
             __import__(module_name)
             print(f"   {success('✓')} {module_name} ({description})")
         except ImportError:
             print(f"   {dim('○')} {module_name} ({description}) - 未安装（可选）")
+            print(f"      {dim(f'启用: {install_hint}')}")
 
     # 6.5 外部工具检查
     print(f"\n{info('6.5 外部工具检查')}")
@@ -220,13 +223,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             elif issue == "disk_space":
                 print("  - 磁盘空间不足，请清理磁盘")
             elif issue == "dependencies":
-                print("  - 核心依赖缺失，请运行 pip install -e .[all]")
+                print("  - 核心依赖缺失，请运行 python -m pip install -e .")
 
         print("\n建议操作:")
         if "api_key" in issues or "workspace" in issues:
             print("  1. 运行: kb init")
         if "dependencies" in issues:
-            print("  2. 运行: pip install -e .[all]")
+            print("  2. 运行: python -m pip install -e .")
 
         print()
         return 1

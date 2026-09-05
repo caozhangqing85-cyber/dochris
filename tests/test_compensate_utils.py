@@ -4,6 +4,7 @@
 """
 
 import logging
+from unittest.mock import patch
 
 from dochris.compensate.compensate_utils import (
     BATCH_DELAY,
@@ -67,37 +68,43 @@ class TestConfigurationConstants:
 class TestSetupLogging:
     """日志设置测试"""
 
-    def test_setup_logging_returns_logger(self, tmp_path, monkeypatch) -> None:
+    def test_setup_logging_returns_logger(self, tmp_path) -> None:
         """测试 setup_logging 返回 logger"""
-        # 修改工作区路径到临时目录
         workspace = tmp_path / "workspace"
-        workspace.mkdir()
-        monkeypatch.setenv("WORKSPACE", str(workspace))
-
-        logger = setup_logging()
+        with patch("logging.basicConfig") as basic_config:
+            logger = setup_logging(workspace)
+            for handler in basic_config.call_args.kwargs["handlers"]:
+                handler.close()
 
         assert isinstance(logger, logging.Logger)
 
-    def test_setup_logging_creates_log_file(self, tmp_path, monkeypatch) -> None:
+    def test_setup_logging_creates_log_file(self, tmp_path) -> None:
         """测试 setup_logging 创建日志文件"""
-        # KB_PATH is module-level, so we test against the real workspace
-        # This test verifies the logging function doesn't crash
-        logger = setup_logging()
-        assert logger is not None
-        assert isinstance(logger, logging.Logger)
+        workspace = tmp_path / "workspace"
 
-    def test_setup_logging_log_file_naming(self, tmp_path, monkeypatch) -> None:
+        with patch("logging.basicConfig") as basic_config:
+            logger = setup_logging(workspace)
+            for handler in basic_config.call_args.kwargs["handlers"]:
+                handler.close()
+
+        assert isinstance(logger, logging.Logger)
+        assert len(list((workspace / "logs").glob("compensate_*.log"))) == 1
+
+    def test_setup_logging_log_file_naming(self, tmp_path) -> None:
         """测试日志文件命名格式"""
         workspace = tmp_path / "workspace"
-        workspace.mkdir()
-        monkeypatch.setenv("WORKSPACE", str(workspace))
 
-        _ = setup_logging()
+        with patch("logging.basicConfig") as basic_config:
+            _ = setup_logging(workspace)
+            for handler in basic_config.call_args.kwargs["handlers"]:
+                handler.close()
 
         logs_dir = workspace / "logs"
         log_files = list(logs_dir.glob("compensate_*.log"))
 
-        # 日志文件名应该包含日期时间
-        if log_files:
-            log_file_name = log_files[0].stem
-            assert "compensate_" in log_file_name
+        assert len(log_files) == 1
+        timestamp = log_files[0].stem.removeprefix("compensate_")
+        assert len(timestamp) == 15
+        assert timestamp[:8].isdigit()
+        assert timestamp[8] == "_"
+        assert timestamp[9:].isdigit()

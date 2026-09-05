@@ -55,5 +55,5 @@ class TestOllamaGenerate:
         provider = OllamaProvider(base_url="http://localhost:11434", model="test")
 
         with patch("dochris.llm.ollama.aiohttp", None):
-            with pytest.raises(ImportError, match="aiohttp"):
+            with pytest.raises(ImportError, match=r"dochris\[ollama\]"):
                 await provider.generate("hello")

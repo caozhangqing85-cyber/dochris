@@ -14,6 +14,8 @@ class TestConstantsModule:
 
     def test_project_constants(self):
         """测试项目信息常量"""
+        from importlib.metadata import version
+
         from dochris.constants import (
             PROJECT_AUTHOR,
             PROJECT_NAME,
@@ -22,7 +24,7 @@ class TestConstantsModule:
         )
 
         assert PROJECT_NAME == "dochris"
-        assert PROJECT_VERSION == "1.3.1"
+        assert version(PROJECT_NAME) == PROJECT_VERSION
         assert isinstance(PROJECT_AUTHOR, str)
         assert isinstance(REPO_URL, str)
 

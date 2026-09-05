@@ -52,9 +52,6 @@ class SummaryGenerator:
                 - concepts: 概念列表
             失败时返回 None
 
-        Raises:
-            不抛出异常，失败返回 None
-
         重试策略:
             - 429 错误: 指数退避（30s, 60s, 120s...）
             - 连接/超时错误: 指数退避（20s, 40s, 80s...）
