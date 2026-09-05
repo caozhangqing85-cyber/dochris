@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from dochris.api.preview import preview_envelope
 from dochris.api.schemas import QueryContributionRequest, QueryContributionResponse
 from dochris.quality.query_contribution import (
     auto_contribute_from_query,
@@ -87,9 +90,37 @@ async def promote_candidate_api(candidate_id: str) -> dict[str, Any]:
 async def discard_candidate_api(
     candidate_id: str,
     reason: str = Query(default="manual_discard"),
+    preview: bool = Query(default=False, description="SEC-05：仅返回预览，不执行丢弃"),
 ) -> dict[str, Any]:
-    """丢弃候选知识"""
+    """丢弃候选知识
+
+    SEC-05：``preview=true`` 时不执行丢弃，返回将被丢弃的候选内容与元数据。
+    """
     settings = get_settings()
+    if preview:
+        meta_file = (
+            Path(settings.workspace) / "outputs" / "candidates" / "meta" / f"{candidate_id}.json"
+        )
+        if not meta_file.exists():
+            raise HTTPException(status_code=404, detail=f"候选不存在: {candidate_id}")
+        try:
+            target = json.loads(meta_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=500, detail=f"候选元数据读取失败: {exc}") from exc
+        return preview_envelope(
+            "discard_candidate",
+            f"将把候选 {candidate_id} 标记为 discarded（不删除任何文件）",
+            [
+                {
+                    "id": target.get("id"),
+                    "query": target.get("query", ""),
+                    "status": target.get("status"),
+                    "quality_score": target.get("quality_score"),
+                    "to_status": "discarded",
+                    "reason": reason,
+                }
+            ],
+        )
     result = discard_candidate(
         workspace_path=settings.workspace,
         candidate_id=candidate_id,

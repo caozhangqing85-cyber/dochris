@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
+from dochris.api.preview import preview_envelope
 from dochris.manifest import get_all_manifests, update_manifest_status
 from dochris.settings import get_settings
 
@@ -60,14 +61,33 @@ async def list_manifests(
 
 
 @router.post("/manifests/reset-failed")
-async def reset_failed_manifests() -> dict[str, Any]:
-    """将所有失败文件重置为待编译状态"""
+async def reset_failed_manifests(
+    preview: bool = Query(default=False, description="SEC-05：仅返回预览，不执行重置"),
+) -> dict[str, Any]:
+    """将所有失败文件重置为待编译状态
+
+    SEC-05：``preview=true`` 时不执行重置，返回将被重置的 manifest 清单。
+    """
     settings = get_settings()
     workspace = settings.workspace
     manifests = get_all_manifests(workspace)
-    reset_count = 0
-    for m in manifests:
-        if m.get("status") in ("failed", "compile_failed") and m.get("id"):
-            update_manifest_status(workspace, m["id"], "ingested")
-            reset_count += 1
-    return {"reset_count": reset_count}
+    resettable = [
+        m for m in manifests if m.get("status") in ("failed", "compile_failed") and m.get("id")
+    ]
+    if preview:
+        return preview_envelope(
+            "reset_failed",
+            f"将把 {len(resettable)} 个失败 manifest 重置为 ingested",
+            [
+                {
+                    "id": m.get("id"),
+                    "title": m.get("title", ""),
+                    "from_status": m.get("status"),
+                    "to_status": "ingested",
+                }
+                for m in resettable
+            ],
+        )
+    for m in resettable:
+        update_manifest_status(workspace, str(m["id"]), "ingested")
+    return {"reset_count": len(resettable)}
