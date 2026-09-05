@@ -169,6 +169,13 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+# numpy 2.5+ 的 stub 使用 PEP 695 `type` 语句，与 python_version=3.11 的检查不兼容；
+# 项目代码不直接依赖 numpy 的类型信息，跳过其 stub 分析
+[[tool.mypy.overrides]]
+module = "numpy"
+follow_imports = "skip"
+ignore_errors = true
+
 [[tool.mypy.overrides]]
 module = [
     "aiohttp",
