@@ -27,7 +27,7 @@ Dochris 是一个 AI 驱动的知识库编译系统，通过**四阶段流水线
 - **插件系统**：6 个扩展点，支持自定义解析器、编译前后处理、查询增强
 - **多 LLM 提供商**：OpenAI 兼容、Ollama 本地模型，轻松切换
 - **多向量库**：ChromaDB、FAISS，按需选择
-- **Web UI**：Gradio 可视化界面（查询、管理、编译、质量仪表盘、知识图谱）
+- **Web UI**：React + Vite 可视化界面（查询、管理、编译、质量仪表盘、知识图谱）
 - **知识图谱**：D3.js 力导向图可视化概念关系
 - **API 文档**：mkdocs-material 自动生成文档站，GitHub Pages 部署
 
@@ -131,6 +131,7 @@ Layer 3: locked/      — 锁定保护，不可修改
 ### 系统要求
 
 - Python 3.11+
+- Node.js 22.13+（仅 React Web UI；不支持 Node 23）
 - 4GB+ RAM（推荐 8GB）
 - OpenAI 兼容的 API Key
 
@@ -145,11 +146,18 @@ cd dochris
 python3.11 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 安装依赖
+# 轻量安装：CLI、纯文本解析与关键词检索
 pip install -e .
 
-# 安装全部可选依赖（Web UI、API、PDF、音频、OCR、开发工具）
+# 推荐安装：API、Office/PDF 与向量/语义检索
+pip install -e ".[standard]"
+
+# 全部运行时能力（另含音频、OCR、Ollama、LEANN；不含开发工具）
 pip install -e ".[all]"
+
+# 安装 React Web UI 依赖（先使用仓库 .nvmrc 指定的 Node 22）
+nvm use
+cd frontend && npm ci && cd ..
 
 # 创建配置文件
 cp .env.example .env
@@ -169,8 +177,8 @@ MODEL=glm-5.1
 # 查询专用模型（可选，默认 glm-4-flash）
 QUERY_MODEL=glm-4-flash
 
-# 工作区路径（可选，默认 ~/.knowledge-base）
-WORKSPACE=~/.knowledge-base
+# 工作区路径（可选，默认 ~/.dochris/knowledge-base）
+WORKSPACE=~/.dochris/knowledge-base
 
 # 本地 LLM 配置（可选，用于兜底）
 LOCAL_LLM_BASE_URL=http://localhost:11434/v1
@@ -198,6 +206,28 @@ kb quality --report
 kb promote SRC-0001 --to wiki
 kb promote SRC-0001 --to obsidian
 ```
+
+### 启动 Web UI
+
+开发环境使用两个终端，先启动 API，再启动 React：
+
+```bash
+# 终端 A：FastAPI，http://127.0.0.1:8000
+make web-api
+
+# 终端 B：React/Vite，http://127.0.0.1:3000
+make web
+```
+
+打开 `http://127.0.0.1:3000`。API liveness 为 `/health`，工作区 readiness 为 `/ready`，OpenAPI 文档位于 `http://127.0.0.1:8000/docs`。
+
+生产容器会把 React/Vite 产物构建到独立 Nginx 镜像，并通过同源 `/api` 代理访问 FastAPI：
+
+```bash
+docker compose --profile api up -d --build
+```
+
+完整产品默认位于 `http://127.0.0.1:3000`，API 仍位于 `http://127.0.0.1:8000`。详细健康检查、端口和持久化说明见 [Docker 部署](docs/advanced/docker.md)。
 
 ### 5 分钟快速体验
 
@@ -346,7 +376,7 @@ def post_compile(src_id: str, result: dict) -> None:
 1. **目录加载**：将插件文件放入插件目录
    ```bash
    # 默认目录
-   ~/.knowledge-base/plugins/
+   ~/.dochris/knowledge-base/plugins/
    
    # 或通过配置指定
    export PLUGIN_DIRS=/path/to/plugins
@@ -433,8 +463,8 @@ A: 修改 `MAX_CONCURRENCY` 参数提高并发数（默认 3），或使用 `noh
 ### 运行测试
 
 ```bash
-# 安装测试依赖
-pip install -e ".[dev]"
+# 安装推荐运行能力和测试依赖
+pip install -e ".[dev,standard]"
 
 # 运行测试
 pytest tests/ -v

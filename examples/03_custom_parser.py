@@ -12,10 +12,10 @@
 输出:
     - 显示自定义解析器是否成功注册
 """
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 
 # 定义自定义解析器
@@ -51,7 +51,6 @@ def custom_csv_parser(file_path: str) -> str | None:
 def main() -> None:
     """执行自定义解析器示例"""
     from dochris.plugin import PluginManager, hookimpl
-    from dochris.plugin.hookspec import hookspec
 
     # 创建插件管理器
     pm = PluginManager()
@@ -77,7 +76,7 @@ def main() -> None:
 
     # 注册 hook
     pm.register("custom_plugin", "ingest_parser", ingest_parser)
-    print(f"✅ 已注册 ingest_parser hook")
+    print("✅ 已注册 ingest_parser hook")
 
     # 方法 2: 创建一个测试 CSV 文件并解析
     print("\n方法 2: 测试自定义解析器")
@@ -91,7 +90,7 @@ def main() -> None:
         # 使用自定义解析器
         result = custom_csv_parser(str(csv_path))
         if result:
-            print(f"✅ CSV 解析成功:")
+            print("✅ CSV 解析成功:")
             print(result)
         else:
             print("❌ CSV 解析失败")

@@ -86,6 +86,8 @@ def post_query(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]
     filtered = [r for r in all_results if r.get("score", 1) >= min_score]
 
     if len(filtered) < len(all_results):
-        logger.info(f"结果过滤: {len(all_results)} → {len(filtered)} (移除 {len(all_results) - len(filtered)} 个低分结果)")
+        logger.info(
+            f"结果过滤: {len(all_results)} → {len(filtered)} (移除 {len(all_results) - len(filtered)} 个低分结果)"
+        )
 
     return filtered

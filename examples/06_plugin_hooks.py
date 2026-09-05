@@ -12,6 +12,7 @@
 输出:
     - 显示所有 hook 的注册和测试结果
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -42,7 +43,7 @@ def main() -> None:
         try:
             content = Path(file_path).read_text(encoding="utf-8")
             # 只提取 ERROR 和 WARNING 行
-            lines = [l for l in content.split("\n") if "ERROR" in l or "WARNING" in l]
+            lines = [line for line in content.split("\n") if "ERROR" in line or "WARNING" in line]
             return "\n".join(lines)
         except Exception:
             return None

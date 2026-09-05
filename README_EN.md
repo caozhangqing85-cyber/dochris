@@ -191,8 +191,14 @@ cd knowledge-base
 python3.11 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
+# Lightweight install: CLI, plain-text parsing, and keyword retrieval
 pip install -e .
+
+# Recommended install: API, Office/PDF, and vector/semantic retrieval
+pip install -e ".[standard]"
+
+# All runtime features (audio, OCR, Ollama, and LEANN included; no dev tools)
+pip install -e ".[all]"
 
 # Create configuration file
 cp .env.example .env
@@ -210,7 +216,7 @@ OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
 MODEL=glm-5.1
 
 # Optional configuration
-WORKSPACE=~/.knowledge-base
+WORKSPACE=~/.dochris/knowledge-base
 MAX_CONCURRENCY=8
 MIN_QUALITY_SCORE=85
 ```
@@ -530,8 +536,8 @@ A: No. Files in `raw/` are symbolic links pointing to original files. Deleting o
 ### Running Tests
 
 ```bash
-# Install test dependencies
-pip install pytest pytest-cov
+# Install the recommended runtime and development dependencies
+pip install -e ".[dev,standard]"
 
 # Run tests
 pytest tests/

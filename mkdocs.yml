@@ -5,6 +5,22 @@ repo_url: https://github.com/caozhangqing85-cyber/dochris
 repo_name: caozhangqing85-cyber/dochris
 edit_uri: edit/main/docs/
 
+# Internal reviews, task notes, and imported reference material stay in the
+# repository but are not part of the public product documentation site.
+exclude_docs: |
+  /OPTIMIZATION_PLAN_*.md
+  /PERFORMANCE_REVIEW.md
+  /RAG_IMPROVEMENT_PLAN.md
+  /RESTART_REVIEW_*.md
+  /ROADMAP.md
+  /TASK-*.md
+  /content_filter_blocked_docs.md
+  /hierarchical_summarization_research.md
+  /open-source-readiness.md
+  /optimization_summary_v5.md
+  /advanced/docker 2.md
+  /claude-code-best-practice/
+
 theme:
   name: material
   language: zh
@@ -88,7 +104,7 @@ nav:
     - 安装指南: getting-started/installation.md
     - 快速上手: getting-started/quickstart.md
     - CLI 命令参考: getting-started/cli.md
-  - 使用示例: examples/EXAMPLES.md
+  - 使用示例: EXAMPLES.md
   - QUICKSTART: QUICKSTART.md
   - 用户指南:
     - 核心概念: guide/concepts.md

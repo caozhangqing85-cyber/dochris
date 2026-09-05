@@ -10,6 +10,7 @@
 输出:
     - 显示所有可用的向量存储及其描述
 """
+
 from __future__ import annotations
 
 
@@ -40,7 +41,7 @@ def main() -> None:
     import inspect
 
     sig = inspect.signature(chroma_store.__init__)
-    print(f"初始化参数:")
+    print("初始化参数:")
     for param_name, param in sig.parameters.items():
         if param_name == "self":
             continue

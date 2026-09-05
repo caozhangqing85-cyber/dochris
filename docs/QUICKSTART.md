@@ -7,6 +7,7 @@
 | 项目 | 要求 |
 |------|------|
 | Python | 3.11 或更高版本 |
+| Node.js | 22.13+（仅 Web UI；不支持 Node 23） |
 | 内存 | 4GB+（推荐 8GB） |
 | API Key | 一个 LLM API Key（推荐智谱 GLM，也支持 OpenRouter 免费模型） |
 
@@ -23,11 +24,12 @@ cd dochris
 python3.11 -m venv venv
 source venv/bin/activate    # Windows: venv\Scripts\activate
 
-# 安装核心依赖
-pip install -e .
+# 推荐安装（API、Office/PDF 与向量/语义检索）
+pip install -e ".[standard]"
 
-# 安装全部可选依赖（Web UI、API、PDF、音频、OCR）
-pip install -e ".[all]"
+# 安装 React Web UI 依赖（先使用仓库 .nvmrc 指定的 Node 22）
+nvm use
+cd frontend && npm ci && cd ..
 ```
 
 预期输出：
@@ -40,10 +42,10 @@ Successfully installed dochris-1.4.0
 ### 使用 PyPI 安装
 
 ```bash
-pip install dochris
+pip install "dochris[standard]"
 ```
 
-> 💡 **提示**：`pip install -e ".[all]"` 会安装所有可选功能（Gradio Web UI、FastAPI、PDF 解析、音频转录等），推荐首次使用时安装。
+> 💡 **提示**：只需 CLI、纯文本解析和关键词检索时使用 `pip install dochris`。`dochris[all]` 安装全部运行时能力，但不包含开发工具；开发环境使用 `dochris[dev,standard]`。React Web UI 的依赖由 `frontend/package.json` 管理。
 
 ## 第二步：配置（1 分钟）
 
@@ -76,10 +78,10 @@ kb init
 请输入选项 [1]: 1
 请输入 API Key: sk-xxxxxxxx
 
-✅ 配置已保存到 ~/.knowledge-base/.env
+✅ 配置已保存到 ~/.dochris/knowledge-base/.env
 
 🚀 初始化完成！接下来：
-   1. 将文件放入 ~/.knowledge-base/raw/ 对应子目录
+   1. 将文件放入 ~/.dochris/knowledge-base/raw/ 对应子目录
    2. 运行 kb ingest 扫描文件
    3. 运行 kb compile 编译知识库
    4. 运行 kb query "关键词" 查询
@@ -104,10 +106,10 @@ export MODEL="glm-5.1"
 
 ```bash
 # 创建配置文件
-cp .env.example ~/.knowledge-base/.env
+cp .env.example ~/.dochris/knowledge-base/.env
 
 # 编辑配置
-nano ~/.knowledge-base/.env
+nano ~/.dochris/knowledge-base/.env
 ```
 
 填入以下必要配置：
@@ -118,8 +120,8 @@ OPENAI_API_KEY=your_api_key_here
 OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
 MODEL=glm-5.1
 
-# 可选：工作区路径（默认 ~/.knowledge-base）
-WORKSPACE=~/.knowledge-base
+# 可选：工作区路径（默认 ~/.dochris/knowledge-base）
+WORKSPACE=~/.dochris/knowledge-base
 ```
 
 ## 第三步：放入你的文件（30 秒）
@@ -139,14 +141,14 @@ WORKSPACE=~/.knowledge-base
 
 ```bash
 # 直接复制文件
-cp ~/Downloads/论文合集/*.pdf ~/.knowledge-base/raw/pdfs/
-cp ~/Music/播客/*.mp3 ~/.knowledge-base/raw/audio/
+cp ~/Downloads/论文合集/*.pdf ~/.dochris/knowledge-base/raw/pdfs/
+cp ~/Music/播客/*.mp3 ~/.dochris/knowledge-base/raw/audio/
 
 # 或创建符号链接（不占用额外空间）
-ln -s ~/Documents/我的笔记.md ~/.knowledge-base/raw/articles/
+ln -s ~/Documents/我的笔记.md ~/.dochris/knowledge-base/raw/articles/
 
 # 或指定外部源目录
-echo "SOURCE_PATH=~/Documents/我的资料" >> ~/.knowledge-base/.env
+echo "SOURCE_PATH=~/Documents/我的资料" >> ~/.dochris/knowledge-base/.env
 ```
 
 ### 从 Obsidian 同步
@@ -155,7 +157,7 @@ echo "SOURCE_PATH=~/Documents/我的资料" >> ~/.knowledge-base/.env
 
 ```bash
 # 配置 Obsidian vault 路径
-echo "OBSIDIAN_VAULT=~/Documents/Obsidian-Sync" >> ~/.knowledge-base/.env
+echo "OBSIDIAN_VAULT=~/Documents/Obsidian-Sync" >> ~/.dochris/knowledge-base/.env
 
 # 拉取 Obsidian 笔记到知识库
 kb vault seed "所有主题"
@@ -185,7 +187,7 @@ kb status
 ```
 📚 Dochris 知识库状态
 ════════════════════════════════════════════
-工作区:    ~/.knowledge-base
+工作区:    ~/.dochris/knowledge-base
 源文件:    25 个
 已编译:    0 个
 待编译:    25 个
@@ -283,18 +285,14 @@ kb query "机器学习优化方法" --top-k 5
 ### Web UI 查询
 
 ```bash
-# 启动 Web UI（需要安装 .[all]）
-kb serve --web
+# 终端 A：启动 FastAPI
+make web-api
+
+# 终端 B：启动 React/Vite
+make web
 ```
 
-预期输出：
-
-```
-🌐 启动 Gradio Web UI...
-Running on local URL:  http://127.0.0.1:7860
-```
-
-打开浏览器访问 `http://127.0.0.1:7860`，你可以：
+打开浏览器访问 `http://127.0.0.1:3000`，你可以：
 - 📝 **查询**：语义搜索知识库
 - ⚙️ **编译**：可视化管理编译任务
 - 📊 **质量**：查看质量仪表盘
@@ -321,9 +319,9 @@ kb serve --port 9000
 API 调用示例：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "注意力机制", "top_k": 5}'
+curl --get http://127.0.0.1:8000/api/v1/query \
+  --data-urlencode "q=注意力机制" \
+  --data "top_k=5"
 ```
 
 ## 进阶使用
@@ -373,17 +371,12 @@ kb vault status
 ### Docker 部署
 
 ```bash
-# 构建镜像
-docker build -t dochris --build-arg BUILD_TARGET=all .
+# 启动 API 与 ChromaDB；.env 不存在时也可解析配置
+docker compose --profile api up -d --build
 
-# 运行容器
-docker run -d \
-  -p 8000:8000 \
-  -p 7860:7860 \
-  -v ~/my-knowledge:/workspace \
-  -e OPENAI_API_KEY=your_key \
-  --name dochris \
-  dochris
+# 验证 liveness / readiness
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/ready
 ```
 
 ## 常见问题

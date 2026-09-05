@@ -11,6 +11,7 @@
 输出:
     - 显示发现的文件数量和前 5 个文件信息
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,8 +31,9 @@ def main() -> None:
         return
 
     # 导入扫描函数
-    from dochris.phases.phase1_ingestion import scan_source_dir
     import logging
+
+    from dochris.phases.phase1_ingestion import scan_source_dir
 
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)

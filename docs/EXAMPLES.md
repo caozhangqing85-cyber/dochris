@@ -12,7 +12,7 @@
 
 ```bash
 # 1. 将论文放入 raw/pdfs/
-cp ~/Downloads/papers/*.pdf ~/.knowledge-base/raw/pdfs/
+cp ~/Downloads/papers/*.pdf ~/.dochris/knowledge-base/raw/pdfs/
 
 # 2. 摄入文件
 kb ingest
@@ -67,7 +67,7 @@ kb query "注意力机制在不同模型中的变体"
 ### 查看结构化摘要
 
 ```bash
-cat ~/.knowledge-base/outputs/summaries/SRC-0001.md
+cat ~/.dochris/knowledge-base/outputs/summaries/SRC-0001.md
 ```
 
 ```markdown
@@ -103,7 +103,7 @@ cat ~/.knowledge-base/outputs/summaries/SRC-0001.md
 pip install -e ".[audio]"
 
 # 2. 放入音频文件
-cp ~/Podcasts/AI-Trending/*.mp3 ~/.knowledge-base/raw/audio/
+cp ~/Podcasts/AI-Trending/*.mp3 ~/.dochris/knowledge-base/raw/audio/
 
 # 3. 摄入
 kb ingest
@@ -161,7 +161,7 @@ kb query "2026年 AI 发展趋势"
 
 ```bash
 # 1. 配置 Obsidian vault 路径
-echo "OBSIDIAN_VAULT=~/Documents/Obsidian-Sync" >> ~/.knowledge-base/.env
+echo "OBSIDIAN_VAULT=~/Documents/Obsidian-Sync" >> ~/.dochris/knowledge-base/.env
 
 # 2. 从 Obsidian 拉取笔记
 kb vault seed "所有主题"
@@ -255,14 +255,14 @@ kb vault push --min-score 90
 ```bash
 # 1. 安装电子书解析插件
 # 将 epub_parser.py 放入插件目录
-mkdir -p ~/.knowledge-base/plugins/
-cp examples/plugins/epub_parser.py ~/.knowledge-base/plugins/
+mkdir -p ~/.dochris/knowledge-base/plugins/
+cp examples/plugins/epub_parser.py ~/.dochris/knowledge-base/plugins/
 
 # 2. 启用插件
 kb plugin enable epub_parser
 
 # 3. 放入电子书
-cp ~/ebooks/*.epub ~/.knowledge-base/raw/ebooks/
+cp ~/ebooks/*.epub ~/.dochris/knowledge-base/raw/ebooks/
 
 # 4. 摄入并编译
 kb ingest
@@ -319,19 +319,19 @@ kb ingest
 kb compile
 
 # 2. 配置 API 认证（可选）
-echo "DOCHRIS_API_KEY=your_secret_key" >> ~/.knowledge-base/.env
-echo "DOCHRIS_CORS_ORIGINS=https://your-app.example.com" >> ~/.knowledge-base/.env
+echo "DOCHRIS_API_KEY=your_secret_key" >> ~/.dochris/knowledge-base/.env
+echo "DOCHRIS_CORS_ORIGINS=https://your-app.example.com" >> ~/.dochris/knowledge-base/.env
 
 # 3. 启动 API 服务
-kb serve --port 8000
+kb serve --host 127.0.0.1 --port 8000
 ```
 
 预期输出：
 
 ```
 🚀 API 服务已启动
-地址: http://0.0.0.0:8000
-文档: http://0.0.0.0:8000/docs
+地址: http://127.0.0.1:8000
+文档: http://127.0.0.1:8000/docs
 认证: 已启用 (DOCHRIS_API_KEY)
 ```
 
@@ -339,13 +339,10 @@ kb serve --port 8000
 
 ```bash
 # 查询知识库
-curl -X POST http://localhost:8000/api/query \
-  -H "Content-Type: application/json" \
+curl --get http://localhost:8000/api/v1/query \
   -H "X-API-Key: your_secret_key" \
-  -d '{
-    "query": "微服务架构最佳实践",
-    "top_k": 5
-  }'
+  --data-urlencode "q=微服务架构最佳实践" \
+  --data "top_k=5"
 ```
 
 预期返回：
@@ -353,7 +350,8 @@ curl -X POST http://localhost:8000/api/query \
 ```json
 {
   "query": "微服务架构最佳实践",
-  "results": [
+  "mode": "combined",
+  "concepts": [
     {
       "src_id": "SRC-0012",
       "title": "微服务设计模式.pdf",
@@ -366,15 +364,21 @@ curl -X POST http://localhost:8000/api/query \
       ]
     }
   ],
-  "total": 3
+  "summaries": [],
+  "vector_results": [],
+  "search_sources": ["keyword"],
+  "time_seconds": 0.12
 }
 ```
 
 ### 启动 Web UI（可选）
 
 ```bash
-# 同时启动 API 和 Web UI
-kb serve --web --port 8000
+# 终端 A：API
+make web-api
+
+# 终端 B：React/Vite
+make web
 ```
 
 团队成员可以：
@@ -386,19 +390,10 @@ kb serve --web --port 8000
 ### Docker 部署（生产环境）
 
 ```bash
-# 构建镜像
-docker build -t dochris --build-arg BUILD_TARGET=all .
+docker compose --profile api up -d --build
 
-# 运行
-docker run -d \
-  --name dochris \
-  -p 8000:8000 \
-  -p 7860:7860 \
-  -v ~/shared-knowledge:/workspace \
-  -e OPENAI_API_KEY=sk-xxx \
-  -e DOCHRIS_API_KEY=team-secret-key \
-  -e DOCHRIS_CORS_ORIGINS=https://app.example.com \
-  dochris
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/ready
 ```
 
 ---
@@ -420,6 +415,6 @@ docker run -d \
 | `kb vault seed "主题"` | 从 Obsidian 拉取 |
 | `kb vault push` | 推送到 Obsidian |
 | `kb graph stats` | 知识图谱统计 |
-| `kb serve --web` | 启动 Web UI |
+| `make web-api` + `make web` | 启动 API 与 React Web UI |
 | `kb config` | 查看配置 |
 | `kb plugin list` | 列出插件 |

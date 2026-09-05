@@ -1,98 +1,84 @@
 # Docker 部署
 
-使用 Docker 快速部署 dochris 服务。
+仓库的 `api` profile 会构建并启动 core、FastAPI、ChromaDB 和 React/Nginx 生产前端。前端镜像使用 Node 22 执行锁文件安装与 Vite production build，再由 Nginx 提供静态资源、SPA fallback 和同源 `/api` 反向代理。
 
-## Dockerfile
+本地开发仍使用 `make web-api` + `make web`，不需要为日常热更新构建容器。
 
-```dockerfile
-FROM python:3.11-slim
+## 启动完整产品
 
-WORKDIR /app
-
-# 安装依赖
-COPY pyproject.toml .
-RUN pip install --no-cache-dir ".[api]"
-
-# 复制源码
-COPY src/ src/
-
-# 暴露端口
-EXPOSE 8000
-
-# 启动 API 服务
-CMD ["kb", "serve", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-## Docker Compose
-
-```yaml
-version: "3.8"
-
-services:
-  dochris-api:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./workspace:/root/.knowledge-base
-      - ./materials:/root/materials:ro
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - MODEL=glm-5.1
-      - OPENAI_API_BASE=https://open.bigmodel.cn/api/coding/paas/v4
-    restart: unless-stopped
-
-  dochris-web:
-    build: .
-    command: kb serve --web --host 0.0.0.0 --web-port 7860
-    ports:
-      - "7860:7860"
-    volumes:
-      - ./workspace:/root/.knowledge-base
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    restart: unless-stopped
-```
-
-## 使用方法
+`.env` 是可选文件；没有它时本机 Compose 也能启动和使用只读界面，但涉及 LLM 的编译与回答需要有效的提供商配置。
 
 ```bash
-# 构建镜像
-docker compose build
+# 可选：先创建并编辑配置
+cp .env.example .env
 
-# 启动服务
-docker compose up -d
+# 构建并启动 React、API、ChromaDB 与 core 容器
+docker compose --profile api up -d --build
 
-# 查看日志
-docker compose logs -f dochris-api
-
-# 停止服务
-docker compose down
+# 查看服务
+docker compose --profile api ps
+docker compose logs -f web api
 ```
 
-## 环境变量
+默认地址：
 
-在 `.env` 文件或 `environment` 中配置：
+- Web UI：`http://127.0.0.1:3000`（可用 `WEB_PORT` 修改）
+- API：`http://127.0.0.1:8000`
+- OpenAPI：`http://127.0.0.1:8000/docs`
+- liveness：`http://127.0.0.1:8000/health`
+- readiness：`http://127.0.0.1:8000/ready`
 
-```env
-OPENAI_API_KEY=your_api_key
-MODEL=glm-5.1
-OPENAI_API_BASE=https://open.bigmodel.cn/api/coding/paas/v4
-WORKSPACE=/root/.knowledge-base
-SOURCE_PATH=/root/materials
-```
-
-## 数据持久化
-
-关键目录需要挂载为 volume：
-
-| 容器路径 | 说明 |
-|----------|------|
-| `/root/.knowledge-base` | 工作区（manifests、outputs、wiki） |
-| `/root/materials` | 源文件（只读） |
+默认端口只绑定到 `127.0.0.1`。本机 Compose 显式设置 `DOCHRIS_ALLOW_UNAUTHENTICATED=true`，让 Web 反向代理在未配置网关密钥时可用；这项默认值只适合单机开发。
 
 ## 健康检查
 
 ```bash
-curl http://localhost:8000/api/v1/status
+curl --fail http://127.0.0.1:8000/health
+curl --fail http://127.0.0.1:8000/ready
+curl --fail http://127.0.0.1:3000/healthz
 ```
+
+`/health` 只证明 API 进程能响应；`/ready` 还会检查工作区和运行所需目录是否存在且可写。`/healthz` 证明 Nginx Web 容器可响应。Compose 会先等待 API ready，再启动 Web。
+
+CI 会解析 Compose 配置并实际构建 Web 镜像。若本机 `docker build` 报无法连接 socket，需先启动 Docker daemon；配置可解析不等于镜像已经在该机器上构建运行。
+
+## 环境变量
+
+在仓库根目录的 `.env` 中配置：
+
+```env
+OPENAI_API_KEY=your_api_key
+MODEL=glm-5.1
+OPENAI_API_BASE=https://open.bigmodel.cn/api/paas/v4
+WORKSPACE=/app
+
+# 对外部署时设置 API 认证与明确的浏览器来源
+DOCHRIS_API_KEY=replace-with-a-strong-secret
+DOCHRIS_ALLOW_UNAUTHENTICATED=false
+DOCHRIS_CORS_ORIGINS=https://your-ui.example.com
+```
+
+启用 `DOCHRIS_API_KEY` 后，在 Web 的“设置 → Dochris 服务访问”中输入同一密钥。这个密钥只保存在当前浏览器的 `localStorage`，与 LLM 提供商 API Key 相互独立。若要对外发布，还需要显式修改 Compose 端口绑定或由受控反向代理暴露 Web，并保持 `DOCHRIS_ALLOW_UNAUTHENTICATED=false`。
+
+## 数据持久化
+
+Compose 使用命名卷保存以下目录：
+
+| 容器路径 | 说明 |
+|----------|------|
+| `/app/raw` | 原始资料 |
+| `/app/manifests` | Manifest 索引 |
+| `/app/outputs` | 编译产物 |
+| `/app/wiki` | 审核后知识层 |
+| `/app/curated` | 人工精选层 |
+| `/app/data` | 向量与运行数据 |
+| `/app/cache` | 缓存 |
+| `/app/logs` | 日志 |
+
+## 停止
+
+```bash
+docker compose --profile api down
+```
+
+命名卷不会被上述命令删除。需要删除数据时必须显式使用 `down --volumes`，执行前先备份。

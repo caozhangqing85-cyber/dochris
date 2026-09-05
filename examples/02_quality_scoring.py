@@ -10,6 +10,7 @@
 输出:
     - 显示示例文本的质量评分（0-100 分）
 """
+
 from __future__ import annotations
 
 

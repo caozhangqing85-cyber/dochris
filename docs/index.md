@@ -24,7 +24,7 @@ kb query "费曼技巧"        # 智能查询
 - :material-robot: **多 LLM 支持** — 智谱 GLM、OpenAI 兼容、Ollama 本地模型
 - :material-database: **多向量库** — ChromaDB、FAISS
 - :material-graph: **知识图谱** — 自动构建概念关联图谱
-- :material-web: **Web UI** — Gradio 可视化界面
+- :material-web: **Web UI** — React + Vite 可视化界面
 - :material-api: **REST API** — FastAPI HTTP 接口
 
 ## 四阶段流水线
@@ -66,4 +66,3 @@ kb query "费曼技巧"        # 智能查询
 - [GitHub](https://github.com/caozhangqing85-cyber/dochris)
 - [贡献指南](development/contributing.md)
 - [API 参考](api/overview.md)
-

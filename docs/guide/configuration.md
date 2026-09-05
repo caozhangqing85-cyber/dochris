@@ -24,7 +24,7 @@ kb config
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `WORKSPACE` | `~/.knowledge-base` | 工作区路径 |
+| `WORKSPACE` | `~/.dochris/knowledge-base` | 工作区路径 |
 | `SOURCE_PATH` | `~/materials` | 源文件目录 |
 
 ### 编译配置
@@ -58,7 +58,7 @@ OPENAI_API_BASE=https://open.bigmodel.cn/api/coding/paas/v4
 MODEL=glm-5.1
 
 # 工作区
-WORKSPACE=~/.knowledge-base
+WORKSPACE=~/.dochris/knowledge-base
 SOURCE_PATH=~/materials
 
 # 编译
