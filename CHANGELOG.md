@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **工作树治理**：约 11,700 行未提交变更按领域拆分为可独立审查/回滚的提交；清除 `:memory:.ses`、`docs/advanced/docker 2.md` 误生成文件
 - **CI/发布闭环**：PR 增加 integration suite 门禁；CI 构建 API + Web 双镜像并做 API 镜像 smoke；完整 Compose 启动健康检查；tag 发布必须先过 release gate（测试+类型+集成+干净环境安装 smoke）；PyPI 迁移到 Trusted Publishing（OIDC）；发布产物附 checksums + CycloneDX SBOM
 - **`make docs`** 改为 `mkdocs build --strict`（与 CI docs.yml 一致），新增 `docs` extra
-- 测试与工具链：fast 套件 374 项；前端新增 graph-safety 测试；全量套件 3219 passed
+- 测试与工具链：fast 套件 374 项；前端新增 graph-safety 测试；全量套件 3254 passed，fresh coverage 77.08%
 
 ### Security
 - 错误脱敏（API key / Bearer / 本机路径）统一收敛到 `dochris/core/error_sanitizer.py`，任务存储与编译流水线共用
