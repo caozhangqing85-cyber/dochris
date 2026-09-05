@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **阶段耗时**：`QueryResponse.timings` 与 SSE `done.timings` 暴露 retrieval/rerank/first_token/generation/total
 - **存储迁移工具**（`storage/migration.py` + `kb storage` CLI）：dry-run、backup、rollback
 - **Provider 注册表接入查询链路**：`settings.llm_provider` 通过 `dochris.llm.get_provider()` 选择 provider（openai_compat / ollama），Ollama 免 key 直连
+- **写操作审计**（SEC-04）：非 GET 请求记录 JSONL 审计事件，响应头返回 `X-Operation-ID`，支持 `Idempotency-Key`
+- **可选限流**（SEC-02）：`DOCHRIS_RATE_LIMIT_PER_MINUTE` 启用内存滑动窗口限流，超限返回 429
+- **任务级超时预算**（JOB-06）：`DOCHRIS_COMPILE_TIMEOUT_SECONDS` 限制后台编译时长
+- **Canonical document ID**（DATA-01/03）：manifest 携带 `canonical_id`，内容哈希幂等查询支撑去重
+- **生成质量指标**（RAG-03/04/05）：faithfulness / answer_relevance / context_relevance / citation_correctness 启发式指标
+- **评测元数据与门槛**（RAG-06/12）：每份评测报告保存模型/provider/语料/commit；golden set 种子与质量门槛表
+- **查询管线 span**（OBS-01）：retrieve/rerank/generate 阶段接入 observability span
 
 ### Fixed
 - **Graph tooltip XSS**（P0）：tooltip 改用 DOM `textContent` 构建，用户文档中的 label 不再经 `.html()` 注入
@@ -25,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **流式/非流式一致**：`done.final_answer` 为与非流式一致的 wiki-link 清理后答案；LLM 流式异常不再以答案文本 chunk 输出（避免泄露底层异常）
 - **编译任务状态语义**：部分文档失败时不再标记为完全成功
 - **前端 `QueryResponse.answer` 空值类型**修正为可空
+- **SEC-03**：受保护部署（配置 API key）默认禁止运行时改写 workspace
+- **mypy 兼容**：pypdf 迁移、numpy 2.5+/openai 新版 stub 漂移处理，干净环境 typecheck 恢复可用
 
 ### Changed
 - **工作树治理**：约 11,700 行未提交变更按领域拆分为可独立审查/回滚的提交；清除 `:memory:.ses`、`docs/advanced/docker 2.md` 误生成文件
