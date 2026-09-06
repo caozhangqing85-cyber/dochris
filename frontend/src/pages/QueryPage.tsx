@@ -288,6 +288,8 @@ export default function QueryPage() {
   const [result, setResult] = useState<QueryResponse | null>(null)
   // AbortController：新查询取消上一次流式请求，防竞态
   const abortRef = useRef<AbortController | null>(null)
+  // 请求序号：降级/非流式路径无 abort 信号，用单调递增序号丢弃过期响应
+  const requestSeqRef = useRef(0)
   const [error, setError] = useState('')
   const [queryError, setQueryError] = useState<QueryErrorView | null>(null)
   const [files, setFiles] = useState<ManifestItem[]>([])
@@ -450,6 +452,9 @@ export default function QueryPage() {
     const queryText = q || query
     if (!queryText.trim()) return
     const useMode = overrideMode || mode
+    requestSeqRef.current += 1
+    const seq = requestSeqRef.current
+    const isCurrent = () => seq === requestSeqRef.current
     setLoading(true); setError(''); setQueryError(null); setResult(null); setElapsed(0); setContributionReceipt(null); setPhaseTimings(null); setDegradationNotice(null); setCancellable(false); setActiveTab('answer')
     if (!q) setQuery(queryText)
     const start = Date.now()
@@ -562,6 +567,7 @@ export default function QueryPage() {
           }
           try {
             const res = await queryKnowledge(queryText, useMode, topK, rerank)
+            if (!isCurrent()) return
             const elapsedSec = (Date.now() - start) / 1000
             setElapsed(Math.round(elapsedSec * 10) / 10)
             setResult(res)
@@ -590,8 +596,11 @@ export default function QueryPage() {
       abortRef.current = null
       setCancellable(false)
       // 非 combined 模式使用传统查询
+      const seq = ++requestSeqRef.current
+      const isCurrent = () => seq === requestSeqRef.current
       try {
         const res = await queryKnowledge(queryText, useMode, topK, rerank)
+        if (!isCurrent()) return
         const elapsedSec = (Date.now() - start) / 1000
         setElapsed(Math.round(elapsedSec * 10) / 10)
         setResult(res)
@@ -608,10 +617,13 @@ export default function QueryPage() {
       } catch (e) { showQueryError(e) }
       finally { setLoading(false) }
     }
-  }, [query, mode, topK, rerank, showQueryError, persistContribution])
+  }, [query, mode, topK, rerank, loading, showQueryError, persistContribution])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery() }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (!loading) handleQuery()
+    }
   }
 
   // Favorites

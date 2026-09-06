@@ -81,43 +81,9 @@ def create_app() -> FastAPI:
 
     application.add_middleware(TracingMiddleware)
 
-    # 安全审计：写操作审计 + 操作 ID（SEC-04）
-    from dochris.api.audit import new_operation_id, record_operation
-
-    @application.middleware("http")
-    async def _audit_middleware(request, call_next):  # type: ignore[no-untyped-def]
-        operation_id = new_operation_id()
-        idempotency_key = request.headers.get("Idempotency-Key", "")
-        if request.method != "GET":
-            request.state.operation_id = operation_id
-        try:
-            response = await call_next(request)
-        except Exception:
-            # 审计盲区修复：未处理异常也必须留痕，再原样抛给框架
-            record_operation(
-                operation_id=operation_id,
-                method=request.method,
-                path=request.url.path,
-                client=request.client.host if request.client else "",
-                trace_id="",
-                idempotency_key=idempotency_key,
-                status_code=500,
-            )
-            raise  # noqa: TRY201 - 保持原始异常与上下文
-        if request.method != "GET":
-            response.headers["X-Operation-ID"] = operation_id
-            record_operation(
-                operation_id=operation_id,
-                method=request.method,
-                path=request.url.path,
-                client=request.client.host if request.client else "",
-                trace_id=response.headers.get("X-Trace-ID", ""),
-                idempotency_key=idempotency_key,
-                status_code=response.status_code,
-            )
-        return response
-
-    # 安全限流（SEC-02）：默认关闭，设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 启用
+    # 安全限流（SEC-02）：默认关闭，设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 启用。
+    # 注意注册顺序：FastAPI 中间件后注册者在外层。限流必须先于审计注册
+    # （即位于内层），这样 429 短路响应仍会经过外层审计中间件留痕。
     from dochris.api.ratelimit import SlidingWindowLimiter, rate_limit_per_minute
     from dochris.api.routes.compile import router as compile_router
     from dochris.api.routes.config import router as config_router
@@ -139,7 +105,9 @@ def create_app() -> FastAPI:
 
         @application.middleware("http")
         async def _rate_limit_middleware(request, call_next):  # type: ignore[no-untyped-def]
-            if request.url.path.startswith("/api"):
+            # OPTIONS 预检不计入限流配额（浏览器每个请求都会先发预检，
+            # 否则正常流量在配额一半就被 429）
+            if request.url.path.startswith("/api") and request.method != "OPTIONS":
                 client_host = request.client.host if request.client else "unknown"
                 if not limiter.allow(client_host):
                     from fastapi.responses import JSONResponse
@@ -151,6 +119,46 @@ def create_app() -> FastAPI:
             return await call_next(request)
     else:
         logger.info("API 限流未启用（设置 DOCHRIS_RATE_LIMIT_PER_MINUTE 以启用）")
+
+    # 安全审计：写操作审计 + 操作 ID（SEC-04）
+    from dochris.api.audit import new_operation_id, record_operation
+
+    _AUDITED_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+    @application.middleware("http")
+    async def _audit_middleware(request, call_next):  # type: ignore[no-untyped-def]
+        operation_id = new_operation_id()
+        idempotency_key = request.headers.get("Idempotency-Key", "")
+        # OPTIONS 预检不是业务操作，不审计
+        is_audited = request.method in _AUDITED_METHODS
+        if is_audited:
+            request.state.operation_id = operation_id
+        try:
+            response = await call_next(request)
+        except Exception:
+            # 审计盲区修复：未处理异常也必须留痕，再原样抛给框架
+            record_operation(
+                operation_id=operation_id,
+                method=request.method,
+                path=request.url.path,
+                client=request.client.host if request.client else "",
+                trace_id="",
+                idempotency_key=idempotency_key,
+                status_code=500,
+            )
+            raise  # noqa: TRY201 - 保持原始异常与上下文
+        if is_audited:
+            response.headers["X-Operation-ID"] = operation_id
+            record_operation(
+                operation_id=operation_id,
+                method=request.method,
+                path=request.url.path,
+                client=request.client.host if request.client else "",
+                trace_id=response.headers.get("X-Trace-ID", ""),
+                idempotency_key=idempotency_key,
+                status_code=response.status_code,
+            )
+        return response
 
     # API 路由需要认证（开发模式下 DOCHRIS_API_KEY 为空则跳过）
     application.include_router(

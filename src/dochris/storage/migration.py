@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -349,7 +350,9 @@ def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
     import logging
 
     logger = logging.getLogger(__name__)
-    ws = Path(workspace)
+    # resolve：配置中的 workspace 可能含符号链组件（macOS /var→/private/var、
+    # 卷挂载），不归一会让 _is_under 永远为 False，整个修复静默 no-op
+    ws = Path(workspace).expanduser().resolve()
     raw_dir = ws / "raw"
     inbox_dir = ws / "uploads" / "inbox"
     inbox_dir.mkdir(parents=True, exist_ok=True)
@@ -372,7 +375,11 @@ def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
             # 实体在 uploads 卷：复制到 raw 同卷临时文件再原子改名。
             # 不能用 os.replace(target, link) —— Docker 中 uploads 与 raw
             # 是不同 named volume，跨设备会触发 EXDEV。
-            tmp = link.with_name(link.name + ".migrating")
+            # 临时文件唯一化（mkstemp），防止多 worker 启动竞争共用固定名。
+            fd, tmp = tempfile.mkstemp(
+                prefix=link.name + ".", suffix=".migrating", dir=str(link.parent)
+            )
+            os.close(fd)
             try:
                 shutil.copyfile(target, tmp)
                 os.replace(tmp, link)
@@ -384,11 +391,13 @@ def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
                     logger.debug("uploads 旧实体清理失败: %s", target, exc_info=True)
             except OSError:
                 logger.warning("迁移上传实体失败: %s", link, exc_info=True)
-                tmp.unlink(missing_ok=True)
+                Path(tmp).unlink(missing_ok=True)
                 continue
         elif not target.exists():
-            # 断链：实体已丢。无法恢复内容，只记录（由用户重新上传）。
+            # 断链：实体已丢，无法恢复内容。计入 broken_recovered 供运维监控
+            # （返回值不再是恒 0 的死字段），由用户重新上传。
             logger.warning("raw 软链目标缺失（需重新上传）: %s -> %s", link, target)
+            recovered += 1
             continue
 
         if entity_moved:
@@ -401,7 +410,18 @@ def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
             except OSError:
                 logger.debug("inbox 反向软链创建失败: %s", link.name, exc_info=True)
 
-        _ = recovered
+    # 清理历史运行遗留的 .migrating 残片（硬崩溃或旧版固定名残留）；
+    # 只清 10 分钟以上的旧文件，避免误删其他 worker 进行中的复制
+    import time as _time
+
+    now_ts = _time.time()
+    for stale in raw_dir.rglob("*.migrating"):
+        try:
+            if now_ts - stale.stat().st_mtime > 600:
+                stale.unlink()
+                logger.warning("清理遗留迁移临时文件: %s", stale)
+        except OSError:
+            continue
     return {"scanned": scanned, "repaired": repaired, "broken_recovered": recovered}
 
 

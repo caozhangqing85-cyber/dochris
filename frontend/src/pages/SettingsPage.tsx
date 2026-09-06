@@ -126,12 +126,13 @@ export default function SettingsPage() {
   }
 
   // 空知识库时折叠高级维护（首次使用减负）
-  const [libraryEmpty, setLibraryEmpty] = useState(false)
+  // 三态：null=探测中（默认收起，避免对空库用户闪开维护面板）
+  const [libraryEmpty, setLibraryEmpty] = useState<boolean | null>(null)
   useEffect(() => {
     let alive = true
     getStatus()
       .then((s) => {
-        if (alive && (s.manifests?.total ?? 0) === 0) setLibraryEmpty(true)
+        if (alive) setLibraryEmpty((s.manifests?.total ?? 0) === 0)
       })
       .catch(() => undefined)
     return () => {
@@ -260,7 +261,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <details open={!libraryEmpty} style={{ marginBottom: 'var(--space-10)' }}>
+      <details open={libraryEmpty === false} style={{ marginBottom: 'var(--space-10)' }}>
       <summary style={{ cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-dimmed)', padding: 'var(--space-2) 0' }}>
         知识库维护（Schema Evolution）{libraryEmpty && ' — 知识库为空，导入并编译文档后再使用'}
       </summary>

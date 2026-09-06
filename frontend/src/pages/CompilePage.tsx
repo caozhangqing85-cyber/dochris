@@ -233,7 +233,12 @@ export default function CompilePage() {
       }
     }
 
-    const timer = window.setInterval(() => { void poll() }, 1000)
+    let pollInFlight = false
+    const timer = window.setInterval(() => {
+      if (pollInFlight) return
+      pollInFlight = true
+      void poll().finally(() => { pollInFlight = false })
+    }, 1000)
     return () => {
       cancelled = true
       window.clearInterval(timer)
@@ -249,9 +254,12 @@ export default function CompilePage() {
 
   const handleCompile = async () => {
     setCompiling(true); setError(''); setResult(null)
-    // 幂等键：同一次提交的网络重放不会创建重复任务
-    const idempotencyKey = crypto.randomUUID()
     try {
+      // 幂等键：同一次提交的网络重放不会创建重复任务。
+      // crypto.randomUUID 仅在安全上下文可用，非 localhost HTTP 部署需回退
+      const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const res = await startCompile({ limit, concurrency, dry_run: dryRun }, idempotencyKey)
       setResult(res)
       setCompileJob(res.job_id ? res : null)

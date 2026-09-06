@@ -1,6 +1,6 @@
 # Docker 部署
 
-仓库的 `api` profile 会构建并启动 core、FastAPI、ChromaDB 和 React/Nginx 生产前端。前端镜像使用 Node 22 执行锁文件安装与 Vite production build，再由 Nginx 提供静态资源、SPA fallback 和同源 `/api` 反向代理。
+仓库的 `api` profile 会构建并启动 core、FastAPI 和 React/Nginx 生产前端（ChromaDB 以嵌入式模式运行在 API 进程内，数据持久化于 `kb-data` 卷，无需独立服务容器）。前端镜像使用 Node 22 执行锁文件安装与 Vite production build，再由 Nginx 提供静态资源、SPA fallback 和同源 `/api` 反向代理。
 
 本地开发仍使用 `make web-api` + `make web`，不需要为日常热更新构建容器。
 
@@ -12,7 +12,7 @@
 # 可选：先创建并编辑配置
 cp .env.example .env
 
-# 构建并启动 React、API、ChromaDB 与 core 容器
+# 构建并启动 React、API 与 core 容器
 docker compose --profile api up -d --build
 
 # 查看服务
@@ -72,6 +72,7 @@ Compose 使用命名卷保存以下目录：
 | `/app/wiki` | 审核后知识层 |
 | `/app/curated` | 人工精选层 |
 | `/app/data` | 向量与运行数据 |
+| `/app/uploads` | 上传暂存（inbox）与 raw 实体 |
 | `/app/cache` | 缓存 |
 | `/app/logs` | 日志 |
 

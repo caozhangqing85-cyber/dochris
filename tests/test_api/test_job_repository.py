@@ -763,3 +763,27 @@ def test_claim_admits_stale_null_lease_queued_zombie(tmp_path: Path) -> None:
     # 新鲜的 queued（NULL lease 但 created_at 在宽限期内）与有 lease 的都阻塞
     assert blocking is not None and blocking["job_id"] in {"fresh", "fresh2"}
     repo.close()
+
+
+def test_json_migration_with_duplicate_idempotency_keys(tmp_path: Path) -> None:
+    """JSON→SQLite 迁移含重复幂等键：确定性去重（保留最新），不丢历史、不炸唯一索引。"""
+    json_path = tmp_path / "compile-jobs.json"
+    jobs = [
+        {"job_id": "old-1", "status": "completed", "idempotency_key": "dup", "record": 1},
+        {"job_id": "old-2", "status": "failed", "idempotency_key": "dup", "record": 2},
+        {"job_id": "old-3", "status": "completed", "idempotency_key": "solo", "record": 3},
+    ]
+    json_path.write_text(json.dumps({"version": 1, "jobs": jobs}), encoding="utf-8")
+
+    repo = SQLiteJobRepository(tmp_path / "jobs.db", migrate_from=json_path)
+
+    # 全部三条历史都保留
+    assert repo.get("old-1") is not None
+    assert repo.get("old-2") is not None
+    assert repo.get("old-3") is not None
+    # 最新一条持有键，旧键被置空
+    found = repo.find_by_idempotency_key("dup")
+    assert found is not None and found["job_id"] == "old-2"
+    assert repo.get("old-1")["idempotency_key"] is None
+    assert repo.find_by_idempotency_key("solo")["job_id"] == "old-3"
+    repo.close()
