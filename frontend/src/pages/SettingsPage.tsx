@@ -4,12 +4,10 @@ import {
   getApiAccessKey,
   getConfig,
   updateConfig,
-  getStatus,
   enrichSchemaFromGraph,
   autoTagSchema,
   checkStaleSchema,
-  setApiAccessKey,
-} from '@/lib/api'
+  setApiAccessKey, getStatus } from '@/lib/api'
 import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 
 /** UX-05：动作类错误（保存/测试连接）统一走 classifyRequestError 的分类模型 */
@@ -126,6 +124,20 @@ export default function SettingsPage() {
     display: 'block', fontSize: 'var(--text-sm)', fontWeight: 500,
     color: 'var(--text-muted)', marginBottom: 'var(--space-2)',
   }
+
+  // 空知识库时折叠高级维护（首次使用减负）
+  const [libraryEmpty, setLibraryEmpty] = useState(false)
+  useEffect(() => {
+    let alive = true
+    getStatus()
+      .then((s) => {
+        if (alive && (s.manifests?.total ?? 0) === 0) setLibraryEmpty(true)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // Schema 维护
   const [schemaLoading, setSchemaLoading] = useState(false)
@@ -248,10 +260,14 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <SectionHeader title="知识库维护（Schema Evolution）" />
+      <details open={!libraryEmpty} style={{ marginBottom: 'var(--space-10)' }}>
+      <summary style={{ cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-dimmed)', padding: 'var(--space-2) 0' }}>
+        知识库维护（Schema Evolution）{libraryEmpty && ' — 知识库为空，导入并编译文档后再使用'}
+      </summary>
       <div style={{
+        marginTop: 'var(--space-3)',
         borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
-        border: '1px solid var(--border-default)', marginBottom: 'var(--space-10)',
+        border: '1px solid var(--border-default)', marginBottom: 'var(--space-6)',
         background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)',
       }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
@@ -277,6 +293,7 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+      </details>
 
       <SectionHeader title="API 配置" />
       {/* Notion card: 12px radius, shadow */}

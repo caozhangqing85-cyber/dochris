@@ -444,7 +444,9 @@ class CompileJobManager:
         )
 
     def current(self) -> CompileJob | None:
-        return next(reversed(self._jobs.values()), None)
+        # 多 worker：首屏恢复可能落在任意 worker，最新任务以仓库为准
+        history = self.history(limit=1)
+        return history[0] if history else None
 
     def history(self, *, limit: int = 20) -> list[CompileJob]:
         """Return the newest jobs first, capped for API consumption."""

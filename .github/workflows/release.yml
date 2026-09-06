@@ -4,7 +4,7 @@ name: Release
 # 且只发布通过门禁的同一份 artifact。
 # REL-07: PyPI 采用 Trusted Publishing（OIDC），不再使用长期 API Token。
 #   前置要求：在 PyPI 项目设置中配置 Trusted Publisher，
-#   owner/repo/workflow = <owner>/<repo>/release.yml，environment 留空。
+#   owner/repo/workflow = <owner>/<repo>/release.yml，environment 必须填 pypi（与下方 publish job 一致）。
 
 on:
   push:

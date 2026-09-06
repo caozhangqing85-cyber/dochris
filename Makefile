@@ -123,14 +123,13 @@ docs-serve: ## 本地预览文档
 changelog: ## 生成 CHANGELOG
 	git-cliff -o CHANGELOG.md
 
-release: ## 创建发布（tag + push）
-	@echo "当前版本: $$($(PYTHON) -c 'import dochris; print(dochris.__version__)')"
-	@read -p "输入新版本号 (如 1.2.0): " version; \
-		sed -i "s/__version__ = \".*\"/__version__ = \"$$version\"/" src/dochris/__init__.py && \
-		sed -i "s/version = \".*\"/version = \"$$version\"/" pyproject.toml && \
-		sed -i "s/PROJECT_VERSION = \".*\"/PROJECT_VERSION = \"$$version\"/" src/dochris/constants.py && \
-		git add -A && git commit -m "chore: bump version to $$version" && \
-		git tag v$$version && git push origin main --tags
+release: ## 版本自检与发布提示（正式发布流程见 docs/RELEASE.md）
+	@$(PYTHON) -c 'import dochris; print("当前版本:", dochris.__version__)'
+	@echo "发布步骤（docs/RELEASE.md）："
+	@echo "  1. 更新 pyproject.toml / src/dochris/__init__.py 的版本号与 CHANGELOG.md"
+	@echo "  2. git commit && git tag vX.Y.Z && git push origin vX.Y.Z"
+	@echo "  3. release.yml 自动执行完整门禁 → 构建 → smoke → PyPI（Trusted Publishing）"
+
 
 # Web UI
 web: ## 启动 React Web UI（需要另行运行 make web-api）

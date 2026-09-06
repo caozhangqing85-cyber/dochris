@@ -157,7 +157,9 @@ class JsonJobRepository(JobRepository):
                 os.fsync(handle.fileno())
             os.replace(temp_path, self.store_path)
         except OSError:
+            # fail-closed：写盘失败必须让调用方感知，禁止无持久化启动编译
             logger.warning("无法保存编译任务历史", exc_info=True)
+            raise
         finally:
             if temp_path is not None and os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -184,8 +186,6 @@ class SQLiteJobRepository(JobRepository):
         heartbeat_at TEXT,
         record TEXT NOT NULL
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_compile_jobs_idem
-        ON compile_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL;
     """
 
     def __init__(self, db_path: Path, *, migrate_from: Path | None = None) -> None:
@@ -198,9 +198,45 @@ class SQLiteJobRepository(JobRepository):
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        # 旧库可能存在同名普通索引（升级前版本）；先删再建唯一索引
-        self._conn.execute("DROP INDEX IF EXISTS idx_compile_jobs_idem")
+        # 旧库可能存在同名普通索引（升级前版本）；先删再建唯一索引。
+        # 若历史数据已有重复幂等键，唯一索引会创建失败并阻塞启动——
+        # 升级前先做确定性去重（同一 key 保留最新 seq）
         self._conn.executescript(self._SCHEMA)
+        dups = self._conn.execute(
+            """
+            SELECT COUNT(*) FROM compile_jobs
+            WHERE idempotency_key IS NOT NULL
+              AND seq NOT IN (
+                  SELECT MAX(seq) FROM compile_jobs
+                  WHERE idempotency_key IS NOT NULL GROUP BY idempotency_key
+              )
+            """
+        ).fetchone()[0]
+        if dups:
+            logger.warning("发现 %d 条重复幂等键的旧任务记录，升级时保留最新一条", dups)
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                self._conn.execute(
+                    """
+                    DELETE FROM compile_jobs
+                    WHERE idempotency_key IS NOT NULL
+                      AND seq NOT IN (
+                          SELECT MAX(seq) FROM compile_jobs
+                          WHERE idempotency_key IS NOT NULL GROUP BY idempotency_key
+                      )
+                    """
+                )
+                self._conn.execute("COMMIT")
+            except sqlite3.Error:
+                self._conn.execute("ROLLBACK")
+                raise
+        self._conn.execute("DROP INDEX IF EXISTS idx_compile_jobs_idem")
+        self._conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_compile_jobs_idem
+                ON compile_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL
+            """
+        )
         if migrate_from is not None:
             self._migrate_from_json(Path(migrate_from))
 
@@ -327,6 +363,21 @@ class SQLiteJobRepository(JobRepository):
 
         self._conn.execute("BEGIN IMMEDIATE")
         try:
+            # 1) 幂等解析优先：重放已完成/失败任务的 key 必须原样返回该任务，
+            #    而不是被当前活跃任务互斥逻辑顶替
+            if idempotency_key:
+                dup = self._conn.execute(
+                    """
+                    SELECT record FROM compile_jobs
+                    WHERE idempotency_key = ? ORDER BY seq DESC LIMIT 1
+                    """,
+                    (idempotency_key,),
+                ).fetchone()
+                if dup is not None:
+                    self._conn.execute("ROLLBACK")
+                    return False, self._loads_or_none(dup["record"])
+
+            # 2) 活跃互斥：仅对全新 key 生效
             blocking = self._conn.execute(
                 """
                 SELECT record FROM compile_jobs
@@ -339,18 +390,6 @@ class SQLiteJobRepository(JobRepository):
             if blocking is not None:
                 self._conn.execute("ROLLBACK")
                 return False, self._loads_or_none(blocking["record"])
-
-            if idempotency_key:
-                dup = self._conn.execute(
-                    """
-                    SELECT record FROM compile_jobs
-                    WHERE idempotency_key = ? ORDER BY seq DESC LIMIT 1
-                    """,
-                    (idempotency_key,),
-                ).fetchone()
-                if dup is not None:
-                    self._conn.execute("ROLLBACK")
-                    return False, self._loads_or_none(dup["record"])
 
             self._conn.execute(
                 """

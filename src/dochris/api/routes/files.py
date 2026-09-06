@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import JSONResponse
 
 from dochris.core.utils import sanitize_filename
 from dochris.manifest import create_manifest, get_all_manifests
@@ -22,12 +23,18 @@ MAX_FILES = 50
 
 
 @router.post("/files/upload")
-async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]:  # noqa: B008
+async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] | JSONResponse:  # noqa: B008
     """上传文件到知识库"""
     if not files:
-        return {"error": "未收到任何文件（需要 multipart/form-data 编码）"}
+        return JSONResponse(
+            status_code=400,
+            content={"error": "未收到任何文件（需要 multipart/form-data 编码）"},
+        )
     if len(files) > MAX_FILES:
-        return {"error": f"单次最多上传 {MAX_FILES} 个文件"}
+        return JSONResponse(
+            status_code=413,
+            content={"error": f"单次最多上传 {MAX_FILES} 个文件"},
+        )
 
     settings = get_settings()
     workspace = settings.workspace

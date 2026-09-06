@@ -161,14 +161,10 @@ class TestSearchObsidianNotes:
 
 class TestSeedFromObsidian:
     @patch("dochris.vault.bridge.append_log")
-    @patch("dochris.vault.bridge.append_to_index")
     @patch("dochris.vault.bridge.create_manifest")
-    @patch("dochris.vault.bridge.get_next_src_id")
     @patch("dochris.vault.bridge.get_all_manifests")
     @patch("dochris.vault.bridge._search_obsidian_notes")
-    def test_seed_success(
-        self, mock_search, mock_all, mock_next_id, mock_create, mock_append, mock_log, tmp_path
-    ):
+    def test_seed_success(self, mock_search, mock_all, mock_create, mock_log, tmp_path):
         from dochris.vault.bridge import seed_from_obsidian
 
         vault = tmp_path / "vault"
@@ -185,7 +181,6 @@ class TestSeedFromObsidian:
             }
         ]
         mock_all.return_value = []
-        mock_next_id.return_value = "SRC-0001"
         mock_create.return_value = {"id": "SRC-0001", "title": "test_note"}
 
         result = seed_from_obsidian(tmp_path, "test")

@@ -1347,8 +1347,12 @@ async function runAuthRecovery(client, sessionId, fixtureServer) {
     await evaluate(client, sessionId, `localStorage.getItem('dochris_api_key')`),
     BROWSER_E2E_ACCESS_KEY,
   )
-  // AppLayout 侧栏版本号会额外探测 /api/v1/status（与 /config 一样经历 401→恢复）
-  assert.deepEqual(fixtureServer.telemetry.authFailures, ['/api/v1/status', '/api/v1/config'])
+  // AppLayout 侧栏版本号与 SettingsPage 空库检查都会探测 /api/v1/status：
+  // [AppLayout 401, 配置加载 401, 保存密钥后已认证重载]
+  assert.deepEqual(
+    fixtureServer.telemetry.authFailures,
+    ['/api/v1/status', '/api/v1/config', '/api/v1/status'],
+  )
   assert.deepEqual(
     fixtureServer.telemetry.authenticatedRequests,
     ['/api/v1/status', '/api/v1/config'],

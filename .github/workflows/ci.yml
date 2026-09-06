@@ -120,6 +120,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # 依赖安全门禁：生产依赖存在已知漏洞即失败（react-router 历史漏洞回归防护）
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate --registry=https://registry.npmjs.org
       - name: Run frontend tests
         run: npm test --if-present
       - run: npm run lint

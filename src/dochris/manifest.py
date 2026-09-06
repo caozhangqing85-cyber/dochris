@@ -275,19 +275,20 @@ def delete_manifest(workspace_path: Path, src_id: str) -> bool:
         True 表示文件已删除，False 表示文件不存在
     """
     manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with _manifest_lock:
-        if not manifest_path.exists():
-            return False
-        try:
-            manifest_path.unlink()
-        except OSError as e:
-            logger.warning(f"删除 manifest 失败 {src_id}: {e}")
-            return False
-        # 重建索引以移除该条目（索引为 CSV，无单行删除 API，重建最简单可靠）
-        try:
-            rebuild_index(workspace_path)
-        except Exception as e:
-            logger.warning(f"删除后重建索引失败 {src_id}: {e}")
+    with _workspace_write_lock(Path(workspace_path)):
+        with _manifest_lock:
+            if not manifest_path.exists():
+                return False
+            try:
+                manifest_path.unlink()
+            except OSError as e:
+                logger.warning(f"删除 manifest 失败 {src_id}: {e}")
+                return False
+            # 重建索引以移除该条目（索引为 CSV，无单行删除 API，重建最简单可靠）
+            try:
+                rebuild_index(workspace_path)
+            except Exception as e:
+                logger.warning(f"删除后重建索引失败 {src_id}: {e}")
     return True
 
 
@@ -317,44 +318,45 @@ def update_manifest_status(
     Returns:
         更新后的 manifest 字典，不存在则返回 None
     """
-    with _manifest_lock:
-        manifest = get_manifest(workspace_path, src_id)
-        if manifest is None:
-            return None
+    with _workspace_write_lock(Path(workspace_path)):
+        with _manifest_lock:
+            manifest = get_manifest(workspace_path, src_id)
+            if manifest is None:
+                return None
 
-        manifest["status"] = status
+            manifest["status"] = status
 
-        if quality_score > 0:
-            manifest["quality_score"] = quality_score
+            if quality_score > 0:
+                manifest["quality_score"] = quality_score
 
-        if error_message is not None:
-            manifest["error_message"] = error_message
+            if error_message is not None:
+                manifest["error_message"] = error_message
 
-        if summary is not None:
-            manifest["summary"] = summary
+            if summary is not None:
+                manifest["summary"] = summary
 
-        if compiled_summary is not None:
-            manifest["compiled_summary"] = compiled_summary
+            if compiled_summary is not None:
+                manifest["compiled_summary"] = compiled_summary
 
-        # promoted_to 用哨兵值 "" 表示显式清空（None 表示不修改）
-        if promoted_to is not None:
-            manifest["promoted_to"] = None if promoted_to == "" else promoted_to
+            # promoted_to 用哨兵值 "" 表示显式清空（None 表示不修改）
+            if promoted_to is not None:
+                manifest["promoted_to"] = None if promoted_to == "" else promoted_to
 
-        if trust_level is not None:
-            manifest["trust_level"] = trust_level
+            if trust_level is not None:
+                manifest["trust_level"] = trust_level
 
-        # 设置时间戳
-        if status == "compiled":
-            manifest["date_compiled"] = datetime.now().isoformat()
-        elif status == "failed":
-            manifest["date_failed"] = datetime.now().isoformat()
+            # 设置时间戳
+            if status == "compiled":
+                manifest["date_compiled"] = datetime.now().isoformat()
+            elif status == "failed":
+                manifest["date_failed"] = datetime.now().isoformat()
 
-        # 原子写回文件
-        manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-        _atomic_write_json(manifest_path, manifest)
+            # 原子写回文件
+            manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
+            _atomic_write_json(manifest_path, manifest)
 
-        # 同步更新 source_index.csv（在同一锁内）
-        update_index_entry(workspace_path, src_id, status, quality_score)
+            # 同步更新 source_index.csv（在同一锁内）
+            update_index_entry(workspace_path, src_id, status, quality_score)
 
     return manifest
 
@@ -446,8 +448,9 @@ def update_index_entry(
                     row["quality_score"] = str(quality_score)
             rows.append(row)
 
-    # 使用临时文件 + 原子替换
-    tmp_path = index_path.with_suffix(".tmp")
+    # 临时文件唯一化（跨进程同锁内串行，但唯一名可防崩溃残留互相覆盖）
+    fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=str(index_path.parent))
+    os.close(fd)
     with open(tmp_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

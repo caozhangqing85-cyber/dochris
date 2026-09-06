@@ -23,11 +23,9 @@ from pathlib import Path
 # 确保 scripts 包可导入
 from dochris.log import append_log
 from dochris.manifest import (
-    append_to_index,
     create_manifest,
     get_all_manifests,
     get_manifest,
-    get_next_src_id,
 )
 from dochris.settings import get_settings as _get_settings
 
@@ -240,11 +238,10 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
         shutil.copy2(src_path, dst)
         file_path = str(dst.relative_to(workspace_path))
 
-        # 创建 manifest
-        src_id = get_next_src_id(workspace_path)
+        # 创建 manifest（src_id=None：锁内自动分配；索引由 create_manifest 独占写入）
         manifest = create_manifest(
             workspace_path=workspace_path,
-            src_id=src_id,
+            src_id=None,
             title=title,
             file_type="article",
             source_path=src_path,
@@ -253,17 +250,15 @@ def seed_from_obsidian(workspace_path: Path, topic: str) -> list[dict]:
             size_bytes=size_bytes,
             tags=["obsidian", "seed", topic],
         )
-        append_to_index(workspace_path, manifest)
-
         seeded.append(
             {
-                "src_id": src_id,
+                "src_id": manifest["id"],
                 "title": title,
                 "file_path": file_path,
             }
         )
 
-        logger.info(f"  入库: {src_id} → {title}")
+        logger.info(f"  入库: {manifest['id']} → {title}")
     if seeded:
         append_log(
             workspace_path,

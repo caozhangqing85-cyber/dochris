@@ -184,7 +184,7 @@ services:
   # ChromaDB 向量数据库
   # ============================================================
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.0.0  # 固定版本：与既有数据卷格式兼容，避免 latest 漂移
     container_name: dochris-chroma
 
     volumes:

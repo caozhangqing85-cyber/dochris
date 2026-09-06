@@ -74,14 +74,26 @@ def test_upload_entity_lives_in_raw_and_inbox_holds_link(tmp_path: Path) -> None
         _stop(patches)
 
 
-def test_upload_without_multipart_returns_error_not_500(tmp_path: Path) -> None:
-    """File(None) + len(None) 曾导致 500；现在应返回显式错误。"""
+def test_upload_without_multipart_returns_400(tmp_path: Path) -> None:
+    """File(None) + len(None) 曾导致 500；空上传是请求级错误，必须 4xx。"""
     client, patches = _client(tmp_path)
     try:
         with client:
             resp = client.post("/api/v1/files/upload")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
         assert "未收到任何文件" in resp.json()["error"]
+    finally:
+        _stop(patches)
+
+
+def test_upload_too_many_files_returns_413(tmp_path: Path) -> None:
+    files = [("files", (f"f{i}.md", b"xxxxxxxxxx", "text/markdown")) for i in range(51)]
+    client, patches = _client(tmp_path)
+    try:
+        with client:
+            resp = client.post("/api/v1/files/upload", files=files)
+        assert resp.status_code == 413
+        assert "最多上传" in resp.json()["error"]
     finally:
         _stop(patches)
 

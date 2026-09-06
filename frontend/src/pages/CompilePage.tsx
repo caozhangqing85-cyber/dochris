@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   PlayCircle, RefreshCw, Loader2, CheckCircle2, XCircle,
   Clock, FileCheck, AlertTriangle, Search, ChevronDown,
@@ -87,6 +87,19 @@ export default function CompilePage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
   const [selectedFile, setSelectedFile] = useState<ManifestItem | null>(null)
+  const detailCloseRef = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (!selectedFile) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setSelectedFile(null)
+      setPromoteMsg('')
+    }
+    document.addEventListener('keydown', handleEscape)
+    requestAnimationFrame(() => detailCloseRef.current?.focus())
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [selectedFile])
   const [promoting, setPromoting] = useState(false)
   const [promoteMsg, setPromoteMsg] = useState('')
   const [page, setPage] = useState(1)
@@ -679,7 +692,16 @@ export default function CompilePage() {
                 const promotable = (f.quality_score ?? 0) >= qualityThreshold
                 return (
                   <tr key={f.id} style={{ borderTop: '1px solid var(--border-subtle)', cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`查看 ${f.title} 详情`}
                     onClick={() => setSelectedFile(f)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setSelectedFile(f)
+                      }
+                    }}
                     onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '8px 16px' }}>
@@ -813,7 +835,11 @@ export default function CompilePage() {
             </div>
           </div>
         }>
-        <div style={{
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`文件详情：${selectedFile.title}`}
+          style={{
           position: 'fixed', inset: 0, zIndex: 50,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'var(--bg-overlay)',
@@ -848,6 +874,8 @@ export default function CompilePage() {
                 </div>
               </div>
               <button onClick={() => { setSelectedFile(null); setPromoteMsg('') }}
+                ref={detailCloseRef}
+                aria-label="关闭文件详情"
                 style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dimmed)', flexShrink: 0 }}>
                 ✕
               </button>

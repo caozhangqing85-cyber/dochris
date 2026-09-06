@@ -580,3 +580,43 @@ async def test_retry_route_returns_503_when_persistence_fails(tmp_path: Path) ->
 
         assert resp.status_code == 503
         assert "持久化失败" in resp.json()["detail"]
+
+
+def test_sqlite_upgrade_dedupes_legacy_duplicate_keys(tmp_path: Path) -> None:
+    """旧库存在重复幂等键时，升级必须确定性去重（保留最新）且服务可启动。"""
+    import sqlite3
+
+    db_path = tmp_path / "legacy-dup.db"
+    legacy = sqlite3.connect(str(db_path))
+    legacy.executescript(
+        """
+        CREATE TABLE compile_jobs (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL UNIQUE,
+            idempotency_key TEXT,
+            status TEXT NOT NULL,
+            lease_owner TEXT,
+            lease_expires_at TEXT,
+            heartbeat_at TEXT,
+            record TEXT NOT NULL
+        );
+        CREATE INDEX idx_compile_jobs_idem ON compile_jobs(idempotency_key);
+        """
+    )
+    for job_id, key in (("old-1", "dup"), ("old-2", "dup"), ("old-3", "keep")):
+        legacy.execute(
+            "INSERT INTO compile_jobs (job_id, idempotency_key, status, record) VALUES (?, ?, ?, ?)",
+            (job_id, key, "completed", json.dumps(_sample_record(job_id))),
+        )
+    legacy.commit()
+    legacy.close()
+
+    repo = SQLiteJobRepository(db_path)
+
+    # 重复键已被去重（保留最新 old-2），且唯一索引生效
+    found = repo.find_by_idempotency_key("dup")
+    assert found is not None and found["job_id"] == "old-2"
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.save({**_sample_record("another"), "idempotency_key": "dup"})
+    assert repo.get("old-3") is not None  # 非重复数据不受影响
+    repo.close()
