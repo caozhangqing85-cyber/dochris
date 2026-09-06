@@ -67,3 +67,26 @@ def test_repair_keeps_external_symlinks_untouched(tmp_path: Path) -> None:
     assert stats["repaired"] == 0
     assert link.is_symlink()  # 保持原样
     assert link.read_text(encoding="utf-8") == "外部源文件"
+
+
+def test_repair_survives_cross_device_rename(tmp_path: Path, monkeypatch) -> None:
+    """模拟 Docker named volume 场景：跨设备 rename 触发 EXDEV 时走复制回退。"""
+    import errno
+
+    link, entity = _make_legacy_layout(tmp_path, "跨卷.md", "跨卷内容")
+    real_replace = os.replace
+
+    def forbid_replace(src, dst, *args, **kwargs):
+        # Docker named volume 下 uploads→raw 的跨卷 rename 必触发 EXDEV；
+        # 实现必须先 copyfile 到 raw 同卷临时文件（raw 卷内的 replace 合法）
+        if Path(str(src)).is_relative_to(tmp_path / "uploads"):
+            raise OSError(errno.EXDEV, "Invalid cross-device link")
+        return real_replace(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr("dochris.storage.migration.os.replace", forbid_replace)
+    stats = repair_uploads_symlinks(tmp_path)
+
+    assert stats["repaired"] == 1
+    assert link.is_file() and not link.is_symlink()
+    assert link.read_text(encoding="utf-8") == "跨卷内容"
+    assert not list(tmp_path.rglob("*.migrating")), "临时文件必须清理"

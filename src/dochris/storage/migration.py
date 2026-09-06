@@ -369,15 +369,22 @@ def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
 
         entity_moved = False
         if target.is_file() and _is_under(target, ws / "uploads"):
-            # 实体在 uploads：迁到 raw 原位，再把 inbox 链回来
+            # 实体在 uploads 卷：复制到 raw 同卷临时文件再原子改名。
+            # 不能用 os.replace(target, link) —— Docker 中 uploads 与 raw
+            # 是不同 named volume，跨设备会触发 EXDEV。
             tmp = link.with_name(link.name + ".migrating")
             try:
-                os.replace(target, tmp)
+                shutil.copyfile(target, tmp)
                 os.replace(tmp, link)
                 entity_moved = True
                 repaired += 1
+                try:
+                    target.unlink()  # 释放 uploads 侧旧实体（失败不影响数据）
+                except OSError:
+                    logger.debug("uploads 旧实体清理失败: %s", target, exc_info=True)
             except OSError:
                 logger.warning("迁移上传实体失败: %s", link, exc_info=True)
+                tmp.unlink(missing_ok=True)
                 continue
         elif not target.exists():
             # 断链：实体已丢。无法恢复内容，只记录（由用户重新上传）。

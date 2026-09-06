@@ -87,7 +87,7 @@ class RetrievalCandidate:
 
     def content_hash(self) -> str:
         """返回文本内容的短哈希，用于去重。"""
-        return hashlib.md5(self.text.encode()).hexdigest()[:12]
+        return hashlib.md5(self.text.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass(frozen=True)

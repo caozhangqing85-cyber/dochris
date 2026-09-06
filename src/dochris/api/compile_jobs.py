@@ -145,6 +145,8 @@ class CompileJobManager:
         self._max_history = max(1, max_history)
         self._owner_id = owner_id or uuid4().hex
         self._lease_ttl = max(1.0, lease_ttl_seconds)
+        # 多 worker 一致性：lease 仓库以 DB 为统一读模型（P1 review 修复）
+        self._lease_aware = getattr(self._repository, "supports_lease", False)
         self._jobs: dict[str, CompileJob] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._heartbeats: dict[str, asyncio.Task[None]] = {}
@@ -181,7 +183,10 @@ class CompileJobManager:
             except Exception as exc:
                 raise JobPersistenceError(f"任务持久化失败，编译未启动: {exc}") from exc
             if not claimed:
-                return CompileJob.from_record(existing_record or job.to_record())
+                # 稳定回填 _jobs：保证 POST 返回的任务随后 GET/取消可达
+                existing_job = CompileJob.from_record(existing_record or job.to_record())
+                self._jobs[existing_job.job_id] = existing_job
+                return existing_job
             self._jobs[job.job_id] = job
             self._tasks[job.job_id] = asyncio.create_task(
                 self._run(job, runner, timeout_seconds=timeout_seconds),
@@ -254,6 +259,24 @@ class CompileJobManager:
         while job.status in ACTIVE_STATUSES and not job.heartbeat_stop:
             await asyncio.sleep(interval)
             if job.status not in ACTIVE_STATUSES or job.heartbeat_stop:
+                break
+            # 跨 worker 取消：先读仓库（另一 worker 置的 cancelling 不能被本地
+            # 续租写覆盖），再续租落盘
+            cancelling_requested = False
+            if self._lease_aware and self._repository is not None:
+                try:
+                    record = self._repository.get(job.job_id)
+                except Exception:
+                    record = None
+                if record is not None and record.get("status") == "cancelling":
+                    cancelling_requested = True
+            if cancelling_requested:
+                job.cancel_requested = True
+                job.status = "cancelling"
+                job.message = "正在取消编译"
+                task = self._tasks.get(job.job_id)
+                if task is not None and not task.done():
+                    task.cancel()
                 break
             self._renew_lease(job)
             self._persist(job)
@@ -360,8 +383,28 @@ class CompileJobManager:
 
     # -- 查询 ------------------------------------------------------
 
+    def _refresh_job(self, job_id: str) -> CompileJob | None:
+        """从仓库刷新任务状态（仅 lease-aware 仓库；DB 为统一读模型）。"""
+        if self._repository is None or not self._lease_aware:
+            return self._jobs.get(job_id)
+        try:
+            record = self._repository.get(job_id)
+        except Exception:
+            logger.warning("刷新任务 %s 失败", job_id, exc_info=True)
+            return self._jobs.get(job_id)
+        if record is None:
+            self._jobs.pop(job_id, None)
+            return None
+        job = CompileJob.from_record(record)
+        self._jobs[job_id] = job
+        return job
+
     def get(self, job_id: str) -> CompileJob | None:
-        return self._jobs.get(job_id)
+        job = self._jobs.get(job_id)
+        # 本进程未持有运行协程的任务，状态以仓库为准（其他 worker 可能已推进/完成）
+        if job is not None and job_id in self._tasks:
+            return job
+        return self._refresh_job(job_id)
 
     def cancel(self, job_id: str) -> CompileJob | None:
         job = self.get(job_id)
@@ -375,9 +418,26 @@ class CompileJobManager:
             job.message = "正在取消编译"
             self._persist(job)
             task.cancel()
+        else:
+            # 跨 worker 取消：把 cancelling 写入仓库，由持有者心跳检测并本地取消
+            job.cancel_requested = True
+            job.status = "cancelling"
+            job.message = "正在取消编译"
+            self._persist(job)
         return job
 
     def active(self) -> CompileJob | None:
+        if self._lease_aware and self._repository is not None:
+            try:
+                records = self._repository.find_active(ACTIVE_STATUSES)
+            except Exception:
+                logger.warning("查询活动任务失败", exc_info=True)
+                records = []
+            for record in records:
+                job = CompileJob.from_record(record)
+                self._jobs[job.job_id] = job
+                return job
+            return None
         return next(
             (job for job in reversed(self._jobs.values()) if job.status in ACTIVE_STATUSES),
             None,
@@ -388,6 +448,16 @@ class CompileJobManager:
 
     def history(self, *, limit: int = 20) -> list[CompileJob]:
         """Return the newest jobs first, capped for API consumption."""
+        if self._lease_aware and self._repository is not None:
+            try:
+                records = self._repository.list_all()
+            except Exception:
+                logger.warning("查询任务历史失败", exc_info=True)
+                records = []
+            jobs = [CompileJob.from_record(r) for r in reversed(records)]
+            for job in jobs:
+                self._jobs.setdefault(job.job_id, job)
+            return jobs[:limit]
         return list(reversed(self._jobs.values()))[:limit]
 
     # -- 持久化 ----------------------------------------------------

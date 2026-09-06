@@ -141,7 +141,9 @@ class TestGenerateSummaryWithLLM:
         mock_client.generate_summary = AsyncMock(return_value={"summary": "test"})
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
         ):
             result = await generate_summary_with_llm("text", "title", logger)
@@ -161,7 +163,9 @@ class TestGenerateSummaryWithLLM:
         mock_client.generate_summary = AsyncMock(side_effect=Exception("LLM error"))
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
         ):
             result = await generate_summary_with_llm("text", "title", logger)
@@ -196,7 +200,9 @@ class TestCompileWithModelFallback:
         mock_client.generate_summary = AsyncMock(return_value={"summary": "ok"})
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
@@ -225,7 +231,9 @@ class TestCompileWithModelFallback:
             return c
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", side_effect=make_client),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
@@ -247,7 +255,9 @@ class TestCompileWithModelFallback:
         mock_client.generate_summary = AsyncMock(side_effect=RuntimeError("all fail"))
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
@@ -267,7 +277,9 @@ class TestCompileWithModelFallback:
         mock_client.generate_summary = AsyncMock(return_value=None)
 
         with (
-            patch("dochris.settings.get_settings", return_value=mock_settings),
+            patch(
+                "dochris.compensate.compensate_failures.get_settings", return_value=mock_settings
+            ),
             patch("dochris.core.llm_client.LLMClient", return_value=mock_client),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):

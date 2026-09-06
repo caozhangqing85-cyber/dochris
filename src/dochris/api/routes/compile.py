@@ -185,18 +185,25 @@ async def retry_compile_job(job_id: str, request: Request) -> CompileResponse:
             retry_of=source.job_id,
         )
 
-    job = manager.start(
-        total_to_compile,
-        lambda **kwargs: _run_compile_task(
-            source.concurrency,
-            source.limit,
-            **kwargs,
-        ),
-        concurrency=source.concurrency,
-        limit=source.limit,
-        attempt=source.attempt + 1,
-        retry_of=source.job_id,
-    )
+    try:
+        job = manager.start(
+            total_to_compile,
+            lambda **kwargs: _run_compile_task(
+                source.concurrency,
+                source.limit,
+                **kwargs,
+            ),
+            concurrency=source.concurrency,
+            limit=source.limit,
+            attempt=source.attempt + 1,
+            retry_of=source.job_id,
+        )
+    except JobPersistenceError as exc:
+        logger.error("重试任务持久化失败: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="任务持久化失败，重试未启动（磁盘/数据库异常），请检查服务端日志后重试",
+        ) from exc
     await asyncio.sleep(0)
     return job.as_response().model_copy(
         update={

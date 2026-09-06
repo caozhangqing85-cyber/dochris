@@ -418,3 +418,165 @@ async def test_legacy_json_start_is_fail_closed_on_save_failure(tmp_path: Path) 
 
     assert manager.active() is None
     await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_worker_b_sees_worker_a_completion(tmp_path: Path) -> None:
+    """统一读模型：A 完成后 B 的 get/active/history 必须反映 completed。"""
+    db_path = tmp_path / "jobs.db"
+    release = asyncio.Event()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        await release.wait()
+
+    started = asyncio.Event()
+
+    async def runner_wait_start(*, progress_callback: Callable[..., None]) -> None:
+        started.set()
+        await release.wait()
+
+    manager_a = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-a")
+    manager_b = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-b")
+    job = manager_a.start(2, runner_wait_start)
+
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1.0)
+        running_from_b = manager_b.get(job.job_id)
+        assert running_from_b is not None and running_from_b.status == "running"
+        assert manager_b.active() is not None
+
+        release.set()
+        await _wait_terminal(job, timeout=2.0)
+        await asyncio.sleep(0.05)  # 等 A 侧最终状态落库
+
+        completed_from_b = manager_b.get(job.job_id)
+        assert completed_from_b is not None
+        assert completed_from_b.status == "completed"
+        assert manager_b.active() is None  # 不能永久返回 running
+        history = manager_b.history(limit=5)
+        assert history and history[0].status == "completed"
+    finally:
+        await manager_a.close()
+        await manager_b.close()
+
+
+@pytest.mark.asyncio
+async def test_cross_worker_cancel_reaches_owner_via_heartbeat(tmp_path: Path) -> None:
+    """B 取消任务 → cancelling 落库 → A 的心跳检测并本地取消。"""
+    db_path = tmp_path / "jobs.db"
+    started = asyncio.Event()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        started.set()
+        await asyncio.Event().wait()
+
+    manager_a = CompileJobManager(
+        repository=SQLiteJobRepository(db_path), owner_id="worker-a", lease_ttl_seconds=0.3
+    )
+    manager_b = CompileJobManager(
+        repository=SQLiteJobRepository(db_path), owner_id="worker-b", lease_ttl_seconds=0.3
+    )
+    job = manager_a.start(2, runner)
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    cancelled_from_b = manager_b.cancel(job.job_id)
+    assert cancelled_from_b is not None and cancelled_from_b.status == "cancelling"
+
+    for _ in range(60):
+        if job.status == "cancelled":
+            break
+        await asyncio.sleep(0.05)
+    assert job.status == "cancelled", f"A 侧未跟进取消: {job.status}"
+
+    await manager_a.close()
+    await manager_b.close()
+
+
+def test_sqlite_index_upgrades_to_unique_on_old_databases(tmp_path: Path) -> None:
+    """旧库已有同名普通索引时，新版本必须升级为唯一索引（P2 review）。"""
+    import sqlite3
+
+    db_path = tmp_path / "legacy.db"
+    legacy = sqlite3.connect(str(db_path))
+    legacy.executescript(
+        """
+        CREATE TABLE compile_jobs (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL UNIQUE,
+            idempotency_key TEXT,
+            status TEXT NOT NULL,
+            lease_owner TEXT,
+            lease_expires_at TEXT,
+            heartbeat_at TEXT,
+            record TEXT NOT NULL
+        );
+        CREATE INDEX idx_compile_jobs_idem ON compile_jobs(idempotency_key);
+        """
+    )
+    legacy.commit()
+    legacy.close()
+
+    repo = SQLiteJobRepository(db_path)
+    repo.save({**_sample_record("first"), "idempotency_key": "dup"})
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.save({**_sample_record("second"), "idempotency_key": "dup"})
+
+    unique = repo._conn.execute(
+        "SELECT DISTINCT sql FROM sqlite_master WHERE name = 'idx_compile_jobs_idem'"
+    ).fetchone()[0]
+    assert "UNIQUE" in unique.upper()
+    repo.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_route_returns_503_when_persistence_fails(tmp_path: Path) -> None:
+    """retry 路径与首次编译一样 fail-closed（P2 review）。"""
+
+    from fastapi.testclient import TestClient
+
+    from dochris.api.app import create_app
+
+    settings = type("S", (), {"workspace": str(tmp_path)})()
+    app = create_app()
+
+    with (
+        patch("dochris.api.routes.compile.get_default_workspace", return_value=str(tmp_path)),
+        patch(
+            "dochris.api.routes.compile.get_all_manifests",
+            return_value=[{"id": "SRC-0001", "status": "ingested"}],
+        ),
+        patch("dochris.phases.phase2_compilation.get_all_manifests", return_value=[]),
+        patch("dochris.api.app.get_settings", return_value=settings, create=True),
+        TestClient(app, raise_server_exceptions=False) as client,
+    ):
+        # 先造一个可重试（failed）任务：编译 runner 抛错使任务进入 failed
+        with patch(
+            "dochris.api.routes.compile.do_compile_all",
+            side_effect=RuntimeError("boom"),
+        ):
+            ok = client.post(
+                "/api/v1/compile",
+                json={"concurrency": 1},
+                headers={"Idempotency-Key": "seed-1"},
+            )
+            assert ok.status_code == 200
+            job_id = ok.json()["job_id"]
+            for _ in range(50):
+                state = client.get(f"/api/v1/compile/jobs/{job_id}").json()
+                if state["status"] == "failed":
+                    break
+                import time
+
+                time.sleep(0.02)
+            assert state["status"] == "failed"
+
+        with patch(
+            "dochris.api.compile_jobs.CompileJobManager.start",
+            side_effect=__import__(
+                "dochris.api.compile_jobs", fromlist=["JobPersistenceError"]
+            ).JobPersistenceError("disk full"),
+        ):
+            resp = client.post(f"/api/v1/compile/jobs/{job_id}/retry")
+
+        assert resp.status_code == 503
+        assert "持久化失败" in resp.json()["detail"]

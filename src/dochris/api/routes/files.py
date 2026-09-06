@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, File, UploadFile
 
 from dochris.core.utils import sanitize_filename
-from dochris.manifest import create_manifest, get_all_manifests, get_next_src_id
+from dochris.manifest import create_manifest, get_all_manifests
 from dochris.phases.phase1_ingestion import file_hash, resolve_path_conflict
 from dochris.settings import get_file_category, get_settings
 
@@ -110,10 +110,10 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]: 
                     logger.debug(f"inbox 软链创建失败（不影响数据）: {inbox_dst.name}")
 
             rel_path = str(managed_path.relative_to(workspace))
-            src_id = get_next_src_id(workspace)
-            create_manifest(
+            # src_id=None：在跨进程写锁内自动分配，防多 worker 竞争覆盖
+            manifest = create_manifest(
                 workspace_path=workspace,
-                src_id=src_id,
+                src_id=None,
                 title=managed_path.name,
                 file_type=category,
                 source_path=managed_path.resolve(),
@@ -121,6 +121,7 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]: 
                 content_hash=content_hash or "",
                 size_bytes=managed_path.stat().st_size,
             )
+            logger.info(f"上传入库 {manifest['id']}: {managed_path.name}")
             existing_hashes.add(content_hash)
             saved += 1
             ingested += 1

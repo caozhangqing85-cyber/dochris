@@ -96,7 +96,7 @@ RUN set -eu; \
 # 元数据
 LABEL maintainer="caozhangqing85-cyber" \
       description="个人知识库编译系统 — 四阶段流水线" \
-      version="1.4.0" \
+      version="1.5.0" \
       build_target="${BUILD_TARGET}"
 
 # 从 builder 复制虚拟环境

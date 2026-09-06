@@ -24,6 +24,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 ACTIVE_STATUSES = frozenset({"queued", "running", "cancelling"})
+ACTIVE_SQL_STATUSES = frozenset({"queued", "running", "cancelling"})
 
 
 def _utc_now_iso() -> str:
@@ -62,6 +63,14 @@ class JobRepository(ABC):
     def recover_stale_leases(self, owner_id: str) -> list[dict[str, Any]]:  # noqa: B027
         """启动恢复钩子：默认无操作，返回启动时应加载的记录。"""
         return self.list_all()
+
+    def find_active(self, active_statuses: frozenset[str] | set[str]) -> list[dict[str, Any]]:
+        """按插入时间倒序返回活动任务（新任务在前）。"""
+        return [
+            record
+            for record in reversed(self.list_all())
+            if record.get("status") in active_statuses
+        ]
 
 
 class JsonJobRepository(JobRepository):
@@ -189,6 +198,8 @@ class SQLiteJobRepository(JobRepository):
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
+        # 旧库可能存在同名普通索引（升级前版本）；先删再建唯一索引
+        self._conn.execute("DROP INDEX IF EXISTS idx_compile_jobs_idem")
         self._conn.executescript(self._SCHEMA)
         if migrate_from is not None:
             self._migrate_from_json(Path(migrate_from))
@@ -268,6 +279,27 @@ class SQLiteJobRepository(JobRepository):
         with self._conn:
             self._conn.execute("DELETE FROM compile_jobs WHERE job_id = ?", (job_id,))
 
+    def find_active(self, active_statuses: frozenset[str] | set[str]) -> list[dict[str, Any]]:
+        """活动任务（新在前）。lease 已过期的 running 视为非活动（自愈语义）。"""
+        if set(active_statuses) != ACTIVE_SQL_STATUSES:
+            raise ValueError(f"unexpected active statuses: {active_statuses!r}")
+        rows = self._conn.execute(
+            """
+            SELECT record FROM compile_jobs
+            WHERE status IN ('queued', 'running', 'cancelling')
+              AND (lease_expires_at IS NULL OR lease_expires_at > ?)
+            ORDER BY seq DESC
+            """,
+            (_utc_now_iso(),),
+        ).fetchall()
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                results.append(json.loads(row["record"]))
+            except (TypeError, ValueError):
+                continue
+        return results
+
     # -- 原子任务准入（多进程互斥 + 幂等）--------------------------
 
     def claim_job(
@@ -286,21 +318,23 @@ class SQLiteJobRepository(JobRepository):
         Raises:
             sqlite3.Error: 持久化失败（磁盘满/锁超时等）——调用方应 fail-closed。
         """
-        placeholders = ", ".join("?" for _ in active_statuses)
         now = _utc_now_iso()
         job_id = str(record["job_id"])
         payload = json.dumps(record, ensure_ascii=False)
+        # 状态集合是代码自有常量（非用户输入），内联避免动态 SQL 拼接（bandit B608）
+        if set(active_statuses) != ACTIVE_SQL_STATUSES:
+            raise ValueError(f"unexpected active statuses: {active_statuses!r}")
 
         self._conn.execute("BEGIN IMMEDIATE")
         try:
             blocking = self._conn.execute(
-                f"""
+                """
                 SELECT record FROM compile_jobs
-                WHERE status IN ({placeholders})
+                WHERE status IN ('queued', 'running', 'cancelling')
                   AND (lease_expires_at IS NULL OR lease_expires_at > ?)
                 LIMIT 1
                 """,
-                (*active_statuses, now),
+                (now,),
             ).fetchone()
             if blocking is not None:
                 self._conn.execute("ROLLBACK")

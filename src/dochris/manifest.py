@@ -24,12 +24,14 @@ Manifest 格式：
 }
 """
 
+import contextlib
 import csv
 import json
 import logging
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 
@@ -39,7 +41,32 @@ logger = logging.getLogger(__name__)
 
 # Manifest 写入锁（防止并发写入同一个 JSON 文件导致数据损坏）
 # 注意：仅进程内有效，多进程部署（多 worker）需配合文件锁
-_manifest_lock = threading.Lock()
+_manifest_lock = threading.RLock()
+
+
+@contextlib.contextmanager
+def _workspace_write_lock(workspace_path: Path) -> Iterator[None]:
+    """manifest 写入的跨进程排他锁（flock），多 worker 部署下防 SRC-ID 竞争覆盖。
+
+    flock 不可用（如 Windows）时退化为仅进程内 _manifest_lock，语义与旧版一致。
+    """
+    lock_dir = workspace_path / "manifests"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / ".write.lock"
+    try:
+        import fcntl
+
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            with _manifest_lock:
+                yield
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+    except ImportError:
+        with _manifest_lock:
+            yield
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
@@ -104,7 +131,7 @@ def get_next_src_id(workspace_path: Path) -> str:
 
 def create_manifest(
     workspace_path: Path,
-    src_id: str,
+    src_id: str | None,
     title: str,
     file_type: str,
     source_path: Path,
@@ -118,7 +145,8 @@ def create_manifest(
 
     Args:
         workspace_path: 工作区路径
-        src_id: 来源 ID（如 SRC-0001）
+        src_id: 来源 ID（如 SRC-0001）；传 None 时在跨进程锁内自动分配
+            （多 worker 并发上传场景必须使用 None，防止目录扫描竞争覆盖）
         title: 来源标题
         file_type: 文件类型（pdf, audio, video, ebook, article, other）
         source_path: 原始文件绝对路径
@@ -131,37 +159,42 @@ def create_manifest(
     Returns:
         创建的 manifest 字典
     """
+    workspace_path = Path(workspace_path)
     _ensure_dirs(workspace_path)
 
     from dochris.core.identity import canonical_document_id
 
-    manifest = {
-        "id": src_id,
-        "title": title,
-        "type": file_type,
-        "source_path": str(source_path),
-        # DATA-01：路径维度的稳定身份（符号链接/大小写归一化后的 sha256 前缀）
-        "canonical_id": canonical_document_id(source_path),
-        "file_path": file_path,
-        "content_hash": content_hash,
-        "date_ingested": datetime.now().strftime("%Y-%m-%d"),
-        "date_published": date_published,
-        "size_bytes": size_bytes,
-        "summary": None,
-        "compiled_summary": None,
-        "status": "ingested",
-        "quality_score": 0,
-        "error_message": None,
-        "promoted_to": None,
-        "tags": tags or [],
-    }
+    # 分配 + 写入 + 索引在同一跨进程临界区内完成（P1：并发上传静默覆盖修复）
+    with _workspace_write_lock(workspace_path):
+        if src_id is None:
+            src_id = get_next_src_id(workspace_path)
 
-    # 写入 manifest 文件（原子写，append_to_index 纳入同一临界区防并发交错）
-    manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
-    with _manifest_lock:
-        _atomic_write_json(manifest_path, manifest)
-        # 同步到索引（在同一锁内，避免并发 create 时 CSV 行交错）
-        append_to_index(workspace_path, manifest)
+        manifest = {
+            "id": src_id,
+            "title": title,
+            "type": file_type,
+            "source_path": str(source_path),
+            # DATA-01：路径维度的稳定身份（符号链接/大小写归一化后的 sha256 前缀）
+            "canonical_id": canonical_document_id(source_path),
+            "file_path": file_path,
+            "content_hash": content_hash,
+            "date_ingested": datetime.now().strftime("%Y-%m-%d"),
+            "date_published": date_published,
+            "size_bytes": size_bytes,
+            "summary": None,
+            "compiled_summary": None,
+            "status": "ingested",
+            "quality_score": 0,
+            "error_message": None,
+            "promoted_to": None,
+            "tags": tags or [],
+        }
+
+        # 原子写 + 同步索引（跨进程锁内，防多 worker 交错/覆盖）
+        manifest_path = workspace_path / "manifests" / "sources" / f"{src_id}.json"
+        with _manifest_lock:
+            _atomic_write_json(manifest_path, manifest)
+            append_to_index(workspace_path, manifest)
 
     return manifest
 
