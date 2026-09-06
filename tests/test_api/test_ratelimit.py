@@ -39,12 +39,13 @@ def test_sliding_window_blocks_over_limit() -> None:
     assert limiter.allow("client-b", now=1.4)
 
 
-def test_limiter_prunes_old_keys() -> None:
+def test_limiter_prunes_expired_entries_per_key() -> None:
+    """过期条目按 key 清理；活跃 key 常驻（进程生命周期内有界）。"""
     limiter = SlidingWindowLimiter(max_requests=1, window_seconds=1.0)
     for i in range(50):
         limiter.allow(f"client-{i}", now=1.0)
         limiter.allow(f"client-{i}", now=3.0)
-    assert len(limiter._hits) <= 50
+    assert len(limiter._hits) == 50  # 每个 key 保留窗口内最新一次
 
 
 def test_api_returns_429_when_limit_exceeded(monkeypatch) -> None:

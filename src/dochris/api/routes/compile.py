@@ -211,6 +211,7 @@ async def retry_compile_job(job_id: str, request: Request) -> CompileResponse:
             limit=source.limit,
             attempt=source.attempt + 1,
             retry_of=source.job_id,
+            timeout_seconds=_compile_timeout_seconds(),
         )
     except JobPersistenceError as exc:
         logger.error("重试任务持久化失败: %s", exc)

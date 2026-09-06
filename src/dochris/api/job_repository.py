@@ -17,7 +17,7 @@ import os
 import sqlite3
 import tempfile
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +63,10 @@ class JobRepository(ABC):
     def recover_stale_leases(self, owner_id: str) -> list[dict[str, Any]]:  # noqa: B027
         """启动恢复钩子：默认无操作，返回启动时应加载的记录。"""
         return self.list_all()
+
+    def is_cancel_requested(self, job_id: str) -> bool:  # noqa: B027
+        """默认不支持（JSON/无持久化仓库为单进程，本地内存即可见）。"""
+        return False
 
     def find_active(self, active_statuses: frozenset[str] | set[str]) -> list[dict[str, Any]]:
         """按插入时间倒序返回活动任务（新任务在前）。"""
@@ -189,6 +193,8 @@ class SQLiteJobRepository(JobRepository):
         lease_owner TEXT,
         lease_expires_at TEXT,
         heartbeat_at TEXT,
+        cancel_requested INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT,
         record TEXT NOT NULL
     );
     """
@@ -240,6 +246,23 @@ class SQLiteJobRepository(JobRepository):
             except sqlite3.Error:
                 self._conn.execute("ROLLBACK")
                 raise
+        try:
+            self._conn.execute(
+                "ALTER TABLE compile_jobs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass  # 列已存在
+        try:
+            self._conn.execute("ALTER TABLE compile_jobs ADD COLUMN created_at TEXT")
+            self._conn.execute(
+                """
+                UPDATE compile_jobs
+                SET created_at = json_extract(record, '$.created_at')
+                WHERE created_at IS NULL
+                """
+            )
+        except sqlite3.OperationalError:
+            pass  # 列已存在
         self._conn.execute("DROP INDEX IF EXISTS idx_compile_jobs_idem")
         self._conn.execute(
             """
@@ -256,12 +279,14 @@ class SQLiteJobRepository(JobRepository):
         job_id = str(record["job_id"])
         payload = json.dumps(record, ensure_ascii=False)
         with self._conn:
+            # 注意：cancel_requested 不在写入列中——它只能由 mark_cancel 置位，
+            # owner 侧的全记录持久化不允许覆盖取消标记（P1 review 修复）
             self._conn.execute(
                 """
                 INSERT INTO compile_jobs
                     (job_id, idempotency_key, status, lease_owner,
-                     lease_expires_at, heartbeat_at, record)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                     lease_expires_at, heartbeat_at, cancel_requested, created_at, record)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
                 ON CONFLICT(job_id) DO UPDATE SET
                     idempotency_key=excluded.idempotency_key,
                     status=excluded.status,
@@ -277,6 +302,7 @@ class SQLiteJobRepository(JobRepository):
                     record.get("lease_owner"),
                     record.get("lease_expires_at"),
                     record.get("heartbeat_at"),
+                    record.get("created_at"),
                     payload,
                 ),
             )
@@ -329,14 +355,19 @@ class SQLiteJobRepository(JobRepository):
         """活动任务（新在前）。lease 已过期的 running 视为非活动（自愈语义）。"""
         if set(active_statuses) != ACTIVE_SQL_STATUSES:
             raise ValueError(f"unexpected active statuses: {active_statuses!r}")
+        cutoff = (datetime.fromisoformat(_utc_now_iso()) - timedelta(seconds=300.0)).isoformat()
         rows = self._conn.execute(
             """
             SELECT record FROM compile_jobs
             WHERE status IN ('queued', 'running', 'cancelling')
-              AND (lease_expires_at IS NULL OR lease_expires_at > ?)
+              AND (
+                  (lease_expires_at IS NOT NULL AND lease_expires_at > ?)
+                  OR
+                  (lease_expires_at IS NULL AND created_at > ?)
+              )
             ORDER BY seq DESC
             """,
-            (_utc_now_iso(),),
+            (_utc_now_iso(), cutoff),
         ).fetchall()
         results: list[dict[str, Any]] = []
         for row in rows:
@@ -353,6 +384,7 @@ class SQLiteJobRepository(JobRepository):
         record: dict[str, Any],
         idempotency_key: str | None,
         active_statuses: frozenset[str] | set[str],
+        zombie_grace_seconds: float = 300.0,
     ) -> tuple[bool, dict[str, Any] | None]:
         """事务化任务准入：BEGIN IMMEDIATE 下一次完成互斥检查与插入。
 
@@ -388,14 +420,21 @@ class SQLiteJobRepository(JobRepository):
                     return False, self._loads_or_none(dup["record"])
 
             # 2) 活跃互斥：仅对全新 key 生效
+            cutoff = (
+                datetime.fromisoformat(now) - timedelta(seconds=zombie_grace_seconds)
+            ).isoformat()
             blocking = self._conn.execute(
                 """
                 SELECT record FROM compile_jobs
                 WHERE status IN ('queued', 'running', 'cancelling')
-                  AND (lease_expires_at IS NULL OR lease_expires_at > ?)
+                  AND (
+                      (lease_expires_at IS NOT NULL AND lease_expires_at > ?)
+                      OR
+                      (lease_expires_at IS NULL AND created_at > ?)
+                  )
                 LIMIT 1
                 """,
-                (now,),
+                (now, cutoff),
             ).fetchone()
             if blocking is not None:
                 self._conn.execute("ROLLBACK")
@@ -405,8 +444,8 @@ class SQLiteJobRepository(JobRepository):
                 """
                 INSERT INTO compile_jobs
                     (job_id, idempotency_key, status, lease_owner,
-                     lease_expires_at, heartbeat_at, record)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                     lease_expires_at, heartbeat_at, cancel_requested, created_at, record)
+                VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
                 (
                     job_id,
@@ -415,6 +454,7 @@ class SQLiteJobRepository(JobRepository):
                     record.get("lease_owner"),
                     record.get("lease_expires_at"),
                     record.get("heartbeat_at"),
+                    record.get("created_at"),
                     payload,
                 ),
             )
@@ -426,6 +466,62 @@ class SQLiteJobRepository(JobRepository):
             except sqlite3.Error:
                 pass
             raise
+
+    def mark_cancel(self, job_id: str) -> dict[str, Any] | None:
+        """条件化取消写入：仅当任务仍为 queued/running/cancelling 时置 cancelling。
+
+        事务内重查状态，杜绝"取消者的过期快照复活已完成任务"（P1 review）。
+        Returns:
+            取消写入后的最新记录；任务不存在或已终结时返回终结状态的记录。
+        """
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = self._conn.execute(
+                "SELECT record FROM compile_jobs WHERE job_id = ?", (job_id,)
+            ).fetchone()
+            if row is None:
+                self._conn.execute("COMMIT")
+                return None
+            try:
+                record = json.loads(row["record"])
+            except (TypeError, ValueError):
+                self._conn.execute("COMMIT")
+                return None
+
+            if record.get("status") in ("completed", "failed", "cancelled", "interrupted"):
+                self._conn.execute("COMMIT")
+                fresh: dict[str, Any] = record
+                return fresh  # 已终结：原样返回，不复活
+
+            patched = dict(record)
+            patched["cancel_requested"] = True
+            patched["status"] = "cancelling"
+            patched["message"] = "正在取消编译"
+            now = _utc_now_iso()
+            patched.setdefault("created_at", now)
+            self._conn.execute(
+                """
+                UPDATE compile_jobs
+                SET status = 'cancelling', cancel_requested = 1, record = ?
+                WHERE job_id = ?
+                """,
+                (json.dumps(patched, ensure_ascii=False), job_id),
+            )
+            self._conn.execute("COMMIT")
+            return patched
+        except Exception:
+            try:
+                self._conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        """owner 侧轮询：任务是否已被请求取消。"""
+        row = self._conn.execute(
+            "SELECT cancel_requested FROM compile_jobs WHERE job_id = ?", (job_id,)
+        ).fetchone()
+        return bool(row and row["cancel_requested"])
 
     @staticmethod
     def _loads_or_none(raw: Any) -> dict[str, Any] | None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
+from dochris.core.error_sanitizer import sanitize_error_text
 from dochris.core.utils import sanitize_filename
 from dochris.manifest import (
     _workspace_write_lock,
@@ -17,7 +19,7 @@ from dochris.manifest import (
     find_manifest_by_content_hash,
     get_all_manifests,
 )
-from dochris.phases.phase1_ingestion import file_hash, resolve_path_conflict
+from dochris.phases.phase1_ingestion import file_hash
 from dochris.settings import get_file_category, get_settings
 
 logger = logging.getLogger(__name__)
@@ -77,15 +79,32 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
 
             managed_dir = raw_dir / category
             managed_dir.mkdir(parents=True, exist_ok=True)
-            managed_path = resolve_path_conflict(managed_dir, original_name, logger)
-            if managed_path is None:
-                failed.append(f"{original_name}: raw 目录冲突")
+
+            # 独占创建（O_EXCL）：消除"解析路径→打开文件"窗口期的并发同名覆盖
+            # （check-then-act 竞态会让两个 worker 交错写坏同一实体）
+            managed_path: Path | None = None
+            write_fd: int | None = None
+            stem, suffix = Path(original_name).stem, Path(original_name).suffix
+            candidate = managed_dir / original_name
+            for attempt in range(1000):
+                try:
+                    write_fd = os.open(str(candidate), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                    managed_path = candidate
+                    break
+                except FileExistsError:
+                    candidate = managed_dir / f"{stem}_{attempt + 1}{suffix}"
+                except OSError as e:
+                    failed.append(f"{original_name}: {type(e).__name__}: {e}")
+                    break
+            if managed_path is None or write_fd is None:
+                if managed_path is None and not failed:
+                    failed.append(f"{original_name}: 文件名冲突过多")
                 continue
 
             # 分块流式写入，边写边累计大小，超限即中止删除（防大文件 OOM）
             too_large = False
             written = 0
-            with open(managed_path, "wb") as f:
+            with os.fdopen(write_fd, "wb") as f:
                 while True:
                     chunk = await upload.read(1024 * 1024)  # 1MB 分块
                     if not chunk:
@@ -124,24 +143,36 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
             rel_path = str(managed_path.relative_to(workspace))
 
             # 跨进程原子判重+创建（P2：哈希查重与 manifest 创建必须同临界区，
-            # 否则双 worker 并发上传相同内容会产生重复 manifest）
-            duplicate = False
-            with _workspace_write_lock(workspace):
-                if content_hash and find_manifest_by_content_hash(workspace, content_hash):
-                    duplicate = True
-                else:
-                    manifest = create_manifest(
+            # 否则双 worker 并发上传相同内容会产生重复 manifest）。
+            # 同步阻塞段放入线程池，避免 flock 等待阻塞事件循环。
+            entity_path = managed_path
+            entity_hash = content_hash
+            entity_category = category
+            entity_rel_path = rel_path
+
+            def _dedupe_and_create(
+                entity_path: Path = entity_path,
+                entity_hash: str | None = entity_hash,
+                entity_category: str = entity_category,
+                entity_rel_path: str = entity_rel_path,
+            ) -> Any | None:
+                with _workspace_write_lock(workspace):
+                    if entity_hash and find_manifest_by_content_hash(workspace, entity_hash):
+                        return None
+                    return create_manifest(
                         workspace_path=workspace,
                         src_id=None,
-                        title=managed_path.name,
-                        file_type=category,
-                        source_path=managed_path.resolve(),
-                        file_path=rel_path,
-                        content_hash=content_hash or "",
-                        size_bytes=managed_path.stat().st_size,
+                        title=entity_path.name,
+                        file_type=entity_category,
+                        source_path=entity_path.resolve(),
+                        file_path=entity_rel_path,
+                        content_hash=entity_hash or "",
+                        size_bytes=entity_path.stat().st_size,
                     )
 
-            if duplicate:
+            manifest = await asyncio.to_thread(_dedupe_and_create)
+
+            if manifest is None:
                 skipped += 1
                 managed_path.unlink(missing_ok=True)
                 continue
@@ -152,7 +183,8 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
             ingested += 1
         except Exception as e:
             logger.warning(f"上传文件失败: {e}")
-            failed.append(str(e))
+            # 错误信息脱敏（不得向客户端泄漏本机绝对路径等内部细节）
+            failed.append(f"{original_name}: {sanitize_error_text(str(e))}")
 
     return {
         "saved": saved,

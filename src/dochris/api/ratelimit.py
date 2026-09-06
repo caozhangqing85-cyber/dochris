@@ -26,18 +26,18 @@ class SlidingWindowLimiter:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
 
     def allow(self, key: str, *, now: float | None = None) -> bool:
-        """记录一次命中并判断是否放行。"""
+        """记录一次命中并判断是否放行。空队列的 key 会被回收，防止无界增长。"""
         current = time.monotonic() if now is None else now
         window_start = current - self.window_seconds
-        hits = self._hits[key]
+        hits = self._hits.get(key)
+        if hits is None:
+            hits = deque()
+            self._hits[key] = hits
         while hits and hits[0] <= window_start:
             hits.popleft()
         if len(hits) >= self.max_requests:
             return False
         hits.append(current)
-        # 防止 key 无界增长：空队列时回收
-        if not hits:
-            self._hits.pop(key, None)
         return True
 
 

@@ -23,6 +23,8 @@ pytestmark = pytest.mark.fast
 
 
 def _sample_record(job_id: str = "job-1", status: str = "queued") -> dict[str, object]:
+    from datetime import UTC, datetime
+
     return {
         "job_id": job_id,
         "status": status,
@@ -31,6 +33,7 @@ def _sample_record(job_id: str = "job-1", status: str = "queued") -> dict[str, o
         "compiled": 0,
         "failed": 0,
         "idempotency_key": None,
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -668,3 +671,95 @@ def test_save_quarantines_corrupt_history_before_overwrite(tmp_path: Path) -> No
     assert len(quarantined) == 1, "损坏文件必须被隔离而不是覆盖"
     assert quarantined[0].read_text(encoding="utf-8") == "{corrupted-evidence"
     assert repo.get("fresh") is not None
+
+
+@pytest.mark.asyncio
+async def test_cancel_marker_survives_owner_progress_persist(tmp_path: Path) -> None:
+    """P1 回归：取消后 owner 的进度持久化不得覆盖 cancel_requested 标记。"""
+    db_path = tmp_path / "jobs.db"
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        started.set()
+        await release.wait()
+        progress_callback(processed=2, compiled=2, failed=0, current_files=[])
+
+    repo = SQLiteJobRepository(db_path)
+    manager = CompileJobManager(repository=repo, owner_id="worker-a", lease_ttl_seconds=0.3)
+    job = manager.start(2, runner)
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    manager_b = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-b")
+    cancelled = manager_b.cancel(job.job_id)
+    assert cancelled.status == "cancelling"
+
+    release.set()  # owner 推进到最终持久化（曾把取消标记覆盖掉）
+    await _wait_terminal(job, timeout=2.0)
+
+    fresh = repo.is_cancel_requested(job.job_id)
+    assert fresh is True, "取消标记一旦置位必须保留"
+    await manager.close()
+    await manager_b.close()
+
+
+@pytest.mark.asyncio
+async def test_cancel_of_terminal_job_does_not_resurrect_it(tmp_path: Path) -> None:
+    """P1 回归：对已完成任务的过期取消快照不得复活/破坏计数。"""
+    db_path = tmp_path / "jobs.db"
+    repo = SQLiteJobRepository(db_path)
+    manager = CompileJobManager(repository=repo, owner_id="worker-a")
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        progress_callback(processed=2, compiled=2, failed=0, current_files=[])
+
+    job = manager.start(2, runner)
+    await _wait_terminal(job)
+    compiled_before = job.compiled
+
+    manager_b = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-b")
+    cancelled = manager_b.cancel(job.job_id)
+
+    # 已终结：原样返回终结状态，不得改写为 cancelling
+    assert cancelled.status == "completed"
+    assert job.status == "completed"
+    assert job.compiled == compiled_before
+    assert manager_b.active() is None  # 不产生假的"活动中"任务
+    await manager.close()
+    await manager_b.close()
+
+
+def test_claim_admits_stale_null_lease_queued_zombie(tmp_path: Path) -> None:
+    """NULL lease 的 queued 僵尸（owner 提交后即死）不得永久阻塞新任务。"""
+    from datetime import UTC, datetime, timedelta
+
+    repo = SQLiteJobRepository(tmp_path / "jobs.db")
+    stale_created = (datetime.now(UTC) - timedelta(seconds=600)).isoformat()
+    repo.save(
+        {
+            **_sample_record("zombie", status="queued"),
+            "lease_owner": None,
+            "lease_expires_at": None,
+            "created_at": stale_created,
+        }
+    )
+
+    claimed, existing = repo.claim_job(
+        _sample_record("fresh", status="queued"), None, {"queued", "running", "cancelling"}
+    )
+    assert claimed is True, "过期 NULL-lease 僵尸不能永久阻塞新任务"
+
+    # 新鲜 queued（grace 期内）仍应阻塞，防误并发
+    repo.save(
+        {
+            **_sample_record("fresh2", status="queued"),
+            "lease_expires_at": (datetime.now(UTC) + timedelta(seconds=60)).isoformat(),
+        }
+    )
+    claimed2, blocking = repo.claim_job(
+        _sample_record("third", status="queued"), None, {"queued", "running", "cancelling"}
+    )
+    assert claimed2 is False
+    # 新鲜的 queued（NULL lease 但 created_at 在宽限期内）与有 lease 的都阻塞
+    assert blocking is not None and blocking["job_id"] in {"fresh", "fresh2"}
+    repo.close()

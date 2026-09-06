@@ -73,6 +73,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-API-Key", "Idempotency-Key"],
+        expose_headers=["X-Operation-ID", "X-Trace-ID"],
     )
 
     # 可观测性：trace_id 中间件（CORS → tracing → auth）

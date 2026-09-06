@@ -288,6 +288,26 @@ class CompileJobManager:
                 return CompileJob.from_record(record)
         return None
 
+    def _observe_remote_cancel(self, job: CompileJob) -> bool:
+        """检查仓库取消标记；命中则本地取消。返回是否命中。"""
+        if job.cancel_requested:
+            return True
+        if not self._lease_aware or self._repository is None:
+            return False
+        try:
+            if not self._repository.is_cancel_requested(job.job_id):
+                return False
+        except Exception:
+            logger.warning("查询取消标记失败: %s", job.job_id, exc_info=True)
+            return False
+        job.cancel_requested = True
+        job.status = "cancelling"
+        job.message = "正在取消编译"
+        task = self._tasks.get(job.job_id)
+        if task is not None and not task.done():
+            task.cancel()
+        return True
+
     def _acquire_lease(self, job: CompileJob) -> None:
         from datetime import timedelta
 
@@ -312,16 +332,9 @@ class CompileJobManager:
             await asyncio.sleep(interval)
             if job.status not in ACTIVE_STATUSES or job.heartbeat_stop:
                 break
-            # 跨 worker 取消：先读仓库（另一 worker 置的 cancelling 不能被本地
-            # 续租写覆盖），再续租落盘
-            cancelling_requested = False
-            if self._lease_aware and self._repository is not None:
-                try:
-                    record = self._repository.get(job.job_id)
-                except Exception:
-                    record = None
-                if record is not None and record.get("status") == "cancelling":
-                    cancelling_requested = True
+            # 跨 worker 取消：先读专用取消标记（不会被 owner 续租/进度写覆盖），
+            # 再续租落盘
+            cancelling_requested = self._observe_remote_cancel(job)
             if cancelling_requested:
                 job.cancel_requested = True
                 job.status = "cancelling"
@@ -431,6 +444,8 @@ class CompileJobManager:
             job.failed_files = list(failed_files)
         if failures is not None:
             job.failure_details = [dict(item) for item in failures]
+        # 跨 worker 取消：进度持久化前轮询取消标记（防止 owner 进度写覆盖取消标记）
+        self._observe_remote_cancel(job)
         self._persist(job)
 
     # -- 查询 ------------------------------------------------------
@@ -470,13 +485,22 @@ class CompileJobManager:
             job.message = "正在取消编译"
             self._persist(job)
             task.cancel()
-        else:
-            # 跨 worker 取消：把 cancelling 写入仓库，由持有者心跳检测并本地取消
-            job.cancel_requested = True
-            job.status = "cancelling"
-            job.message = "正在取消编译"
-            self._persist(job)
-        return job
+        elif self._lease_aware and self._repository is not None:
+            # 跨 worker 取消：条件化写入（事务内重查状态，防止过期快照复活
+            # 已终结任务），随后以仓库最新状态为准
+            try:
+                marker = getattr(self._repository, "mark_cancel", None)
+                fresh = marker(job_id) if marker is not None else None
+            except Exception:
+                logger.warning("跨 worker 取消写入失败: %s", job_id, exc_info=True)
+                fresh = None
+            if fresh is not None:
+                self._jobs[job_id] = CompileJob.from_record(fresh)
+            else:
+                job.cancel_requested = True
+                job.status = "cancelling"
+                job.message = "正在取消编译"
+        return self._jobs.get(job_id, job)
 
     def active(self) -> CompileJob | None:
         if self._lease_aware and self._repository is not None:

@@ -72,12 +72,11 @@ def sse_encode(
         parts.append(f"data: {payload}")
     elif isinstance(data, str):
         # SSE 协议：多行内容必须拆为多个 data: 行。
-        # splitlines 处理 \n / \r\n / \r 三种换行符，避免 \r 破坏事件帧
-        lines = data.splitlines()
-        if lines:
-            parts.extend(f"data: {line}" for line in lines)
-        else:
-            parts.append("data: ")
+        # 只按 \n 拆分（先归一化 \r\n、\r），保留尾随换行与 U+2028 等字符，
+        # 避免增量文本与最终答案漂移
+        normalized = data.replace("\r\n", "\n").replace("\r", "\n")
+        lines = normalized.split("\n")
+        parts.extend(f"data: {line}" for line in lines)
     elif data is not None:
         parts.append(f"data: {data}")
     else:
@@ -178,9 +177,9 @@ def sse_done_event(
         data["contribution"] = contribution
     if final_answer is not None:
         data["final_answer"] = final_answer
-    if citations:
+    if citations is not None:
         data["citations"] = citations
-    if unresolved_refs:
+    if unresolved_refs is not None:
         data["unresolved_refs"] = unresolved_refs
     return sse_encode(QueryStreamEventName.DONE, data)
 
