@@ -12,8 +12,24 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import urlparse
 
 from .base import BaseLLMProvider
+
+
+def _is_loopback_base(api_base: str | None) -> bool:
+    """判断 API 基址是否指向本机（环回）。
+
+    环回请求不应经过 HTTP(S)_PROXY / 系统代理：宿主机代理通常无法正确
+    回源到自身 loopback，会把本地 fixture / 本地 LLM 的请求劫持成 502。
+    """
+    if not api_base:
+        return False
+    try:
+        host = urlparse(api_base).hostname or ""
+    except ValueError:
+        return False
+    return host in {"localhost", "::1"} or host.startswith("127.")
 
 
 class OpenAICompatProvider(BaseLLMProvider):
@@ -68,9 +84,12 @@ class OpenAICompatProvider(BaseLLMProvider):
                     base_url=self.api_base,
                     max_retries=0,
                     timeout=self.timeout,
+                    # 环回地址（本地 fixture / 本地 LLM）永不走系统或环境代理，
+                    # 避免宿主机代理把 loopback 请求劫持成 502
                     # 部分 openai 版本的 stub 将 http_client 声明为 vendored httpx2，
                     # 运行时两者同为 httpx.AsyncClient，忽略该 stub 漂移
                     http_client=httpx.AsyncClient(  # type: ignore[arg-type]
+                        trust_env=not _is_loopback_base(self.api_base),
                         # 连接池扩大：max_concurrency=3 配置需要匹配的连接池上限
                         limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
                         timeout=self.timeout,

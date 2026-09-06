@@ -472,3 +472,19 @@ class TestOllamaProviderIntegration:
                 await p.generate_with_messages([{"role": "user", "content": "hi"}])
         finally:
             ollama_mod.aiohttp = original
+
+
+def test_is_loopback_base_detection() -> None:
+    """环回基址判定：代理环境下的 loopback 流量必须直连（502 回归防护）。"""
+    from dochris.llm.openai_compat import _is_loopback_base
+
+    assert _is_loopback_base("http://127.0.0.1:8000/v1") is True
+    assert _is_loopback_base("http://127.9.9.9:8080") is True
+    assert _is_loopback_base("http://localhost:11434") is True
+    assert _is_loopback_base("http://LOCALHOST:11434") is True
+    assert _is_loopback_base("http://[::1]:11434") is True
+    assert _is_loopback_base(None) is False
+    assert _is_loopback_base("") is False
+    assert _is_loopback_base("https://open.bigmodel.cn/api/paas/v4") is False
+    assert _is_loopback_base("http://api.deepseek.com") is False
+    assert _is_loopback_base("http://192.168.1.10:11434") is False  # 内网非环回
