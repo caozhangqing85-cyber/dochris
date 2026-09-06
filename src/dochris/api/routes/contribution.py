@@ -72,6 +72,73 @@ async def get_candidates(
     return {"candidates": candidates, "total": len(candidates)}
 
 
+@router.get("/candidates/{candidate_id}")
+async def get_candidate_detail(candidate_id: str) -> dict[str, Any]:
+    """候选详情（UX-03）：全文、来源、矛盾检测与晋升最终 diff 计划。"""
+    from dochris.quality.query_contribution import _safe_filename
+
+    settings = get_settings()
+    ws = Path(settings.workspace)
+    meta_file = ws / "outputs" / "candidates" / "meta" / f"{candidate_id}.json"
+    if not meta_file.exists():
+        raise HTTPException(status_code=404, detail=f"候选不存在: {candidate_id}")
+    try:
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"候选元数据读取失败: {exc}") from exc
+
+    full_text = ""
+    content_rel = str(meta.get("file", ""))
+    content_file = ws / content_rel if content_rel else None
+    content_exists = bool(content_file and content_file.exists())
+    if content_exists and content_file is not None:
+        try:
+            full_text = content_file.read_text(encoding="utf-8")
+        except OSError:
+            full_text = ""
+
+    # 晋升最终 diff 计划：与 promote_candidate 的写入逻辑保持一致
+    # （摘要写入 wiki/summaries/{safe_title}.md，同 名已存在时改用 _hash 后缀）
+    promote_plan: dict[str, Any] = {"changes": [], "blockers": []}
+    if meta.get("status") == "candidate":
+        if not content_exists or content_file is None:
+            promote_plan["blockers"].append("候选内容文件缺失")
+        else:
+            wiki_dir = ws / "wiki" / "summaries"
+            safe_title = _safe_filename(str(meta.get("title", "")))
+            planned = wiki_dir / f"{safe_title}.md"
+            if planned.exists():
+                planned = wiki_dir / f"{safe_title}_{str(meta.get('content_hash', ''))[:4]}.md"
+            promote_plan["changes"].append(
+                {
+                    "path": str(planned.relative_to(ws)),
+                    "action": "identical"
+                    if planned.exists() and planned.read_bytes() == content_file.read_bytes()
+                    else "overwrite"
+                    if planned.exists()
+                    else "create",
+                    "size_bytes": content_file.stat().st_size,
+                }
+            )
+        for concept in meta.get("concepts_extracted", []):
+            name = str(concept.get("name", "")) if isinstance(concept, dict) else str(concept)
+            if not name:
+                continue
+            concept_file = ws / "wiki" / "concepts" / f"{_safe_filename(name)}.md"
+            promote_plan["changes"].append(
+                {
+                    "path": str(concept_file.relative_to(ws)),
+                    "action": "identical" if concept_file.exists() else "create",
+                }
+            )
+
+    return {
+        **meta,
+        "full_text": full_text,
+        "promote_plan": promote_plan,
+    }
+
+
 @router.post("/candidates/{candidate_id}/promote")
 async def promote_candidate_api(candidate_id: str) -> dict[str, Any]:
     """将候选知识晋升到 wiki 层"""

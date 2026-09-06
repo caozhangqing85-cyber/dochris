@@ -11,6 +11,13 @@ import {
   setApiAccessKey,
 } from '@/lib/api'
 import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
+
+/** UX-05：动作类错误（保存/测试连接）统一走 classifyRequestError 的分类模型 */
+function describeActionError(e: unknown, fallback: string): string {
+  const info = classifyRequestError(e)
+  const detail = info.message || info.diagnostic
+  return `${fallback}：${info.title} — ${detail}${info.retryable ? '（可重试）' : ''}`
+}
 import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
 import RequestErrorState from '@/components/ui/RequestErrorState'
@@ -81,14 +88,14 @@ export default function SettingsPage() {
       if (form.vector_store) u.vector_store = form.vector_store
       if (form.workspace) u.workspace = form.workspace
       await updateConfig(u); setMessage({ type: 'success', text: '配置已保存' })
-    } catch (e) { setMessage({ type: 'error', text: '保存失败: ' + (e as Error).message }) }
+    } catch (e) { setMessage({ type: 'error', text: describeActionError(e, '保存失败') }) }
     finally { setSaving(false) }
   }
 
   const handleTest = async () => {
     setTesting(true); setMessage(null)
     try { await getStatus(); setMessage({ type: 'success', text: '连接成功！' }) }
-    catch (e) { setMessage({ type: 'error', text: '连接失败: ' + (e as Error).message }) }
+    catch (e) { setMessage({ type: 'error', text: describeActionError(e, '连接失败') }) }
     finally { setTesting(false) }
   }
 
@@ -130,7 +137,7 @@ export default function SettingsPage() {
     try {
       const res = await enrichSchemaFromGraph()
       setSchemaMsg(`元数据丰富完成: ${JSON.stringify(res)}`)
-    } catch (e) { setSchemaMsg((e as Error).message) }
+    } catch (e) { setSchemaMsg(describeActionError(e, 'Schema 操作失败')) }
     finally { setSchemaLoading(false) }
   }
   const handleAutoTag = async () => {
@@ -140,7 +147,7 @@ export default function SettingsPage() {
     try {
       const res = await autoTagSchema()
       setSchemaMsg(`自动打标签完成: ${JSON.stringify(res)}`)
-    } catch (e) { setSchemaMsg((e as Error).message) }
+    } catch (e) { setSchemaMsg(describeActionError(e, 'Schema 操作失败')) }
     finally { setSchemaLoading(false) }
   }
   const handleCheckStale = async () => {
@@ -148,7 +155,7 @@ export default function SettingsPage() {
     try {
       const res = await checkStaleSchema()
       setSchemaMsg(`过时检查: ${JSON.stringify(res)}`)
-    } catch (e) { setSchemaMsg((e as Error).message) }
+    } catch (e) { setSchemaMsg(describeActionError(e, 'Schema 操作失败')) }
     finally { setSchemaLoading(false) }
   }
 

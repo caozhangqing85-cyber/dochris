@@ -3,7 +3,7 @@ PYTEST ?= $(PYTHON) -m pytest
 RUFF ?= $(PYTHON) -m ruff
 MYPY ?= $(PYTHON) -m mypy
 
-.PHONY: help install install-standard install-dev install-all install-audio install-docs test test-cov test-fast test-full test-full-no-cov lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report docs docs-serve changelog release web web-api graph-stats graph-export
+.PHONY: help install install-standard install-dev install-all install-audio install-docs test test-cov test-fast test-full test-full-no-cov lint format format-check typecheck check clean build docker-build docker-up docker-down docker-all docker-api docker-bench bench bench-report bench-save bench-check docs docs-serve changelog release web web-api graph-stats graph-export
 
 # 默认目标
 help: ## 显示帮助信息
@@ -98,6 +98,19 @@ bench-report: ## 运行基准测试并保存报告
 	$(PYTEST) benchmark/ --benchmark-only \
 		--benchmark-json=reports/benchmark-$$(date +%Y%m%d-%H%M%S).json \
 		-v
+
+# DEBT-06：p50/p95 回归对比（先 bench-save 存基线，再 bench-check 守门）
+bench-save: ## 保存基准基线（reports/benchmark-baseline.json）
+	@mkdir -p reports
+	$(PYTEST) benchmark/ --benchmark-only -q \
+		--benchmark-json=reports/benchmark-baseline.json
+
+bench-check: ## 与基线对比，均值劣化超过 25% 视为回归（CI 可用）
+	@[ -f reports/benchmark-baseline.json ] || { echo "缺少基线文件，请先 make bench-save"; exit 1; }
+	$(PYTEST) benchmark/ --benchmark-only -q \
+		--benchmark-json=reports/benchmark-current.json \
+		--benchmark-compare=reports/benchmark-baseline.json \
+		--benchmark-compare-fail=mean:25%
 
 # 文档
 docs: ## 构建 MkDocs 文档（strict 模式，与 CI docs.yml 一致）

@@ -79,6 +79,7 @@ def span(name: str, **attrs: Any) -> Generator[SpanContext, None, None]:
     """创建一个子 span。
 
     在 trace_request 上下文内使用，记录操作名称和属性。
+    结束时尝试桥接到 OpenTelemetry（OBS-02，未启用时零开销）。
 
     Args:
         name: span 名称（如 "retrieval", "llm_generate"）
@@ -87,6 +88,10 @@ def span(name: str, **attrs: Any) -> Generator[SpanContext, None, None]:
     Yields:
         SpanContext 包含 span_id 和 trace_id
     """
+    import time
+
+    from dochris.observability.otel_exporter import export_span
+
     trace_id = _current_trace_id.get("")
     span_id = generate_span_id()
 
@@ -107,10 +112,16 @@ def span(name: str, **attrs: Any) -> Generator[SpanContext, None, None]:
         trace_id,
         attrs,
     )
+    start_monotonic = time.monotonic()
 
     try:
         yield SpanContext(span_id=span_id, trace_id=trace_id)
     finally:
         if stack is not None and stack and stack[-1] == name:
             stack.pop()
+        duration_ms = (time.monotonic() - start_monotonic) * 1000
         logger.debug("span:end name=%s span_id=%s", name, span_id)
+        try:
+            export_span(name, trace_id, span_id, duration_ms, attrs)
+        except Exception:  # noqa: BLE001 - 观测桥接失败不影响主流程
+            pass

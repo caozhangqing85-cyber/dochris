@@ -98,6 +98,24 @@ docker compose --profile api up -d --build
 
 此外：以当前认证模型（单机 `DOCHRIS_ALLOW_UNAUTHENTICATED=true`）**不应开放公网多用户访问**。
 
+## 失败恢复、重试与回滚契约（SEC-06）
+
+| 失败场景 | 系统行为 | 恢复手段 |
+|---|---|---|
+| 后台编译中进程崩溃 | 任务在重启后按 lease 状态标记为 `interrupted`（SQLite 仓库要求 lease 过期；他人有效 lease 不抢占），错误摘要脱敏入库 | `POST /compile/jobs/{id}/retry` 以原参数重试；`GET /compile/jobs/{id}/failures` 下载失败明细 |
+| 单文档编译失败 | 其余文档继续；任务终态 `completed_with_errors`，`failed_files`/`failure_details` 可查 | 修复诱因后 retry（只重编 `status=ingested` 的文档）；单文档可用 recompile |
+| 编译超时 | 任务级预算（`DOCHRIS_COMPILE_TIMEOUT_SECONDS`）到期标记 `failed`，错误注明预算值 | 调大预算后 retry |
+| 客户端重复提交编译 | `Idempotency-Key` 命中已有任务时直接返回原任务，不重复执行 | — |
+| 向量检索不可用 | `mode=vector` 返回类型化错误；`combined` 降级为关键词检索并发 warning | 修复向量库后自动恢复；期间查询不中断 |
+| 存储迁移出错 | 迁移前强制备份；支持 rollback 恢复 | `kb storage` 的 dry-run → apply → rollback 流程 |
+| 晋升/重置误操作 | 两者均提供 preview（`/promote/{id}/preview`、`reset-failed?preview=true`）先行确认 | 晋升产物可用文件备份恢复；建议操作前备份工作区 |
+
+约定：
+
+1. 一切"不可直接撤销"的写操作必须先提供 preview/diff（SEC-05）。
+2. 任务历史（`data/compile-jobs.db`）跨重启保留，终态任务受 `max_history` 约束滚动清理，活动任务永不清除。
+3. 错误对外的文本一律经过脱敏（无 API key / Bearer / 本机路径），见 `core/error_sanitizer.py`。
+
 ## RAG 质量门槛（RAG-12）
 
 在默认开启 Reranker 或语义分块等"质量增强"能力之前，必须用真实语料基线证明收益。

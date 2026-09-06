@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, MessageSquare } from 'lucide-react'
-import { getCandidates, promoteCandidate, discardCandidate } from '@/lib/api'
-import type { CandidateMeta } from '@/lib/api'
+import { getCandidates, getCandidateDetail, promoteCandidate, discardCandidate } from '@/lib/api'
+import type { CandidateDetail, CandidateMeta } from '@/lib/api'
 import { classifyRequestError, type RequestErrorInfo } from '@/lib/errors'
 import { withMinDelay } from '@/lib/utils'
 import PageHeader from '@/components/ui/PageHeader'
@@ -20,6 +20,22 @@ export default function CandidatesPage() {
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
   const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
+  const [detail, setDetail] = useState<CandidateDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  // UX-03：展开候选详情（全文/来源/冲突/晋升 diff）
+  const openDetail = useCallback(async (id: string) => {
+    if (detail?.id === id) { setDetail(null); return }
+    setDetailLoading(true); setDetail(null)
+    try {
+      setDetail(await getCandidateDetail(id))
+    } catch (e) {
+      setMsg((e as Error).message)
+      setTimeout(() => setMsg(''), 2500)
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [detail])
 
   const loadCandidates = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
@@ -146,7 +162,12 @@ export default function CandidatesPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <MessageSquare size={14} style={{ color: 'var(--color-primary)' }} />
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.query || c.title}</span>
+                    <button onClick={() => { void openDetail(c.id) }}
+                      title="查看全文 / 来源 / 冲突 / 晋升 diff"
+                      style={{ fontWeight: 600, color: 'var(--text-primary)', background: 'transparent',
+                        border: 'none', padding: 0, cursor: 'pointer', fontSize: 'inherit' }}>
+                      {c.query || c.title}
+                    </button>
                     <span style={{ fontSize: 'var(--text-xs)', padding: '2px 6px', borderRadius: '4px',
                       color: STATUS_META[c.status]?.color, background: 'var(--bg-elevated)' }}>
                       {STATUS_META[c.status]?.label || c.status}
@@ -188,6 +209,60 @@ export default function CandidatesPage() {
                   )}
                 </div>
               </div>
+
+              {/* UX-03：候选详情（全文 / 来源 / 冲突 / 晋升 diff） */}
+              {detailLoading && detail?.id !== c.id && (
+                <div style={{ marginTop: '10px', fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>
+                  加载详情…
+                </div>
+              )}
+              {detail?.id === c.id && (
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                  {detail.contradiction && (detail.contradiction as { has_contradiction?: boolean }).has_contradiction && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px',
+                      fontSize: 'var(--text-xs)', color: 'var(--status-warning)' }}>
+                      <AlertTriangle size={12} />
+                      检测到与现有知识可能矛盾：
+                      {(detail.contradiction as { conflicts?: Array<{ summary?: string }> }).conflicts?.map((c2, i2, arr) => (
+                        <span key={i2}>{c2?.summary || '未知冲突'}{i2 < arr.length - 1 ? '；' : ''}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)', marginBottom: '6px' }}>
+                    来源：{(detail.source_manifest_ids?.length ? detail.source_manifest_ids.join('、') : '无 manifest 关联')}
+                    {detail.file ? ` · 文件 ${detail.file}` : ''}
+                  </div>
+                  <pre style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: '6px',
+                    background: 'var(--bg-elevated)', fontSize: 'var(--text-xs)', lineHeight: 1.6,
+                    color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    maxHeight: '260px', overflow: 'auto' }}>
+                    {detail.full_text || detail.answer_preview || '（无内容）'}
+                  </pre>
+                  {detail.status === 'candidate' && detail.promote_plan && (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>确认后将写入（最终 diff）：</div>
+                      {detail.promote_plan.blockers?.length > 0 && (
+                        <div style={{ color: 'var(--status-error)', marginBottom: '4px' }}>
+                          阻塞：{detail.promote_plan.blockers.join('；')}
+                        </div>
+                      )}
+                      <ul style={{ margin: 0, paddingInlineStart: '18px' }}>
+                        {detail.promote_plan.changes.map((change) => (
+                          <li key={change.path}>
+                            <span style={{
+                              color: change.action === 'overwrite' ? 'var(--status-warning)' : 'var(--status-success)',
+                              fontWeight: 600,
+                            }}>
+                              {change.action === 'overwrite' ? '覆盖' : change.action === 'identical' ? '相同' : '新增'}
+                            </span>
+                            {' '}{change.path}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

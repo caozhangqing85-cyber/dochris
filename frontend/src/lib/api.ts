@@ -543,6 +543,19 @@ export interface CandidateMeta {
 }
 export const getCandidates = (status?: 'candidate' | 'promoted' | 'discarded', needsReviewOnly: boolean = false) =>
   request<{ candidates: CandidateMeta[]; total: number }>('/candidates' + (status ? `?status=${status}${needsReviewOnly ? '&needs_review_only=true' : ''}` : ''))
+/** 候选详情（UX-03）：全文 + 来源 + 矛盾 + 晋升最终 diff 计划 */
+export interface CandidateDetail extends CandidateMeta {
+  full_text?: string
+  file?: string
+  answer_preview?: string
+  promoted_to?: string
+  promote_plan?: {
+    changes: Array<{ path: string; action: string; size_bytes?: number }>
+    blockers: string[]
+  }
+}
+export const getCandidateDetail = (candidateId: string) =>
+  request<CandidateDetail>(`/candidates/${encodeURIComponent(candidateId)}`)
 export const promoteCandidate = (candidateId: string) =>
   request<{ success: boolean; reason?: string }>(`/candidates/${candidateId}/promote`, { method: 'POST' })
 export const discardCandidate = (candidateId: string, reason: string = 'manual_discard') =>
