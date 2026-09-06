@@ -1205,12 +1205,16 @@ class TestQualityMonitorCheckAlerts:
             result = check_process_status()
             assert result["running"] is False
 
-    def test_main_no_progress(self, monkeypatch: pytest.MonkeyPatch):
+    def test_main_no_progress(self, monkeypatch: pytest.MonkeyPatch, caplog):
         """main() 无进度数据时提前返回（行 257-259）"""
+        import logging
+
         from dochris.quality.quality_monitor import main
 
         monkeypatch.setattr("dochris.quality.quality_monitor.load_progress", lambda: None)
-        main()  # 不应抛异常
+        with caplog.at_level(logging.ERROR):
+            main()  # 不应抛异常
+        assert any("无法加载进度数据" in record.message for record in caplog.records)
 
 
 class TestSettingsConfigValidate:
@@ -1622,8 +1626,10 @@ class TestQualityMonitorMain:
         captured = capsys.readouterr()
         assert "编译进度" in captured.out
 
-    def test_main_with_severe_alerts(self, monkeypatch: pytest.MonkeyPatch, capsys):
+    def test_main_with_severe_alerts(self, monkeypatch: pytest.MonkeyPatch, capsys, caplog):
         """main() 有严重告警时记录"""
+        import logging
+
         from dochris.quality.quality_monitor import main
 
         progress_data = {"total": 10, "completed": 2, "failed": 8}
@@ -1667,7 +1673,11 @@ class TestQualityMonitorMain:
             lambda: {"running": False, "process_count": 0},
         )
 
-        main()  # 不应抛异常，但会记录严重告警
+        with caplog.at_level(logging.ERROR):
+            main()  # 不应抛异常，但会记录严重告警
+        assert any("严重告警" in record.message for record in caplog.records)
+        output = capsys.readouterr().out
+        assert "编译进度" in output
 
 
 class TestLogUtilsUncovered:

@@ -831,6 +831,7 @@ class TestCleanupClients:
 
         _client_instances.clear()
         cleanup_all_clients()
+        assert _client_instances == []  # 清理后注册表必须为空
 
     def test_cleanup_with_clients(self):
         from dochris.core.llm_client import _client_instances, cleanup_all_clients

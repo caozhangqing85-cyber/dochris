@@ -159,3 +159,10 @@ recursive 尺寸纪律最好，semantic 的语义边界优势需在更长文档�
 复现方式：`eval/golden_questions` 协议 + `dochris.rag.chunking.factory`，
 报告样例见 `reports/`（不入库）。
 
+
+## 可观测性 Dashboard（OBS-03）
+
+`/api/v1/metrics` 暴露 Prometheus 指标（查询/LLM/检索/重排/缓存）。
+Grafana 导入面板：[`monitoring/grafana-dochris-dashboard.json`](../monitoring/grafana-dochris-dashboard.json)，
+覆盖延迟 p50/p95、LLM 错误率、token 用量与成本估算、缓存命中率。
+指标明细见 `src/dochris/observability/metrics.py`。

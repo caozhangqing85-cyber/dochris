@@ -114,3 +114,15 @@ def test_compilation_with_mock_llm():
 - 每次 push 到 `main`
 - 每个 Pull Request
 - 覆盖率报告上传到 Codecov
+
+## coverage_boost 套件审计（DEBT-04/05，2026-09-06）
+
+对 21 个 `test_coverage_boost*.py`（约 7,988 行、560 个测试函数）的 AST 级审计结论：
+
+- **无 `assert True` / 纯 mock 空转**的垃圾测试（此类为 0）；
+- 9 处主动 skip、3 个"不崩即过"的冒烟测试（已全部补上真实断言：
+  `test_main_no_progress`、`test_main_with_severe_alerts`、`test_cleanup_empty`）；
+- 断言密度整体可接受：绝大多数测试函数含 assert 或 patch 结构化上下文。
+
+处置决定：**保留该套件**，不再按领域拆分迁移（DEBT-05）——迁移的收益（文件名可读性）
+低于大规模移动带来的回归风险；后续新增测试一律按领域命名，存量文件随触碰随整理。

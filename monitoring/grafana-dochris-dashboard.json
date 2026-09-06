@@ -1,0 +1,123 @@
+{
+  "title": "Dochris — 查询质量与成本（OBS-03）",
+  "uid": "dochris-overview",
+  "tags": ["dochris"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "查询 QPS（按模式/状态）",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (mode, status) (rate(dochris_query_total[5m]))",
+          "legendFormat": "{{mode}} / {{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "查询延迟 p50 / p95",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(dochris_query_latency_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dochris_query_latency_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "LLM 调用错误率",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(dochris_llm_calls_total{status!=\"success\"}[5m])) / clamp_min(sum(rate(dochris_llm_calls_total[5m])), 0.001)",
+          "legendFormat": "LLM 错误率"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "LLM Token 用量（prompt / completion，5m 速率）",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (type) (rate(dochris_llm_tokens_total[5m]))",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Token 成本估算（按 0.015 元/1k tokens 折算，按实际单价调整）",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(increase(dochris_llm_tokens_total[$__range])) / 1000 * 0.015",
+          "legendFormat": "区间成本（元）"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyCNY" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "检索 / Rerank 延迟 p95",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dochris_retrieval_latency_seconds_bucket[5m])))",
+          "legendFormat": "retrieval p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(dochris_rerank_latency_seconds_bucket[5m])))",
+          "legendFormat": "rerank p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "title": "查询缓存命中率",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "sum(rate(dochris_cache_total{result=\"hit\"}[15m])) / clamp_min(sum(rate(dochris_cache_total[15m])), 0.001)",
+          "legendFormat": "hit rate"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "title": "LLM 延迟 p95（按 provider/model）",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(dochris_llm_latency_seconds_bucket[5m])))",
+          "legendFormat": "{{provider}}/{{model}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    }
+  ]
+}
