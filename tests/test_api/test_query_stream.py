@@ -416,7 +416,7 @@ async def test_stream_errors_are_sanitized_and_traceable() -> None:
     """SSE error 不能把原始异常、绝对路径或本地敏感文本发给客户端。"""
 
     async def failing_answer_stream(*_args: object, **_kwargs: object):
-        raise RuntimeError("failed at /Users/changqing/private/token.txt")
+        raise RuntimeError("failed at /Users/alice/private/token.txt")
         yield "unreachable"
 
     with (

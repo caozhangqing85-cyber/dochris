@@ -92,3 +92,9 @@ site/
 # 本地评测产物（用户语料专属，不入库）
 eval/rag_golden.local.jsonl
 /reports/
+
+# 个人运行时产物（曾误提交，2026-09-06 清理；本地保留不跟踪）
+/log.md
+/index_completion.txt
+/monitoring-reports/
+/cache/
