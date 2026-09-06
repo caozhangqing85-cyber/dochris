@@ -87,6 +87,8 @@ export default function CompilePage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
   const [selectedFile, setSelectedFile] = useState<ManifestItem | null>(null)
+  const [promoting, setPromoting] = useState(false)
+  const [promoteMsg, setPromoteMsg] = useState('')
   const detailCloseRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     if (!selectedFile) return
@@ -100,8 +102,7 @@ export default function CompilePage() {
     requestAnimationFrame(() => detailCloseRef.current?.focus())
     return () => document.removeEventListener('keydown', handleEscape)
   }, [selectedFile])
-  const [promoting, setPromoting] = useState(false)
-  const [promoteMsg, setPromoteMsg] = useState('')
+
   const [page, setPage] = useState(1)
 
   const loadData = useCallback(async (isCancelled: () => boolean = () => false) => {

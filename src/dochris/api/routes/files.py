@@ -22,7 +22,7 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 MAX_FILES = 50
 
 
-@router.post("/files/upload")
+@router.post("/files/upload", response_model=None)
 async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] | JSONResponse:  # noqa: B008
     """上传文件到知识库"""
     if not files:
