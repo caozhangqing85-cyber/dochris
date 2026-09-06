@@ -85,12 +85,17 @@ class JsonJobRepository(JobRepository):
         if self.store_path.is_file():
             try:
                 payload = json.loads(self.store_path.read_text(encoding="utf-8"))
-                if isinstance(payload, dict):
-                    for item in payload.get("jobs", []):
-                        if isinstance(item, dict) and item.get("job_id"):
-                            jobs[str(item["job_id"])] = item
+                parse_failed = not isinstance(payload, dict)
             except (OSError, ValueError):
-                logger.warning("读取 JSON 任务历史失败，重建快照", exc_info=True)
+                parse_failed = True
+            if parse_failed:
+                # 损坏文件先隔离（保留故障证据），再写新快照——禁止静默覆盖
+                logger.warning("读取 JSON 任务历史失败，隔离损坏文件后重建快照", exc_info=True)
+                self._quarantine_corrupt_store()
+            else:
+                for item in payload.get("jobs", []):
+                    if isinstance(item, dict) and item.get("job_id"):
+                        jobs[str(item["job_id"])] = item
         jobs[str(record["job_id"])] = record
         self._write_snapshot(list(jobs.values()))
 
@@ -213,12 +218,17 @@ class SQLiteJobRepository(JobRepository):
             """
         ).fetchone()[0]
         if dups:
-            logger.warning("发现 %d 条重复幂等键的旧任务记录，升级时保留最新一条", dups)
+            # 不删除任务历史：仅把重复行的冲突键置空（保留最新一条持有键），
+            # 历史完整保留且唯一索引可以创建
+            logger.warning(
+                "发现 %d 条重复幂等键的旧任务记录，升级时保留最新一条的键，其余键置空",
+                dups,
+            )
             self._conn.execute("BEGIN IMMEDIATE")
             try:
                 self._conn.execute(
                     """
-                    DELETE FROM compile_jobs
+                    UPDATE compile_jobs SET idempotency_key = NULL
                     WHERE idempotency_key IS NOT NULL
                       AND seq NOT IN (
                           SELECT MAX(seq) FROM compile_jobs
@@ -489,11 +499,25 @@ class SQLiteJobRepository(JobRepository):
             logger.warning("无法读取旧 JSON 任务历史，跳过迁移", exc_info=True)
             return
         records = payload.get("jobs", []) if isinstance(payload, dict) else []
+
+        # 确定性去重：同一幂等键保留文件中最后一条（视为最新），其余键置空后
+        # 照常迁移——历史完整保留，不因唯一索引而丢任务
+        by_key: dict[str, dict[str, Any]] = {}
+        ordered: list[dict[str, Any]] = []
+        for record in records:
+            if not isinstance(record, dict) or not record.get("job_id"):
+                continue
+            key = record.get("idempotency_key")
+            if key:
+                if key in by_key:
+                    demoted = by_key[key]
+                    demoted["idempotency_key"] = None
+                by_key[key] = record
+            ordered.append(record)
+
         imported = 0
         with self._conn:
-            for record in records:
-                if not isinstance(record, dict) or not record.get("job_id"):
-                    continue
+            for record in ordered:
                 self.save(dict(record))
                 imported += 1
         if imported:

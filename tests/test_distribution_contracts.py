@@ -114,7 +114,8 @@ def test_compose_local_dev_auth_is_explicit_and_ports_are_loopback_only() -> Non
     )
     assert services["api"]["ports"] == ["127.0.0.1:${API_PORT:-8000}:8000"]
     assert services["web"]["ports"] == ["127.0.0.1:${WEB_PORT:-3000}:80"]
-    assert services["chromadb"]["ports"] == ["127.0.0.1:${CHROMA_PORT:-8100}:8000"]
+    # 应用使用嵌入式 PersistentClient（数据在 kb-data 卷），无独立 chroma 服务
+    assert "chromadb" not in services
 
 
 @pytest.mark.fast
@@ -192,14 +193,14 @@ def test_cpu_image_preinstalls_cpu_only_torch_before_project_dependencies() -> N
 
 
 @pytest.mark.fast
-def test_chroma_healthcheck_uses_available_shell_and_current_v2_endpoint() -> None:
+def test_compose_has_no_standalone_chroma_server() -> None:
+    """应用使用嵌入式 PersistentClient（kb-data 卷）；独立 chroma 服务是死重，禁止回归。"""
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
-    healthcheck = compose["services"]["chromadb"]["healthcheck"]["test"]
 
-    assert healthcheck[:3] == ["CMD", "bash", "-ec"]
-    assert "/dev/tcp/127.0.0.1/8000" in healthcheck[-1]
-    assert "GET /api/v2/heartbeat HTTP/1.1" in healthcheck[-1]
-    assert '[[ "$$status" == *" 200 "* ]]' in healthcheck[-1]
+    assert "chromadb" not in compose["services"]
+    assert not any("kb-chroma" in str(v) for v in compose.get("volumes", {}))
+    # 数据仍通过 kb-data 持久化
+    assert "kb-data:/app/data" in compose["services"]["api"]["volumes"]
 
 
 @pytest.mark.fast

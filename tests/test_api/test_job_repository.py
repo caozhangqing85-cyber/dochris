@@ -613,10 +613,58 @@ def test_sqlite_upgrade_dedupes_legacy_duplicate_keys(tmp_path: Path) -> None:
 
     repo = SQLiteJobRepository(db_path)
 
-    # 重复键已被去重（保留最新 old-2），且唯一索引生效
+    # 去重策略：保留全部历史；最新 old-2 持有键，old-1 键置空，old-3 不受影响
+    assert repo.get("old-1") is not None, "去重不得删除任务历史"
     found = repo.find_by_idempotency_key("dup")
     assert found is not None and found["job_id"] == "old-2"
+    assert repo.get("old-1")["idempotency_key"] is None
     with pytest.raises(sqlite3.IntegrityError):
         repo.save({**_sample_record("another"), "idempotency_key": "dup"})
-    assert repo.get("old-3") is not None  # 非重复数据不受影响
     repo.close()
+
+
+@pytest.mark.asyncio
+async def test_replaying_completed_key_wins_over_unrelated_active(tmp_path: Path) -> None:
+    """API 回归：旧任务已完成 + 存在无关活动任务 + 重放旧 key → 必须返回原任务。"""
+    db_path = tmp_path / "jobs.db"
+    started_b = asyncio.Event()
+
+    async def runner_a(*, progress_callback: Callable[..., None]) -> None:
+        progress_callback(processed=1, compiled=1, failed=0, current_files=[])
+
+    async def runner_b(*, progress_callback: Callable[..., None]) -> None:
+        started_b.set()
+        await asyncio.Event().wait()
+
+    manager_a = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-a")
+    manager_b = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-b")
+
+    original = manager_a.start(1, runner_a, idempotency_key="key-original")
+    await _wait_terminal(original)
+
+    # 无关任务 B 开始运行（无幂等键）
+    job_b = manager_b.start(2, runner_b)
+    await asyncio.wait_for(started_b.wait(), timeout=1.0)
+    assert job_b.job_id != original.job_id
+
+    # 重放旧 key：必须返回原任务 A，而不是任务 B
+    replayed = manager_a.start(1, runner_b, idempotency_key="key-original")
+    assert replayed.job_id == original.job_id
+    assert replayed.status == "completed"
+
+    await manager_a.close()
+    await manager_b.close()
+
+
+def test_save_quarantines_corrupt_history_before_overwrite(tmp_path: Path) -> None:
+    """损坏 JSON 必须先隔离（保留证据），再写新快照——禁止静默覆盖。"""
+    store = tmp_path / "compile-jobs.json"
+    store.write_text("{corrupted-evidence", encoding="utf-8")
+
+    repo = JsonJobRepository(store)
+    repo.save(_sample_record("fresh"))
+
+    quarantined = list(tmp_path.glob("compile-jobs.corrupt-*.json"))
+    assert len(quarantined) == 1, "损坏文件必须被隔离而不是覆盖"
+    assert quarantined[0].read_text(encoding="utf-8") == "{corrupted-evidence"
+    assert repo.get("fresh") is not None

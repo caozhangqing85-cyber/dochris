@@ -57,11 +57,14 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
         )
 
     manager = _get_compile_job_manager(request)
-    active_job = manager.active()
-    if active_job is not None:
-        return active_job.as_response()
-
     idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
+    # 幂等键优先：带键请求必须先解析幂等语义（重放已完成任务时原样返回该任务），
+    # 不能被无关的当前活动任务截获；仅无键请求走活动互斥早退
+    if idempotency_key is None:
+        active_job = manager.active()
+        if active_job is not None:
+            return active_job.as_response()
+
     try:
         job = manager.start(
             total_to_compile,

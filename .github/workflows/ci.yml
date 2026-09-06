@@ -79,7 +79,8 @@ jobs:
   test-full-coverage:
     name: Full Coverage Gate (push/nightly/manual)
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

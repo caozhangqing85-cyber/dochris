@@ -150,7 +150,18 @@ export default function FilesPage() {
     setUploading(true); setUploadMsg('')
     try {
       const res = await uploadFiles(Array.from(fileList))
-      setUploadMsg(`成功上传 ${res.ingested} 个文件`); await load()
+      await load()
+      // 部分成功契约：分别展示 成功/跳过/失败 与逐文件错误
+      if (res.failed > 0) {
+        const reasons = res.errors?.length ? `，原因：${res.errors.join('；')}` : ''
+        setUploadMsg(
+          `上传完成：成功 ${res.ingested} 个，失败 ${res.failed} 个${reasons}`,
+        )
+      } else if (res.skipped > 0) {
+        setUploadMsg(`上传完成：成功 ${res.ingested} 个，跳过重复 ${res.skipped} 个`)
+      } else {
+        setUploadMsg(`成功上传 ${res.ingested} 个文件`)
+      }
     } catch (err) { setUploadMsg('上传失败: ' + (err as Error).message) }
     finally { setUploading(false) }
   }

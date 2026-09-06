@@ -194,16 +194,16 @@ class CompileJobManager:
             )
             return job
 
-        # 旧仓库（JSON / 无持久化）：保留进程内互斥语义
-        active = self.active()
-        if active is not None:
-            return active
-
-        # JOB-05：幂等键命中时返回已有任务，不重复创建
+        # 旧仓库（JSON / 无持久化）：保留进程内互斥语义。
+        # 幂等解析优先于活动互斥（与 SQLite claim 语义一致）
         if idempotency_key:
             existing = self._find_by_idempotency_key(idempotency_key)
             if existing is not None:
                 return existing
+
+        active = self.active()
+        if active is not None:
+            return active
 
         job = CompileJob(
             total=total,

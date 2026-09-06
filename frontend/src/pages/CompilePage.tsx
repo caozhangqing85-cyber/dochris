@@ -90,17 +90,52 @@ export default function CompilePage() {
   const [promoting, setPromoting] = useState(false)
   const [promoteMsg, setPromoteMsg] = useState('')
   const detailCloseRef = useRef<HTMLButtonElement | null>(null)
+  const detailDialogRef = useRef<HTMLDivElement | null>(null)
+  const selectedTriggerRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (!selectedFile) return
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setSelectedFile(null)
-      setPromoteMsg('')
+    selectedTriggerRef.current = document.activeElement as HTMLElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSelectedFile(null)
+        setPromoteMsg('')
+        return
+      }
+      if (event.key !== 'Tab') return
+      // 焦点锁：Tab 循环限制在弹窗内
+      const dialog = detailDialogRef.current
+      if (!dialog) return
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
-    document.addEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleKeyDown)
     requestAnimationFrame(() => detailCloseRef.current?.focus())
-    return () => document.removeEventListener('keydown', handleEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+      // 关闭后焦点恢复到触发元素
+      selectedTriggerRef.current?.focus()
+    }
   }, [selectedFile])
 
   const [page, setPage] = useState(1)
@@ -845,7 +880,10 @@ export default function CompilePage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'var(--bg-overlay)',
         }} onClick={() => { setSelectedFile(null); setPromoteMsg('') }}>
-          <div style={{
+          <div
+            ref={detailDialogRef}
+            tabIndex={-1}
+            style={{
             width: '100%', maxWidth: '560px', maxHeight: '85vh',
             borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)',
             background: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)',

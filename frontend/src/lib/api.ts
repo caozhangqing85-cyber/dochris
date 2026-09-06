@@ -481,7 +481,7 @@ export async function getManifests(): Promise<ManifestItem[]> {
 }
 
 // ── Files ───────────────────────────────────────────────
-export async function uploadFiles(files: File[]): Promise<{ saved: number; ingested: number; failed: number }> {
+export async function uploadFiles(files: File[]): Promise<{ saved: number; ingested: number; skipped: number; failed: number; errors?: string[] }> {
   const formData = new FormData()
   files.forEach((f) => formData.append('files', f))
   const res = await fetch(`${BASE}/files/upload`, {

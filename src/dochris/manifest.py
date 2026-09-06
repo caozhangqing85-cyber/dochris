@@ -55,18 +55,20 @@ def _workspace_write_lock(workspace_path: Path) -> Iterator[None]:
     lock_path = lock_dir / ".write.lock"
     try:
         import fcntl
-
-        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            with _manifest_lock:
-                yield
-            fcntl.flock(fd, fcntl.LOCK_UN)
-        finally:
-            os.close(fd)
     except ImportError:
+        # 无 fcntl（Windows）：退化为仅进程内锁
         with _manifest_lock:
             yield
+        return
+
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        with _manifest_lock:
+            yield
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
@@ -487,13 +489,21 @@ def get_all_manifests(workspace_path: Path, status: str | None = None) -> list[d
 
 
 def rebuild_index(workspace_path: Path) -> None:
-    """从所有 manifest 文件重建 source_index.csv"""
+    """从所有 manifest 文件重建 source_index.csv（跨进程锁 + 原子替换）"""
+    workspace_path = Path(workspace_path)
+    with _workspace_write_lock(workspace_path):
+        _rebuild_index_unlocked(workspace_path)
+
+
+def _rebuild_index_unlocked(workspace_path: Path) -> None:
     _ensure_dirs(workspace_path)
     index_path = workspace_path / "manifests" / "source_index.csv"
 
     manifests = get_all_manifests(workspace_path)
 
-    with open(index_path, "w", encoding="utf-8", newline="") as f:
+    fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=str(index_path.parent))
+    os.close(fd)
+    with open(tmp_path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
             [
@@ -520,3 +530,4 @@ def rebuild_index(workspace_path: Path) -> None:
                     m["quality_score"],
                 ]
             )
+    os.replace(tmp_path, index_path)
