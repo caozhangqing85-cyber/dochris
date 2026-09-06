@@ -200,8 +200,10 @@ export default function CompilePage() {
 
   const handleCompile = async () => {
     setCompiling(true); setError(''); setResult(null)
+    // 幂等键：同一次提交的网络重放不会创建重复任务
+    const idempotencyKey = crypto.randomUUID()
     try {
-      const res = await startCompile({ limit, concurrency, dry_run: dryRun })
+      const res = await startCompile({ limit, concurrency, dry_run: dryRun }, idempotencyKey)
       setResult(res)
       setCompileJob(res.job_id ? res : null)
       if (res.job_id) {

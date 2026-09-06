@@ -39,6 +39,12 @@ ProgressCallback = Callable[..., None]
 CompileRunner = Callable[..., Awaitable[None]]
 RETRYABLE_STATUSES = frozenset({"failed", "cancelled", "interrupted", "completed_with_errors"})
 DEFAULT_MAX_HISTORY = 200
+
+
+class JobPersistenceError(RuntimeError):
+    """任务持久化失败（fail-closed：此时编译绝不启动）。"""
+
+
 DEFAULT_LEASE_TTL_SECONDS = 300.0
 
 
@@ -158,6 +164,32 @@ class CompileJobManager:
         timeout_seconds: float | None = None,
         idempotency_key: str | None = None,
     ) -> CompileJob:
+        # 支持 BEGIN IMMEDIATE 事务的仓库（SQLite）：原子准入跨进程互斥 + 幂等，
+        # 且插入即持久化（fail-closed：持久化失败时抛错，绝不启动无状态任务）
+        claim = getattr(self._repository, "claim_job", None)
+        if claim is not None:
+            job = CompileJob(
+                total=total,
+                concurrency=concurrency,
+                limit=limit,
+                attempt=attempt,
+                retry_of=retry_of,
+                idempotency_key=idempotency_key,
+            )
+            try:
+                claimed, existing_record = claim(job.to_record(), idempotency_key, ACTIVE_STATUSES)
+            except Exception as exc:
+                raise JobPersistenceError(f"任务持久化失败，编译未启动: {exc}") from exc
+            if not claimed:
+                return CompileJob.from_record(existing_record or job.to_record())
+            self._jobs[job.job_id] = job
+            self._tasks[job.job_id] = asyncio.create_task(
+                self._run(job, runner, timeout_seconds=timeout_seconds),
+                name=f"dochris-compile-{job.job_id}",
+            )
+            return job
+
+        # 旧仓库（JSON / 无持久化）：保留进程内互斥语义
         active = self.active()
         if active is not None:
             return active
@@ -177,7 +209,11 @@ class CompileJobManager:
             idempotency_key=idempotency_key,
         )
         self._jobs[job.job_id] = job
-        self._persist(job)
+        if not self._persist(job):
+            self._jobs.pop(job.job_id, None)
+            raise JobPersistenceError(
+                f"任务持久化失败，编译未启动（仓库: {type(self._repository).__name__ if self._repository else 'None'}）"
+            )
         self._tasks[job.job_id] = asyncio.create_task(
             self._run(job, runner, timeout_seconds=timeout_seconds),
             name=f"dochris-compile-{job.job_id}",
@@ -392,14 +428,17 @@ class CompileJobManager:
                         logger.warning("无法持久化中断恢复结果", exc_info=True)
         _ = pruned
 
-    def _persist(self, job: CompileJob) -> None:
+    def _persist(self, job: CompileJob) -> bool:
+        """持久化单任务；返回是否成功（start 路径 fail-closed 依赖该返回值）。"""
         self._prune_history()
         if self._repository is None:
-            return
+            return True
         try:
             self._repository.save(job.to_record())
         except Exception:
             logger.warning("无法保存编译任务 %s", job.job_id, exc_info=True)
+            return False
+        return True
 
     def _prune_history(self) -> bool:
         """Keep bounded terminal history while never discarding an active job."""

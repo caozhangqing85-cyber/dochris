@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from dochris.api.compile_jobs import CompileJobManager
+from dochris.api.compile_jobs import CompileJobManager, JobPersistenceError
 from dochris.api.job_repository import build_repository
 from dochris.api.schemas import (
     CompileJobFailuresResponse,
@@ -62,18 +62,25 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
         return active_job.as_response()
 
     idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
-    job = manager.start(
-        total_to_compile,
-        lambda **kwargs: _run_compile_task(
-            req.concurrency,
-            req.limit,
-            **kwargs,
-        ),
-        concurrency=req.concurrency,
-        limit=req.limit,
-        timeout_seconds=_compile_timeout_seconds(),
-        idempotency_key=idempotency_key,
-    )
+    try:
+        job = manager.start(
+            total_to_compile,
+            lambda **kwargs: _run_compile_task(
+                req.concurrency,
+                req.limit,
+                **kwargs,
+            ),
+            concurrency=req.concurrency,
+            limit=req.limit,
+            timeout_seconds=_compile_timeout_seconds(),
+            idempotency_key=idempotency_key,
+        )
+    except JobPersistenceError as exc:
+        logger.error("编译任务持久化失败: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="任务持久化失败，编译未启动（磁盘/数据库异常），请检查服务端日志后重试",
+        ) from exc
     await asyncio.sleep(0)
 
     return job.as_response().model_copy(

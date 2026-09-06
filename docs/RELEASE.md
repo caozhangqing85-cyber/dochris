@@ -9,7 +9,7 @@
 | Python | 3.11、3.12（CI 双版本矩阵；3.13 可运行但 FAISS/SWIG 有弃用警告） |
 | 操作系统 | Linux x86_64（CI/镜像）、macOS arm64（CI 安装 smoke） |
 | Docker | 任意支持 Compose v2 的运行时；镜像基于 python:3.11-slim 与 node:22 |
-| 浏览器 | 现代常青浏览器（React 18 + Vite 构建） |
+| 浏览器 | 现代常青浏览器（React 19 + Vite 构建） |
 | 发布渠道 | PyPI（Trusted Publishing）、GitHub Release（wheel/sdist/checksums/SBOM） |
 
 ## 发布门禁（必须全部通过）
@@ -74,7 +74,7 @@ docker compose --profile api up -d --build   # 命名卷数据保留
 
 - 升级前建议备份工作区（`manifests/`、`outputs/`、`wiki/`、`curated/`、`data/`）。
 - 存储格式变更由 `kb storage` 迁移子命令处理：先 `--dry-run` 审计，确认备份后 `--apply`。
-- 编译任务历史（`data/compile-jobs.json`）向后兼容；服务重启时进行中的任务会被标记为 `interrupted`（可重试）。
+- 编译任务历史默认存于 `data/compile-jobs.db`（SQLite WAL，`DOCHRIS_JOB_STORE=json` 可回退 JSON）；服务重启时进行中的任务按 lease 状态标记为 `interrupted`（可重试）。
 
 ## 回滚（Rollback）
 

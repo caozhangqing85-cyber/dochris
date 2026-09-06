@@ -4,6 +4,7 @@ import {
   LayoutDashboard, FolderOpen, PlayCircle, Search,
   Target, Activity, Share2, Settings, Menu, X, FileEdit,
 } from 'lucide-react'
+import { getStatus } from '@/lib/api'
 
 const mainNav = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
@@ -21,6 +22,13 @@ const toolNav = [
 ]
 
 export default function AppLayout() {
+  // 侧栏版本号：从 /status 动态获取，避免硬编码漂移
+  const [appVersion, setAppVersion] = useState('')
+  useEffect(() => {
+    let alive = true
+    getStatus().then((s) => { if (alive && s.version) setAppVersion(s.version) }).catch(() => undefined)
+    return () => { alive = false }
+  }, [])
   const [mobileMenuState, setMobileMenuState] = useState({ open: false, pathname: '' })
   const location = useLocation()
   const mobileOpen = mobileMenuState.open && mobileMenuState.pathname === location.pathname
@@ -155,7 +163,7 @@ export default function AppLayout() {
         borderTop: '1px solid var(--border-subtle)',
         fontSize: '12px', color: 'var(--text-dimmed)', fontWeight: 400,
       }}>
-        v1.4.0
+        {appVersion ? `v${appVersion}` : ''}
       </div>
     </>
   )

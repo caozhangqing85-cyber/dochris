@@ -95,7 +95,11 @@ async def query_knowledge_base(
         raise HTTPException(status_code=503, detail=f"{exc.code}: {exc.message}") from exc
     except Exception as exc:
         logger.exception("查询失败")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # 与 SSE 链路对齐：不向浏览器透传内部异常细节，凭 trace_id 关联日志
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询失败，请查看服务端日志（trace_id={get_current_trace_id() or '无'}）",
+        ) from exc
 
     return QueryResponse(
         query=result["query"],

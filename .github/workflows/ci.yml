@@ -8,6 +8,7 @@ on:
   schedule:
     - cron: "0 19 * * *"
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -144,12 +145,14 @@ jobs:
           push: false
           load: true
           tags: dochris:api-ci
+          build-args: |
+            BUILD_TARGET=api
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Smoke test API image
         run: |
-          docker run -d --name dochris-api-smoke -p 8000:8000 \
-            -e DOCHRIS_ALLOW_UNAUTHENTICATED=true dochris:api-ci
+          # 默认 CMD 是 kb --help（立即退出）；API 镜像必须以 uvicorn 启动验证
+          docker run -d --name dochris-api-smoke -p 8000:8000             -e DOCHRIS_ALLOW_UNAUTHENTICATED=true             dochris:api-ci             uvicorn dochris.api.app:app --host 0.0.0.0 --port 8000
           for i in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
               echo "API healthy"; docker rm -f dochris-api-smoke >/dev/null; exit 0
@@ -209,6 +212,17 @@ jobs:
         run: curl --fail --silent "http://127.0.0.1:8000/api/v1/status" >/dev/null
       - name: Stop and keep volumes
         run: docker compose --profile api down
+
+  docs:
+    name: Docs (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[docs]"
+      - run: mkdocs build --strict
 
   security:
     name: Security

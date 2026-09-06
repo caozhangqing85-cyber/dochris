@@ -16,40 +16,15 @@ permissions:
   id-token: write
 
 jobs:
-  release-gate:
-    name: Release Gate (lint + typecheck + fast + integration)
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip install ruff mypy
-      - run: pip install -e ".[dev,standard]"
-      - name: Lint
-        run: |
-          ruff check src/ tests/
-          ruff format --check src/ tests/
-      - name: Typecheck
-        run: mypy src/dochris/
-      - name: Fast tests
-        run: pytest tests/ -q -m "fast" --no-cov
-      - name: Integration-critical suites
-        run: |
-          pytest tests/test_write_path_e2e.py \
-                 tests/test_storage_migration.py \
-                 tests/test_api/ \
-                 tests/test_distribution_contracts.py \
-                 tests/test_openai_compat_real_transport.py \
-                 --tb=short -q --no-cov
+  # 完整 CI 门禁：lint/typecheck/fast/integration + 前端全套 + API/Web 镜像构建与
+  # API smoke + Compose 栈 E2E + docs strict（与 docs/RELEASE.md 的承诺一致）
+  ci:
+    name: Release Gate (full CI)
+    uses: ./.github/workflows/ci.yml
 
   build:
     name: Build sdist / wheel / SBOM / checksums
-    needs: [release-gate]
+    needs: [ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +103,7 @@ jobs:
 
   github-release:
     name: Attach artifacts to GitHub Release
-    needs: [build, install-smoke]
+    needs: [build, install-smoke, ci]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -147,7 +122,7 @@ jobs:
 
   publish:
     name: Publish to PyPI (Trusted Publishing)
-    needs: [build, install-smoke, github-release]
+    needs: [ci, build, install-smoke, github-release]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

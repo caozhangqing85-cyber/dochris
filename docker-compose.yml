@@ -37,6 +37,7 @@ services:
     volumes:
       - kb-data:/app/data
       - kb-raw:/app/raw
+      - kb-uploads:/app/uploads
       - kb-outputs:/app/outputs
       - kb-wiki:/app/wiki
       - kb-curated:/app/curated
@@ -105,6 +106,7 @@ services:
     volumes:
       - kb-data:/app/data
       - kb-raw:/app/raw
+      - kb-uploads:/app/uploads
       - kb-outputs:/app/outputs
       - kb-wiki:/app/wiki
       - kb-curated:/app/curated
@@ -227,6 +229,8 @@ services:
 # 命名卷
 # ============================================================
 volumes:
+  kb-uploads:
+    name: dochris-uploads
   kb-data:
     name: dochris-data
   kb-raw:

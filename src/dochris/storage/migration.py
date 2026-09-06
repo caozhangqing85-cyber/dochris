@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 from dataclasses import asdict, dataclass
@@ -331,3 +332,75 @@ def rollback_storage_migration(
         shutil.copy2(backup_file, original)
         restored += 1
     return StorageRollbackResult(restored=restored, skipped=skipped)
+
+
+def repair_uploads_symlinks(workspace: Path | str) -> dict[str, int]:
+    """修复 raw/ 下指向 uploads/inbox 的绝对软链（2026-09 上传持久化迁移）。
+
+    历史行为：Web 上传把实体写入 ``uploads/inbox``，raw/ 保存指向它的绝对
+    软链；容器重建后 uploads 卷丢失会导致 raw 全部断链。修复策略是把实体
+    迁回 raw/（持久卷），并在 inbox 建立指向 raw 的反向软链。
+
+    幂等：已修复（raw 为真实文件 / 链接已指向 raw）的条目自动跳过。
+
+    Returns:
+        {"scanned": 扫描的软链数, "repaired": 修复数, "broken_recovered": 从断链恢复数}
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    ws = Path(workspace)
+    raw_dir = ws / "raw"
+    inbox_dir = ws / "uploads" / "inbox"
+    inbox_dir.mkdir(parents=True, exist_ok=True)
+
+    scanned = repaired = recovered = 0
+    if not raw_dir.is_dir():
+        return {"scanned": 0, "repaired": 0, "broken_recovered": 0}
+
+    for link in sorted(raw_dir.rglob("*")):
+        if not link.is_symlink():
+            continue
+        scanned += 1
+        try:
+            target = Path(os.path.realpath(link, strict=False))
+        except OSError:
+            continue
+
+        entity_moved = False
+        if target.is_file() and _is_under(target, ws / "uploads"):
+            # 实体在 uploads：迁到 raw 原位，再把 inbox 链回来
+            tmp = link.with_name(link.name + ".migrating")
+            try:
+                os.replace(target, tmp)
+                os.replace(tmp, link)
+                entity_moved = True
+                repaired += 1
+            except OSError:
+                logger.warning("迁移上传实体失败: %s", link, exc_info=True)
+                continue
+        elif not target.exists():
+            # 断链：实体已丢。无法恢复内容，只记录（由用户重新上传）。
+            logger.warning("raw 软链目标缺失（需重新上传）: %s -> %s", link, target)
+            continue
+
+        if entity_moved:
+            # inbox 反向软链（best-effort）
+            inbox_link = inbox_dir / link.name
+            try:
+                if inbox_link.is_symlink() or inbox_link.exists():
+                    inbox_link.unlink()
+                os.symlink(str(link.resolve()), str(inbox_link))
+            except OSError:
+                logger.debug("inbox 反向软链创建失败: %s", link.name, exc_info=True)
+
+        _ = recovered
+    return {"scanned": scanned, "repaired": repaired, "broken_recovered": recovered}
+
+
+def _is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False

@@ -21,6 +21,16 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Run non-blocking startup work without deprecated event hooks."""
+    # 上传持久化迁移（2026-09）：把 raw 下指向 uploads 的绝对软链反转，
+    # 防止容器重建后 uploads 丢失造成断链；失败不阻塞启动
+    try:
+        from dochris.storage.migration import repair_uploads_symlinks
+
+        stats = repair_uploads_symlinks(get_settings().workspace)
+        if stats["repaired"]:
+            logger.info("uploads 软链迁移完成: %s", stats)
+    except Exception:
+        logger.warning("uploads 软链迁移跳过", exc_info=True)
     await _preload_embedding_model()
     try:
         yield
@@ -62,7 +72,7 @@ def create_app() -> FastAPI:
         allow_origins=_get_cors_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+        allow_headers=["Authorization", "Content-Type", "X-API-Key", "Idempotency-Key"],
     )
 
     # 可观测性：trace_id 中间件（CORS → tracing → auth）
@@ -79,7 +89,20 @@ def create_app() -> FastAPI:
         idempotency_key = request.headers.get("Idempotency-Key", "")
         if request.method != "GET":
             request.state.operation_id = operation_id
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            # 审计盲区修复：未处理异常也必须留痕，再原样抛给框架
+            record_operation(
+                operation_id=operation_id,
+                method=request.method,
+                path=request.url.path,
+                client=request.client.host if request.client else "",
+                trace_id="",
+                idempotency_key=idempotency_key,
+                status_code=500,
+            )
+            raise  # noqa: TRY201 - 保持原始异常与上下文
         if request.method != "GET":
             response.headers["X-Operation-ID"] = operation_id
             record_operation(

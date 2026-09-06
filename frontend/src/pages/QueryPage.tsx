@@ -561,7 +561,7 @@ export default function QueryPage() {
             abortRef.current = null
           }
           try {
-            const res = await queryKnowledge(queryText, useMode, topK)
+            const res = await queryKnowledge(queryText, useMode, topK, rerank)
             const elapsedSec = (Date.now() - start) / 1000
             setElapsed(Math.round(elapsedSec * 10) / 10)
             setResult(res)
@@ -591,7 +591,7 @@ export default function QueryPage() {
       setCancellable(false)
       // 非 combined 模式使用传统查询
       try {
-        const res = await queryKnowledge(queryText, useMode, topK)
+        const res = await queryKnowledge(queryText, useMode, topK, rerank)
         const elapsedSec = (Date.now() - start) / 1000
         setElapsed(Math.round(elapsedSec * 10) / 10)
         setResult(res)

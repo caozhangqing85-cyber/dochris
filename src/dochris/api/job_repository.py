@@ -175,18 +175,21 @@ class SQLiteJobRepository(JobRepository):
         heartbeat_at TEXT,
         record TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_compile_jobs_idem ON compile_jobs(idempotency_key);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_compile_jobs_idem
+        ON compile_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL;
     """
 
     def __init__(self, db_path: Path, *, migrate_from: Path | None = None) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        # isolation_level=None → 显式事务（claim 的 BEGIN IMMEDIATE 需要跨进程写互斥）
+        self._conn = sqlite3.connect(
+            str(self.db_path), check_same_thread=False, isolation_level=None
+        )
         self._conn.row_factory = sqlite3.Row
-        with self._conn:
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA synchronous=NORMAL")
-            self._conn.executescript(self._SCHEMA)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.executescript(self._SCHEMA)
         if migrate_from is not None:
             self._migrate_from_json(Path(migrate_from))
 
@@ -264,6 +267,90 @@ class SQLiteJobRepository(JobRepository):
     def delete(self, job_id: str) -> None:
         with self._conn:
             self._conn.execute("DELETE FROM compile_jobs WHERE job_id = ?", (job_id,))
+
+    # -- 原子任务准入（多进程互斥 + 幂等）--------------------------
+
+    def claim_job(
+        self,
+        record: dict[str, Any],
+        idempotency_key: str | None,
+        active_statuses: frozenset[str] | set[str],
+    ) -> tuple[bool, dict[str, Any] | None]:
+        """事务化任务准入：BEGIN IMMEDIATE 下一次完成互斥检查与插入。
+
+        拒绝条件（返回 (False, 已存在任务)）：
+        1. 库中已有活动任务（queued/running/cancelling 且 lease 未过期）——
+           跨进程互斥，防止多个 API worker 同时接受编译；
+        2. 幂等键命中既有任务。
+
+        Raises:
+            sqlite3.Error: 持久化失败（磁盘满/锁超时等）——调用方应 fail-closed。
+        """
+        placeholders = ", ".join("?" for _ in active_statuses)
+        now = _utc_now_iso()
+        job_id = str(record["job_id"])
+        payload = json.dumps(record, ensure_ascii=False)
+
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            blocking = self._conn.execute(
+                f"""
+                SELECT record FROM compile_jobs
+                WHERE status IN ({placeholders})
+                  AND (lease_expires_at IS NULL OR lease_expires_at > ?)
+                LIMIT 1
+                """,
+                (*active_statuses, now),
+            ).fetchone()
+            if blocking is not None:
+                self._conn.execute("ROLLBACK")
+                return False, self._loads_or_none(blocking["record"])
+
+            if idempotency_key:
+                dup = self._conn.execute(
+                    """
+                    SELECT record FROM compile_jobs
+                    WHERE idempotency_key = ? ORDER BY seq DESC LIMIT 1
+                    """,
+                    (idempotency_key,),
+                ).fetchone()
+                if dup is not None:
+                    self._conn.execute("ROLLBACK")
+                    return False, self._loads_or_none(dup["record"])
+
+            self._conn.execute(
+                """
+                INSERT INTO compile_jobs
+                    (job_id, idempotency_key, status, lease_owner,
+                     lease_expires_at, heartbeat_at, record)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    job_id,
+                    idempotency_key,
+                    str(record.get("status", "")),
+                    record.get("lease_owner"),
+                    record.get("lease_expires_at"),
+                    record.get("heartbeat_at"),
+                    payload,
+                ),
+            )
+            self._conn.execute("COMMIT")
+            return True, None
+        except Exception:
+            try:
+                self._conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
+
+    @staticmethod
+    def _loads_or_none(raw: Any) -> dict[str, Any] | None:
+        try:
+            result: dict[str, Any] = json.loads(raw)
+            return result
+        except (TypeError, ValueError):
+            return None
 
     # -- lease 恢复（JOB-05）--------------------------------------
 

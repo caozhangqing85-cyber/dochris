@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
@@ -24,6 +24,8 @@ MAX_FILES = 50
 @router.post("/files/upload")
 async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]:  # noqa: B008
     """上传文件到知识库"""
+    if not files:
+        return {"error": "未收到任何文件（需要 multipart/form-data 编码）"}
     if len(files) > MAX_FILES:
         return {"error": f"单次最多上传 {MAX_FILES} 个文件"}
 
@@ -53,16 +55,25 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]: 
                 failed.append(f"{original_name}: 文件过大（{declared_size} 字节）")
                 continue
 
-            # 读取上传文件到临时位置
-            inbox_dst = resolve_path_conflict(inbox_dir, original_name, logger)
-            if inbox_dst is None:
-                failed.append(f"{original_name}: 文件名冲突过多")
+            # 实体文件直接写入持久卷 raw/<category>/（修复容器重建后
+            # uploads 丢失导致 raw 软链断链的数据丢失风险）；
+            # uploads/inbox 仅保留指向 raw 的软链以兼容 inbox 工作流。
+            category = get_file_category(Path(original_name).suffix.lower())
+            if category is None:
+                failed.append(f"{original_name}: 不支持的文件类型")
+                continue
+
+            managed_dir = raw_dir / category
+            managed_dir.mkdir(parents=True, exist_ok=True)
+            managed_path = resolve_path_conflict(managed_dir, original_name, logger)
+            if managed_path is None:
+                failed.append(f"{original_name}: raw 目录冲突")
                 continue
 
             # 分块流式写入，边写边累计大小，超限即中止删除（防大文件 OOM）
             too_large = False
             written = 0
-            with open(inbox_dst, "wb") as f:
+            with open(managed_path, "wb") as f:
                 while True:
                     chunk = await upload.read(1024 * 1024)  # 1MB 分块
                     if not chunk:
@@ -75,51 +86,40 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any]: 
 
             if too_large:
                 failed.append(f"{original_name}: 文件过大")
-                inbox_dst.unlink(missing_ok=True)
+                managed_path.unlink(missing_ok=True)
                 continue
 
             file_size = written
             if file_size == 0:
                 failed.append(f"{original_name}: 空文件")
-                inbox_dst.unlink(missing_ok=True)
+                managed_path.unlink(missing_ok=True)
                 continue
 
-            content_hash = file_hash(inbox_dst)
+            content_hash = file_hash(managed_path)
             if content_hash and content_hash in existing_hashes:
                 skipped += 1
-                inbox_dst.unlink(missing_ok=True)
+                managed_path.unlink(missing_ok=True)
                 continue
 
-            category = get_file_category(inbox_dst.suffix.lower())
-            if category is None:
-                failed.append(f"{original_name}: 不支持的文件类型")
-                inbox_dst.unlink(missing_ok=True)
-                continue
-
-            managed_dir = raw_dir / category
-            managed_dir.mkdir(parents=True, exist_ok=True)
-            managed_path = resolve_path_conflict(managed_dir, inbox_dst.name, logger)
-            if managed_path is None:
-                failed.append(f"{original_name}: raw 目录冲突")
-                continue
-
-            # 优先符号链接
-            try:
-                os.symlink(str(inbox_dst.resolve()), str(managed_path))
-            except (OSError, NotImplementedError):
-                shutil.copy2(inbox_dst, managed_path)
+            # inbox 软链指向 raw 实体（方向与旧版相反：raw 才是持久真身）
+            inbox_dst = inbox_dir / managed_path.name
+            if not inbox_dst.exists():
+                try:
+                    os.symlink(str(managed_path.resolve()), str(inbox_dst))
+                except OSError:
+                    logger.debug(f"inbox 软链创建失败（不影响数据）: {inbox_dst.name}")
 
             rel_path = str(managed_path.relative_to(workspace))
             src_id = get_next_src_id(workspace)
             create_manifest(
                 workspace_path=workspace,
                 src_id=src_id,
-                title=inbox_dst.name,
+                title=managed_path.name,
                 file_type=category,
-                source_path=inbox_dst.resolve(),
+                source_path=managed_path.resolve(),
                 file_path=rel_path,
                 content_hash=content_hash or "",
-                size_bytes=inbox_dst.stat().st_size,
+                size_bytes=managed_path.stat().st_size,
             )
             existing_hashes.add(content_hash)
             saved += 1

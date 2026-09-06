@@ -178,8 +178,8 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export const getStatus = () => request<StatusResponse>('/status')
 
 // ── Query ───────────────────────────────────────────────
-export const queryKnowledge = (q: string, mode = 'combined', topK = 5) =>
-  request<QueryResponse>(`/query?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}`)
+export const queryKnowledge = (q: string, mode = 'combined', topK = 5, rerank = false) =>
+  request<QueryResponse>(`/query?q=${encodeURIComponent(q)}&mode=${mode}&top_k=${topK}${rerank ? '&rerank=true' : ''}`)
 
 export interface ContributionMeta {
   id: string
@@ -450,8 +450,12 @@ function dispatchEvent(
 }
 
 // ── Compile ─────────────────────────────────────────────
-export const startCompile = (body: CompileRequest) =>
-  request<CompileResponse>('/compile', { method: 'POST', body: JSON.stringify(body) })
+export const startCompile = (body: CompileRequest, idempotencyKey?: string) =>
+  request<CompileResponse>('/compile', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  })
 export const getCurrentCompileJob = () => request<CompileResponse>('/compile/jobs/current')
 export const getCompileJobs = (limit = 20) =>
   request<CompileResponse[]>(`/compile/jobs?limit=${encodeURIComponent(limit)}`)

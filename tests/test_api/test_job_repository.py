@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dochris.api.compile_jobs import CompileJobManager
+from dochris.api.compile_jobs import CompileJobManager, JobPersistenceError
 from dochris.api.job_repository import (
     JsonJobRepository,
     SQLiteJobRepository,
@@ -136,15 +136,56 @@ def test_sqlite_keeps_valid_foreign_lease_running(tmp_path: Path) -> None:
     repo.close()
 
 
-def test_sqlite_find_by_idempotency_key_returns_newest(tmp_path: Path) -> None:
+def test_sqlite_idempotency_key_is_unique(tmp_path: Path) -> None:
+    """幂等键带部分唯一约束：不同任务不能共享同一键（原子准入的兜底）。"""
+    import sqlite3
+
     repo = SQLiteJobRepository(tmp_path / "jobs.db")
-    repo.save({**_sample_record("old"), "idempotency_key": "op-1"})
-    repo.save({**_sample_record("new", status="completed"), "idempotency_key": "op-1"})
+    repo.save({**_sample_record("first"), "idempotency_key": "op-1"})
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.save({**_sample_record("second"), "idempotency_key": "op-1"})
 
     found = repo.find_by_idempotency_key("op-1")
     assert found is not None
-    assert found["job_id"] == "new"
+    assert found["job_id"] == "first"
     assert repo.find_by_idempotency_key("nope") is None
+    repo.close()
+
+
+def test_claim_job_rejects_when_active_job_exists(tmp_path: Path) -> None:
+    repo = SQLiteJobRepository(tmp_path / "jobs.db")
+    claimed, existing = repo.claim_job(
+        _sample_record("worker-a", status="queued"), None, {"queued", "running", "cancelling"}
+    )
+    assert claimed is True and existing is None
+
+    # 另一个 worker 的准入被活动任务拒绝（lease 未过期）
+    claimed2, existing2 = repo.claim_job(
+        _sample_record("worker-b", status="queued"), "op-2", {"queued", "running", "cancelling"}
+    )
+    assert claimed2 is False
+    assert existing2 is not None and existing2["job_id"] == "worker-a"
+    assert repo.get("worker-b") is None  # 拒绝时不得落库
+    repo.close()
+
+
+def test_claim_job_ignores_expired_lease_when_mutexting(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    repo = SQLiteJobRepository(tmp_path / "jobs.db")
+    expired = (datetime.now(UTC) - timedelta(seconds=5)).isoformat()
+    repo.save(
+        {
+            **_sample_record("stale", status="running"),
+            "lease_owner": "dead-process",
+            "lease_expires_at": expired,
+        }
+    )
+
+    claimed, _ = repo.claim_job(
+        _sample_record("fresh", status="queued"), None, {"queued", "running", "cancelling"}
+    )
+    assert claimed is True  # 过期 lease 不阻塞新任务（自愈）
     repo.close()
 
 
@@ -318,3 +359,62 @@ def test_sqlite_concurrent_writers_serialize(tmp_path: Path) -> None:
     assert repo.get("ext") is not None
     assert repo.get("mine") is not None
     repo.close()
+
+
+@pytest.mark.asyncio
+async def test_cross_process_mutex_second_manager_returns_existing_job(tmp_path: Path) -> None:
+    """两个 manager（模拟两个 API worker）必须互斥：后者拿回前者的任务。"""
+    db_path = tmp_path / "jobs.db"
+    started = asyncio.Event()
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        started.set()
+        await asyncio.Event().wait()
+
+    manager_a = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-a")
+    job_a = manager_a.start(2, runner)
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    manager_b = CompileJobManager(repository=SQLiteJobRepository(db_path), owner_id="worker-b")
+    job_b = manager_b.start(2, runner)
+    assert job_b.job_id == job_a.job_id
+    assert job_b.status == "running"
+
+    await manager_a.close()
+    await manager_b.close()
+
+
+@pytest.mark.asyncio
+async def test_start_is_fail_closed_when_persistence_fails(tmp_path: Path) -> None:
+    """持久化失败时编译绝不启动（JobPersistenceError）。"""
+    from dochris.api.compile_jobs import JobPersistenceError
+
+    repo = SQLiteJobRepository(tmp_path / "jobs.db")
+    manager = CompileJobManager(repository=repo)
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        raise AssertionError("runner 不应被调用")
+
+    with patch.object(repo, "claim_job", side_effect=sqlite3.OperationalError("disk I/O error")):
+        with pytest.raises(JobPersistenceError):
+            manager.start(1, runner)
+
+    assert manager.active() is None
+    assert repo.get.__module__  # repo 仍可用
+    repo.close()
+
+
+@pytest.mark.asyncio
+async def test_legacy_json_start_is_fail_closed_on_save_failure(tmp_path: Path) -> None:
+    store = tmp_path / "compile-jobs.json"
+    manager = CompileJobManager(store_path=store)
+
+    async def runner(*, progress_callback: Callable[..., None]) -> None:
+        raise AssertionError("runner 不应被调用")
+
+    with patch.object(manager._repository, "save", side_effect=OSError("No space left on device")):
+        with pytest.raises(JobPersistenceError):
+            manager.start(1, runner)
+
+    assert manager.active() is None
+    await manager.close()
