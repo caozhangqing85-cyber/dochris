@@ -84,6 +84,8 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
             # （check-then-act 竞态会让两个 worker 交错写坏同一实体）
             managed_path: Path | None = None
             write_fd: int | None = None
+            open_error: str | None = None
+            exhausted = False
             stem, suffix = Path(original_name).stem, Path(original_name).suffix
             candidate = managed_dir / original_name
             for attempt in range(1000):
@@ -94,11 +96,21 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
                 except FileExistsError:
                     candidate = managed_dir / f"{stem}_{attempt + 1}{suffix}"
                 except OSError as e:
-                    failed.append(f"{original_name}: {type(e).__name__}: {e}")
+                    # 脱敏：os.open 错误可能带绝对路径
+                    failed.append(
+                        f"{original_name}: {type(e).__name__}: {sanitize_error_text(str(e))}"
+                    )
+                    open_error = type(e).__name__
                     break
             if managed_path is None or write_fd is None:
-                if managed_path is None and not failed:
+                if open_error is None:
+                    exhausted = True
+                if exhausted:
                     failed.append(f"{original_name}: 文件名冲突过多")
+                elif open_error is not None:
+                    pass  # 错误已在循环内记录
+                else:
+                    failed.append(f"{original_name}: 文件打开失败")
                 continue
 
             # 分块流式写入，边写边累计大小，超限即中止删除（防大文件 OOM）

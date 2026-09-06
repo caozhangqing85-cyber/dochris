@@ -357,6 +357,14 @@ class CompileJobManager:
         job.message = "编译进行中"
         job.started_at = _utc_now()
         self._acquire_lease(job)
+        # queued 期间收到的跨 worker 取消：启动时立即消费（否则最长延迟 ttl/3）
+        if self._observe_remote_cancel(job):
+            job.status = "cancelled"
+            job.message = "编译已取消"
+            job.finished_at = _utc_now()
+            self._release_lease(job)
+            self._persist(job)
+            return
         self._persist(job)
 
         heartbeat = asyncio.create_task(

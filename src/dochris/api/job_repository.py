@@ -546,6 +546,7 @@ class SQLiteJobRepository(JobRepository):
         """
         now = _utc_now_iso()
         stale_ids: list[str] = []
+        cutoff = (datetime.fromisoformat(now) - timedelta(seconds=300.0)).isoformat()
         for record in self.list_all():
             if record.get("status") not in ACTIVE_STATUSES:
                 continue
@@ -553,6 +554,8 @@ class SQLiteJobRepository(JobRepository):
             owner = record.get("lease_owner")
             if expires_at and expires_at > now and owner and owner != owner_id:
                 continue  # 其他进程持有有效 lease，不动
+            if not expires_at and str(record.get("created_at") or "") > cutoff:
+                continue  # 刚 claim 的 NULL-lease queued 任务：另一 worker 的 claim→run 窗口期内，不动
             stale_ids.append(str(record["job_id"]))
 
         if stale_ids:
