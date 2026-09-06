@@ -831,7 +831,7 @@ async function launchChrome() {
     return { chromeProcess, profileDirectory, webSocketUrl }
   } catch (error) {
     chromeProcess.kill('SIGTERM')
-    await rm(profileDirectory, { recursive: true, force: true })
+    await removeProfileDirectory(profileDirectory)
     throw error
   }
 }
@@ -842,7 +842,20 @@ async function stopChrome(chromeProcess, profileDirectory) {
     await Promise.race([once(chromeProcess, 'exit'), delay(3_000)])
   }
   if (chromeProcess.exitCode === null) chromeProcess.kill('SIGKILL')
-  await rm(profileDirectory, { recursive: true, force: true })
+  await removeProfileDirectory(profileDirectory)
+}
+
+// Chrome 退出后可能仍短暂持有 profile 文件句柄，rm 需要重试兜底
+async function removeProfileDirectory(profileDirectory) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await rm(profileDirectory, { recursive: true, force: true })
+      return
+    } catch (error) {
+      if (attempt === 5) throw error
+      await delay(500 * attempt)
+    }
+  }
 }
 
 class DevToolsClient {
