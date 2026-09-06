@@ -43,14 +43,27 @@ logger = logging.getLogger(__name__)
 # 注意：仅进程内有效，多进程部署（多 worker）需配合文件锁
 _manifest_lock = threading.RLock()
 
+# 跨进程写锁的同线程重入深度（flock 对同一进程的第二个 fd 会互斥，必须可重入）
+_write_lock_state = threading.local()
+
 
 @contextlib.contextmanager
 def _workspace_write_lock(workspace_path: Path) -> Iterator[None]:
     """manifest 写入的跨进程排他锁（flock），多 worker 部署下防 SRC-ID 竞争覆盖。
 
+    同线程可重入（嵌套调用直接通过）；跨线程/跨进程由 flock 串行。
     flock 不可用（如 Windows）时退化为仅进程内 _manifest_lock，语义与旧版一致。
     """
-    lock_dir = workspace_path / "manifests"
+    depth = getattr(_write_lock_state, "depth", 0)
+    if depth > 0:
+        _write_lock_state.depth = depth + 1
+        try:
+            yield
+        finally:
+            _write_lock_state.depth = depth
+        return
+
+    lock_dir = Path(workspace_path) / "manifests"
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / ".write.lock"
     try:
@@ -58,14 +71,21 @@ def _workspace_write_lock(workspace_path: Path) -> Iterator[None]:
     except ImportError:
         # 无 fcntl（Windows）：退化为仅进程内锁
         with _manifest_lock:
-            yield
+            _write_lock_state.depth = 1
+            try:
+                yield
+            finally:
+                _write_lock_state.depth = 0
         return
 
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
-        with _manifest_lock:
+        _write_lock_state.depth = 1
+        try:
             yield
+        finally:
+            _write_lock_state.depth = 0
         fcntl.flock(fd, fcntl.LOCK_UN)
     finally:
         os.close(fd)
@@ -286,11 +306,13 @@ def delete_manifest(workspace_path: Path, src_id: str) -> bool:
             except OSError as e:
                 logger.warning(f"删除 manifest 失败 {src_id}: {e}")
                 return False
-            # 重建索引以移除该条目（索引为 CSV，无单行删除 API，重建最简单可靠）
+            # 重建索引以移除该条目（当前已持有 workspace 写锁，必须用免锁变体，
+            # 否则 rebuild_index 内 flock 二次获取会自死锁）
             try:
-                rebuild_index(workspace_path)
+                _rebuild_index_unlocked(workspace_path)
             except Exception as e:
-                logger.warning(f"删除后重建索引失败 {src_id}: {e}")
+                logger.error(f"删除后重建索引失败 {src_id}: {e}")
+                return False
     return True
 
 

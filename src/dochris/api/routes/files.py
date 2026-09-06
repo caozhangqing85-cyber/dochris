@@ -11,7 +11,12 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
 from dochris.core.utils import sanitize_filename
-from dochris.manifest import create_manifest, get_all_manifests
+from dochris.manifest import (
+    _workspace_write_lock,
+    create_manifest,
+    find_manifest_by_content_hash,
+    get_all_manifests,
+)
 from dochris.phases.phase1_ingestion import file_hash, resolve_path_conflict
 from dochris.settings import get_file_category, get_settings
 
@@ -117,17 +122,30 @@ async def upload_files(files: list[UploadFile] = File(None)) -> dict[str, Any] |
                     logger.debug(f"inbox 软链创建失败（不影响数据）: {inbox_dst.name}")
 
             rel_path = str(managed_path.relative_to(workspace))
-            # src_id=None：在跨进程写锁内自动分配，防多 worker 竞争覆盖
-            manifest = create_manifest(
-                workspace_path=workspace,
-                src_id=None,
-                title=managed_path.name,
-                file_type=category,
-                source_path=managed_path.resolve(),
-                file_path=rel_path,
-                content_hash=content_hash or "",
-                size_bytes=managed_path.stat().st_size,
-            )
+
+            # 跨进程原子判重+创建（P2：哈希查重与 manifest 创建必须同临界区，
+            # 否则双 worker 并发上传相同内容会产生重复 manifest）
+            duplicate = False
+            with _workspace_write_lock(workspace):
+                if content_hash and find_manifest_by_content_hash(workspace, content_hash):
+                    duplicate = True
+                else:
+                    manifest = create_manifest(
+                        workspace_path=workspace,
+                        src_id=None,
+                        title=managed_path.name,
+                        file_type=category,
+                        source_path=managed_path.resolve(),
+                        file_path=rel_path,
+                        content_hash=content_hash or "",
+                        size_bytes=managed_path.stat().st_size,
+                    )
+
+            if duplicate:
+                skipped += 1
+                managed_path.unlink(missing_ok=True)
+                continue
+
             logger.info(f"上传入库 {manifest['id']}: {managed_path.name}")
             existing_hashes.add(content_hash)
             saved += 1

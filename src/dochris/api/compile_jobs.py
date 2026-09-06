@@ -154,6 +154,58 @@ class CompileJobManager:
 
     # -- 提交与运行 ------------------------------------------------
 
+    def find_by_idempotency_key(self, key: str) -> CompileJob | None:
+        """按幂等键查找任务（供路由在 no_work/dry_run 判定前解析重放）。"""
+        if not key:
+            return None
+        return self._find_by_idempotency_key(key)
+
+    def submit(
+        self,
+        total: int,
+        runner: CompileRunner,
+        *,
+        concurrency: int = 1,
+        limit: int | None = None,
+        attempt: int = 1,
+        retry_of: str | None = None,
+        timeout_seconds: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> tuple[CompileJob, bool]:
+        """提交编译任务。
+
+        Returns:
+            (job, created)：
+            - created=True：新任务已创建并持久化（调用方可改写为 accepted）；
+            - created=False：幂等重放或活动互斥返回了既有任务——调用方必须
+              原样返回该任务，不得改写状态。
+        Raises:
+            JobPersistenceError: 持久化失败（fail-closed，编译绝不启动）。
+        """
+        # 幂等解析优先于活动互斥（与 SQLite claim 语义一致）
+        if idempotency_key:
+            replay = self._find_by_idempotency_key(idempotency_key)
+            if replay is not None:
+                return replay, False
+
+        jobs_before = set(self._jobs)
+        pre_active = self.active()
+
+        job = self.start(
+            total,
+            runner,
+            concurrency=concurrency,
+            limit=limit,
+            attempt=attempt,
+            retry_of=retry_of,
+            timeout_seconds=timeout_seconds,
+            idempotency_key=idempotency_key,
+        )
+        created = job.job_id not in jobs_before and not (
+            pre_active is not None and job.job_id == pre_active.job_id
+        )
+        return job, created
+
     def start(
         self,
         total: int,

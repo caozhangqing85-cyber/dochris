@@ -35,6 +35,22 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
 
     后台异步执行编译任务，立即返回任务状态。
     """
+    manager = _get_compile_job_manager(request)
+    idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
+
+    # 幂等重放最优先：在 pending/no_work/dry_run 等任何判定之前解析，
+    # 重放旧任务的 key 必须原样返回该任务（含其原始状态），不得被 no_work 顶替
+    if idempotency_key:
+        replay = manager.find_by_idempotency_key(idempotency_key)
+        if replay is not None:
+            return replay.as_response()
+
+    # 无键请求走活动互斥早退（带键请求由 submit 的 created 标志决定语义）
+    if idempotency_key is None:
+        active_job = manager.active()
+        if active_job is not None:
+            return active_job.as_response()
+
     workspace = get_default_workspace()
     pending = get_all_manifests(workspace, status="ingested")
     total_to_compile = len(pending)
@@ -56,17 +72,8 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
             total=total_to_compile,
         )
 
-    manager = _get_compile_job_manager(request)
-    idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
-    # 幂等键优先：带键请求必须先解析幂等语义（重放已完成任务时原样返回该任务），
-    # 不能被无关的当前活动任务截获；仅无键请求走活动互斥早退
-    if idempotency_key is None:
-        active_job = manager.active()
-        if active_job is not None:
-            return active_job.as_response()
-
     try:
-        job = manager.start(
+        job, created = manager.submit(
             total_to_compile,
             lambda **kwargs: _run_compile_task(
                 req.concurrency,
@@ -85,6 +92,10 @@ async def compile_documents(req: CompileRequest, request: Request) -> CompileRes
             detail="任务持久化失败，编译未启动（磁盘/数据库异常），请检查服务端日志后重试",
         ) from exc
     await asyncio.sleep(0)
+
+    if not created:
+        # 幂等重放（或活动互斥命中既有任务）：原样返回，不得改写为 accepted
+        return job.as_response()
 
     return job.as_response().model_copy(
         update={

@@ -1,15 +1,15 @@
-"""manifest SRC-ID 跨进程原子分配测试（并发上传覆盖回归）。"""
+"""manifest SRC-ID 跨进程原子分配 + delete 死锁回归测试。"""
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
 
-from dochris.manifest import create_manifest, get_all_manifests
+from dochris.manifest import create_manifest, delete_manifest, get_all_manifests
 
 pytestmark = pytest.mark.fast
 
@@ -69,7 +69,6 @@ def test_concurrent_processes_allocate_unique_src_ids(tmp_path: Path) -> None:
     assert len(ids) == workers * per_worker, "manifest 数量必须等于创建次数（无覆盖）"
     assert len(set(ids)) == len(ids), f"SRC-ID 出现重复: {sorted(ids)}"
 
-    # 落盘文件与索引一致
     on_disk = sorted((tmp_path / "manifests" / "sources").glob("SRC-*.json"))
     assert len(on_disk) == len(ids)
     rows = (tmp_path / "manifests" / "source_index.csv").read_text(encoding="utf-8")
@@ -79,8 +78,6 @@ def test_concurrent_processes_allocate_unique_src_ids(tmp_path: Path) -> None:
 
 def test_same_process_threads_allocate_unique_src_ids(tmp_path: Path) -> None:
     """进程内多线程并发（上传路由的线程池场景）。"""
-    import threading
-
     barrier = threading.Barrier(6)
     created: list[str] = []
     lock = threading.Lock()
@@ -126,18 +123,50 @@ def test_create_manifest_with_explicit_id_still_works(tmp_path: Path) -> None:
     assert (tmp_path / "manifests" / "sources" / "SRC-0042.json").exists()
 
 
-def test_manifest_json_shape_unchanged(tmp_path: Path) -> None:
+def test_delete_manifest_does_not_deadlock_and_updates_index(tmp_path: Path) -> None:
+    """P1 回归：delete 在持锁状态下重建索引曾自死锁；必须能在超时内完成且 CSV 同步。"""
     manifest = create_manifest(
         tmp_path,
         src_id=None,
-        title="doc",
+        title="待删除.md",
         file_type="other",
-        source_path=tmp_path / "doc.md",
-        file_path="raw/doc.md",
+        source_path=tmp_path / "待删除.md",
+        file_path="raw/待删除.md",
+        content_hash="deadbeef",
+        size_bytes=1,
+    )
+    result: dict[str, object] = {}
+
+    def try_delete() -> None:
+        result["ok"] = delete_manifest(tmp_path, manifest["id"])
+
+    thread = threading.Thread(target=try_delete, daemon=True)
+    thread.start()
+    thread.join(timeout=4)
+    assert not thread.is_alive(), "delete_manifest 死锁（4s 未完成）"
+    assert result.get("ok") is True
+
+    assert not (tmp_path / "manifests" / "sources" / f"{manifest['id']}.json").exists()
+    rows = (tmp_path / "manifests" / "source_index.csv").read_text(encoding="utf-8")
+    assert manifest["id"] not in rows, "CSV 必须同步移除该条目"
+
+
+def test_delete_manifest_returns_false_when_index_rebuild_fails(tmp_path: Path) -> None:
+    """索引重建失败不得谎报删除成功。"""
+    from unittest.mock import patch
+
+    manifest = create_manifest(
+        tmp_path,
+        src_id=None,
+        title="x.md",
+        file_type="other",
+        source_path=tmp_path / "x.md",
+        file_path="raw/x.md",
         content_hash="h",
+        size_bytes=1,
     )
-    stored = json.loads(
-        (tmp_path / "manifests" / "sources" / f"{manifest['id']}.json").read_text(encoding="utf-8")
-    )
-    for key in ("id", "title", "status", "content_hash", "canonical_id", "file_path"):
-        assert key in stored
+
+    with patch("dochris.manifest._rebuild_index_unlocked", side_effect=OSError("disk full")):
+        ok = delete_manifest(tmp_path, manifest["id"])
+
+    assert ok is False

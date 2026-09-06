@@ -90,14 +90,21 @@ jobs:
           python -m venv .smoke-venv
           ./.smoke-venv/bin/pip install --no-cache-dir dist/*.whl
       - name: Query smoke (offline paths)
+        env:
+          EXPECTED_VERSION: ${GITHUB_REF_NAME#v}
         run: |
           ./.smoke-venv/bin/python - <<'PY'
+          import os
           import dochris
           from dochris.settings import get_settings
           s = get_settings()
-          print("version:", dochris.__version__)
+          expected = os.environ["EXPECTED_VERSION"]
+          print("version:", dochris.__version__, "| expected:", expected)
           print("workspace:", s.workspace)
-          assert dochris.__version__, "version must be present"
+          # 发布门禁：安装后的运行时版本必须与 tag 严格一致
+          assert dochris.__version__ == expected, (
+              f"wheel 版本 {dochris.__version__} != tag {expected}"
+          )
           PY
           ./.smoke-venv/bin/python -m dochris.cli.main --help >/dev/null
 
