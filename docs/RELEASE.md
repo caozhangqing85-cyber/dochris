@@ -136,3 +136,26 @@ docker compose --profile api up -d --build
 对比 无 reranker / cross-encoder / BGE reranker，以及 structure / recursive /
 semantic 分块；每轮保存 JSON 报告（含 commit SHA）后再决定是否切换默认配置。
 
+### 已记录的真实基线（2026-09-06，本地 5 篇中文语料，15,340 字符）
+
+检索器对比（10 题 golden，k=5，无 reranker）：
+
+| 检索通道 | recall@5 | MRR | NDCG@5 |
+|---|---|---|---|
+| concept（关键词，wiki 优先） | 0.90 | **0.90** | 0.90 |
+| vector（ChromaDB + bge-small-zh） | **1.00** | 0.88 | 0.91 |
+
+分块策略对比（chunk_size=1000，overlap=100）：
+
+| 策略 | chunks | 均值 | p50 | p95 | 耗时 |
+|---|---|---|---|---|---|
+| structure | 72 | 212 | 146 | 587 | ~0s |
+| recursive | 21 | 774 | 880 | 994 | ~0s |
+| semantic | 27 | 581 | 544 | 1000 | 6.5s（bge embedding） |
+
+结论（作为后续切换默认配置的参照，非普适结论）：小语料下 vector 通道召回更全，
+concept 通道排序略优；structure 分块在小文档上过碎（min 7 字符），
+recursive 尺寸纪律最好，semantic 的语义边界优势需在更长文档上复测。
+复现方式：`eval/golden_questions` 协议 + `dochris.rag.chunking.factory`，
+报告样例见 `reports/`（不入库）。
+
