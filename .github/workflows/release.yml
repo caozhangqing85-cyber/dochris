@@ -91,14 +91,14 @@ jobs:
           ./.smoke-venv/bin/pip install --no-cache-dir dist/*.whl
       - name: Query smoke (offline paths)
         env:
-          EXPECTED_VERSION: ${GITHUB_REF_NAME#v}
+          EXPECTED_VERSION: ${{ github.ref_name }}
         run: |
           ./.smoke-venv/bin/python - <<'PY'
           import os
           import dochris
           from dochris.settings import get_settings
           s = get_settings()
-          expected = os.environ["EXPECTED_VERSION"]
+          expected = os.environ["EXPECTED_VERSION"].removeprefix("v")
           print("version:", dochris.__version__, "| expected:", expected)
           print("workspace:", s.workspace)
           # 发布门禁：安装后的运行时版本必须与 tag 严格一致
