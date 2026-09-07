@@ -124,9 +124,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          echo "# DocChris $GITHUB_REF_NAME" > release_body.md
+          echo "" >> release_body.md
+          echo "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md) for details." >> release_body.md
+          echo "" >> release_body.md
+          echo "## Artifacts" >> release_body.md
+          echo "- Python wheel + sdist (verified by clean-venv install smoke on ubuntu + macos)" >> release_body.md
+          echo "- SBOM (CycloneDX JSON) + SHA-256 checksums" >> release_body.md
           gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
+            --title "DocChris $GITHUB_REF_NAME" \
+            --notes-file release_body.md \
             dist/* sbom.json checksums.sha256
 
   publish:
