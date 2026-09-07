@@ -115,26 +115,32 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: release-dist
-      - name: Create GitHub Release with artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+      - name: Create release body
         run: |
-          echo "# DocChris $GITHUB_REF_NAME" > release_body.md
-          echo "" >> release_body.md
-          echo "See [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md) for details." >> release_body.md
-          echo "" >> release_body.md
-          echo "## Artifacts" >> release_body.md
-          echo "- Python wheel + sdist (verified by clean-venv install smoke on ubuntu + macos)" >> release_body.md
-          echo "- SBOM (CycloneDX JSON) + SHA-256 checksums" >> release_body.md
-          gh release create "$GITHUB_REF_NAME" \
-            --title "DocChris $GITHUB_REF_NAME" \
-            --notes-file release_body.md \
-            dist/* sbom.json checksums.sha256
+          cat > release_body.md <<'BODY'
+          # DocChris ${{ github.ref_name }}
+
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+          ## Artifacts
+          - Python wheel + sdist (verified by clean-venv install smoke on ubuntu + macos)
+          - SBOM (CycloneDX JSON) + SHA-256 checksums
+          BODY
+      - name: Create GitHub Release with artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: DocChris ${{ github.ref_name }}
+          body_path: release_body.md
+          files: |
+            dist/*
+            sbom.json
+            checksums.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
     name: Publish to PyPI (Trusted Publishing)
