@@ -47,7 +47,7 @@ jobs:
       - name: Generate SBOM (CycloneDX)
         run: |
           pip install -e ".[standard]" --quiet
-          cyclonedx-py environment --output-format json --output-file sbom.json --force
+          cyclonedx-py environment --output-format json --output-file sbom.json
       - name: Generate checksums
         run: |
           cd dist
