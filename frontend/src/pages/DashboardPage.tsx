@@ -94,6 +94,20 @@ export default function DashboardPage() {
       </div>
 
       <SectionHeader title="数据概览" />
+      {m && m.total === 0 && (
+        <div style={{
+          padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)',
+          border: '1px dashed var(--border-default)', marginBottom: 'var(--space-6)',
+          background: 'var(--bg-elevated)', textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 var(--space-2)' }}>
+            知识库还是空的
+          </p>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>
+            前往「文件管理」上传你的第一份文档，开始构建知识库
+          </p>
+        </div>
+      )}
       <div className="grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-12)' }}>
         {stats.map((s) => <StatCard key={s.label} {...s} />)}
       </div>

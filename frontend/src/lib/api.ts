@@ -98,7 +98,17 @@ async function readErrorDetails(res: Response, fallback: string): Promise<ErrorD
     }
     if (typeof body.error === 'string') return { message: body.error, code }
   } catch {
-    return { message: text }
+    // JSON 解析失败：区分网关/代理返回的 HTML 错误页（展示干净提示）
+    // 和有意义的纯文本错误（如 nginx 的 plain text 或后端自定义信息）
+    if (text.trimStart().startsWith('<')) {
+      const hint = res.status >= 500
+        ? '服务端暂时不可用，请稍后重试'
+        : res.status >= 400
+          ? `请求失败（HTTP ${res.status}）`
+          : fallback
+      return { message: hint, code: statusCodeToErrorCode(res.status) }
+    }
+    return { message: text, code: statusCodeToErrorCode(res.status) }
   }
   return { message: fallback }
 }

@@ -41,7 +41,7 @@ export default function FilesPage() {
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<ManifestItem | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [uploadMsg, setUploadMsg] = useState('')
+  const [uploadMsg, setUploadMsg] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null)
   const [page, setPage] = useState(1)
   const [dragOver, setDragOver] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -147,22 +147,21 @@ export default function FilesPage() {
 
   const doUpload = async (fileList: FileList | File[]) => {
     if (!fileList.length) return
-    setUploading(true); setUploadMsg('')
+    setUploading(true); setUploadMsg(null)
     try {
       const res = await uploadFiles(Array.from(fileList))
       await load()
       // 部分成功契约：分别展示 成功/跳过/失败 与逐文件错误
       if (res.failed > 0) {
         const reasons = res.errors?.length ? `，原因：${res.errors.join('；')}` : ''
-        setUploadMsg(
-          `上传完成：成功 ${res.ingested} 个，失败 ${res.failed} 个${reasons}`,
-        )
+        const skippedNote = res.skipped > 0 ? `，跳过重复 ${res.skipped} 个` : ''
+        setUploadMsg({ tone: 'warning', text: `上传完成：成功 ${res.ingested} 个，失败 ${res.failed} 个${skippedNote}${reasons}` })
       } else if (res.skipped > 0) {
-        setUploadMsg(`上传完成：成功 ${res.ingested} 个，跳过重复 ${res.skipped} 个`)
+        setUploadMsg({ tone: 'success', text: `上传完成：成功 ${res.ingested} 个，跳过重复 ${res.skipped} 个` })
       } else {
-        setUploadMsg(`成功上传 ${res.ingested} 个文件`)
+        setUploadMsg({ tone: 'success', text: `成功上传 ${res.ingested} 个文件` })
       }
-    } catch (err) { setUploadMsg('上传失败: ' + (err as Error).message) }
+    } catch (err) { setUploadMsg({ tone: 'error', text: '上传失败: ' + (err as Error).message }) }
     finally { setUploading(false) }
   }
 
@@ -250,10 +249,15 @@ export default function FilesPage() {
         <div style={{
           padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)',
           fontSize: 'var(--text-sm)', borderRadius: '4px', fontWeight: 500,
-          background: uploadMsg.startsWith('上传失败') ? 'var(--status-error-bg)' : 'var(--status-success-bg)',
-          color: uploadMsg.startsWith('上传失败') ? 'var(--status-error)' : 'var(--status-success)',
+          background: uploadMsg.tone === 'error' ? 'var(--status-error-bg)'
+            : uploadMsg.tone === 'warning' ? 'var(--status-warning-bg)'
+            : 'var(--status-success-bg)',
+          color: uploadMsg.tone === 'error' ? 'var(--status-error)'
+            : uploadMsg.tone === 'warning' ? 'var(--status-warning)'
+            : 'var(--status-success)',
+          border: `1px solid ${uploadMsg.tone === 'error' ? 'var(--status-error-border)' : uploadMsg.tone === 'warning' ? 'var(--status-warning-border)' : 'var(--status-success-border)'}`,
         }}>
-          {uploadMsg}
+          {uploadMsg.text}
         </div>
       )}
 
