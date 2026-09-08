@@ -17,7 +17,7 @@ from dochris.core.cache import cache_dir, file_hash, load_cached, save_cached
 from dochris.core.llm_client import LLMClient
 from dochris.core.quality_scorer import score_summary_quality_v4
 from dochris.core.utils import sanitize_filename
-from dochris.exceptions import CompilationError
+from dochris.exceptions import APIKeyError, CompilationError, ConfigurationError
 from dochris.manifest import get_default_workspace, get_manifest, update_manifest_status
 
 # 导入解析器
@@ -103,13 +103,17 @@ class CompilerWorker:
             logger.warning("主通道未配置 API key，将仅使用本地兜底")
 
         # 兜底通道 LLM（本地 Ollama）
-        if enable_fallback:
+        # 仅在显式配置了 LOCAL_LLM_BASE_URL 时创建；空 base_url 会让请求
+        # 落到远程默认端点并触发数分钟的无意义重试
+        if enable_fallback and fallback_base_url.strip():
             self.fallback_llm = LLMClient(
                 fallback_api_key, fallback_base_url, fallback_model, request_delay=5.0
             )
             logger.info(f"兜底通道: {fallback_model} @ {fallback_base_url}")
         else:
             self.fallback_llm = None
+            if enable_fallback:
+                logger.info("未配置 LOCAL_LLM_BASE_URL，跳过本地兜底通道")
 
         self.enable_fallback = enable_fallback
         self.workspace = workspace if workspace is not None else get_default_workspace()
@@ -173,9 +177,13 @@ class CompilerWorker:
             logger.error(f"兜底通道也失败: {title[:30]}")
             return None
 
-        # 3. 没有可用的 LLM
+        # 3. 没有可用的 LLM 通道：快速失败并给出可操作原因，
+        # 避免上层只能记下「编译返回空结果」让用户无从下手
         logger.error(f"无可用 LLM 通道: {title[:30]}")
-        return None
+        raise APIKeyError(
+            "未配置可用的 LLM 通道：主通道缺少 API Key，且未设置 LOCAL_LLM_BASE_URL 本地兜底。"
+            "请在「系统设置 → API 配置」填写 API 密钥后重试"
+        )
 
     async def compile_document(self, src_id: str) -> dict[str, Any] | None:
         """
@@ -286,6 +294,12 @@ class CompilerWorker:
             logger.info(f"✓ Compiled {src_id} (quality: {quality_score})")
             return compile_result
 
+        except ConfigurationError as e:
+            # 配置类错误（如未配置 API Key）标记失败后原样上抛，
+            # 让调度层把可操作的原因写入任务失败详情
+            logger.error(f"Configuration error for {src_id}: {e}")
+            await self._mark_failed(src_id, str(e))
+            raise
         except (CompilationError, OSError, ValueError, RuntimeError) as e:
             logger.error(f"Compilation failed for {src_id}: {e}", exc_info=True)
             await self._mark_failed(src_id, str(e))

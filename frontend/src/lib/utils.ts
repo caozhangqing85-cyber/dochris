@@ -52,8 +52,8 @@ export function statusLabel(status: string): string {
     ingested: '待编译',
     failed: '失败',
     compile_failed: '编译失败',
-    promoted_to_wiki: 'Wiki',
-    promoted: 'Curated',
+    promoted_to_wiki: '已入 Wiki',
+    promoted: '已精选',
   }
   return map[status] || status
 }

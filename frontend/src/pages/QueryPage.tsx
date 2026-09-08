@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Search, Loader2, Brain, Sparkles, Database, FileText,
   BookmarkPlus, BookmarkCheck, ChevronDown,
@@ -278,6 +279,7 @@ function ResultCard({ result, query }: { result: SearchResult | VectorResult; qu
 type ResultTab = 'answer' | 'documents' | 'concepts' | 'vector'
 
 export default function QueryPage() {
+  const navigate = useNavigate()
   // Query state
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState('combined')
@@ -520,6 +522,7 @@ export default function QueryPage() {
                   ...streamResult,
                   answer: finalAnswer,
                   time_seconds: finalTime || elapsedSec,
+                  llm_unavailable: done?.llm_unavailable ?? false,
                   citations: (done?.citations ?? []).map(c => ({
                     ref: c.ref,
                     manifest_id: c.manifest_id ?? null,
@@ -675,7 +678,7 @@ export default function QueryPage() {
 
   const tabCounts = useMemo(() => ({
     answer: result?.answer ? 1 : 0,
-    documents: (result?.summaries?.length || 0) + (result?.vector_results?.length || 0),
+    documents: result?.summaries?.length || 0,
     concepts: result?.concepts?.length || 0,
     vector: result?.vector_results?.length || 0,
   }), [result])
@@ -999,7 +1002,7 @@ export default function QueryPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginBottom: 'var(--space-4)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 'var(--space-2)' }}>
               {([
                 { key: 'answer' as ResultTab, label: 'AI 回答', count: result.answer ? 1 : 0, icon: Sparkles },
-                { key: 'documents' as ResultTab, label: '相关文档', count: (result.summaries?.length || 0) + (result.vector_results?.length || 0), icon: FileText },
+                { key: 'documents' as ResultTab, label: '相关文档', count: result.summaries?.length || 0, icon: FileText },
                 { key: 'concepts' as ResultTab, label: '概念匹配', count: result.concepts?.length || 0, icon: Tag },
                 { key: 'vector' as ResultTab, label: '向量检索', count: result.vector_results?.length || 0, icon: Database },
               ]).map((tab) => (
@@ -1209,20 +1212,48 @@ export default function QueryPage() {
             {/* AI Answer */}
             {activeTab === 'answer' && (
               result.answer ? (
-                <div style={{
-                  borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
-                  border: '1px solid var(--border-default)', background: 'var(--bg-card)',
-                }}>
-                  <StreamingMarkdown content={result.answer} streaming={false} />
-                  {result.search_sources?.length > 0 && (
-                    <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-elevated)', borderRadius: '4px' }}>
-                      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-2)' }}>引用来源</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
-                        {result.search_sources.map(s => <SourceBadge key={s} source={s} />)}
-                      </div>
+                result.llm_unavailable ? (
+                  <div style={{
+                    borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+                    border: '1px solid var(--status-warning-border)', background: 'var(--status-warning-bg)',
+                    display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <AlertTriangle size={16} style={{ color: 'var(--status-warning)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--status-warning)' }}>
+                        AI 生成暂不可用
+                      </span>
                     </div>
-                  )}
-                </div>
+                    <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0, lineHeight: 'var(--leading-relaxed)' }}>
+                      未检索到可用的生成通道（通常是未配置 LLM API 密钥）。检索功能正常，
+                      下方"相关文档 / 概念匹配 / 向量检索"标签仍可查看。
+                    </p>
+                    <div>
+                      <button onClick={() => navigate('/settings')} style={{
+                        padding: '6px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 500,
+                        border: '1px solid var(--status-warning-border)', cursor: 'pointer',
+                        background: 'var(--bg-card)', color: 'var(--status-warning)',
+                      }}>
+                        去系统设置配置 API 密钥
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)',
+                    border: '1px solid var(--border-default)', background: 'var(--bg-card)',
+                  }}>
+                    <StreamingMarkdown content={result.answer} streaming={false} />
+                    {result.search_sources?.length > 0 && (
+                      <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-elevated)', borderRadius: '4px' }}>
+                        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-2)' }}>引用来源</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                          {result.search_sources.map(s => <SourceBadge key={s} source={s} />)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-dimmed)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
                   <p style={{ fontSize: 'var(--text-sm)', margin: 0 }}>该查询模式未生成 AI 回答</p>

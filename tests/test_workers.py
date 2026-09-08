@@ -105,6 +105,50 @@ class TestCompilerWorker(unittest.TestCase):
 
         mock_update.assert_not_called()
 
+    @patch("dochris.workers.compiler_worker.get_default_workspace")
+    @patch("dochris.workers.compiler_worker.LLMClient")
+    def test_fallback_skipped_without_base_url(self, mock_llm, mock_workspace):
+        """未配置 LOCAL_LLM_BASE_URL 时不应创建兜底通道（避免空 base_url 落到远程端点空转重试）"""
+        mock_workspace.return_value = self.temp_path
+
+        from dochris.workers.compiler_worker import CompilerWorker
+
+        worker = CompilerWorker(api_key="", base_url="", fallback_base_url="")
+
+        self.assertIsNone(worker.llm)
+        self.assertIsNone(worker.fallback_llm)
+        mock_llm.assert_not_called()
+
+    @patch("dochris.workers.compiler_worker.get_default_workspace")
+    @patch("dochris.workers.compiler_worker.LLMClient")
+    def test_fallback_created_with_base_url(self, mock_llm, mock_workspace):
+        """显式配置 LOCAL_LLM_BASE_URL 时兜底通道正常创建"""
+        mock_workspace.return_value = self.temp_path
+
+        from dochris.workers.compiler_worker import CompilerWorker
+
+        worker = CompilerWorker(
+            api_key="", base_url="", fallback_base_url="http://localhost:11434/v1"
+        )
+
+        self.assertIsNone(worker.llm)
+        self.assertIsNotNone(worker.fallback_llm)
+
+    @patch("dochris.workers.compiler_worker.get_default_workspace")
+    @patch("dochris.workers.compiler_worker.LLMClient")
+    def test_generate_raises_api_key_error_without_channels(self, mock_llm, mock_workspace):
+        """主通道与兜底通道都不可用时快速抛出 APIKeyError（可操作文案），不再返回 None"""
+        mock_workspace.return_value = self.temp_path
+
+        from dochris.exceptions import APIKeyError
+        from dochris.workers.compiler_worker import CompilerWorker
+
+        worker = CompilerWorker(api_key="", base_url="", fallback_base_url="")
+
+        with self.assertRaises(APIKeyError) as ctx:
+            asyncio.run(worker._generate_with_fallback("正文", "标题"))
+        self.assertIn("API 密钥", str(ctx.exception))
+
 
 class TestCompilerWorkerPDF(unittest.TestCase):
     """测试 PDF 文件编译"""

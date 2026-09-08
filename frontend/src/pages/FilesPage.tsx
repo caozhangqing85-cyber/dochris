@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
   compiling: { color: 'var(--status-warning)', bg: 'var(--status-warning-bg)' },
   compiled: { color: 'var(--status-success)', bg: 'var(--status-success-bg)' },
   failed: { color: 'var(--status-error)', bg: 'var(--status-error-bg)' },
+  promoted_to_wiki: { color: 'var(--color-primary)', bg: 'var(--color-primary-bg)' },
   promoted: { color: 'var(--color-primary)', bg: 'var(--color-primary-bg)' },
 }
 

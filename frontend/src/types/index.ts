@@ -57,6 +57,8 @@ export interface QueryResponse {
   citations?: Citation[]
   unresolved_refs?: string[]
   warnings?: string[]
+  /** LLM 生成通道不可用（如未配置 API Key），answer 为降级提示而非真实回答 */
+  llm_unavailable?: boolean
   timings?: Record<string, number>
   trace_id?: string
 }

@@ -57,6 +57,7 @@ export default function QualityPage() {
   const m = status?.manifests
   const total = m?.total ?? 0; const compiled = m?.compiled ?? 0; const failed = m?.failed ?? 0
   const ingested = m?.ingested ?? 0
+  const promoted = (m?.promoted_to_wiki ?? 0) + (m?.promoted ?? 0)
   const resettableCount = manifests.filter((manifest) => (
     typeof manifest.quality_score === 'number'
     && manifest.quality_score < threshold
@@ -79,6 +80,7 @@ export default function QualityPage() {
   const compiledPct = total ? Math.round((compiled / total) * 100) : 0
   const failedPct = total ? Math.round((failed / total) * 100) : 0
   const ingestedPct = total ? Math.round((ingested / total) * 100) : 0
+  const promotedPct = total ? Math.round((promoted / total) * 100) : 0
   const qualityScores = manifests
     .map((manifest) => manifest.quality_score)
     .filter((score): score is number => typeof score === 'number' && Number.isFinite(score))
@@ -94,6 +96,7 @@ export default function QualityPage() {
     { label: '失败', pct: failedPct, color: 'var(--status-error)', bg: 'var(--status-error-bg)' },
     { label: '待编译', pct: ingestedPct, color: 'var(--status-info)', bg: 'var(--status-info-bg)' },
     { label: '已编译', pct: compiledPct, color: 'var(--status-success)', bg: 'var(--status-success-bg)' },
+    { label: '已晋升', pct: promotedPct, color: 'var(--color-primary)', bg: 'var(--color-primary-bg)' },
   ]
 
   // 溯源分布统计

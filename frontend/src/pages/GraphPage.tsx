@@ -26,6 +26,19 @@ const VIEW_OPTIONS: { value: ViewMode; label: string; icon: typeof Tag }[] = [
   { value: 'mixed', label: '混合视图', icon: Layers },
 ]
 
+// 节点详情「元数据」不展示的内部字段：源文件路径、溯源 ID 数组等对用户没有意义
+const METADATA_INTERNAL_KEYS = new Set(['file', 'files', 'source_ids', 'duplicate_files', 'derived'])
+
+// 已知元数据字段的中文名称
+const METADATA_LABELS: Record<string, string> = {
+  aliases: '别名',
+  variants: '变体',
+  category: '类别',
+  type: '类型',
+  trust_level: '可信度',
+  quality_score: '质量分',
+}
+
 export default function GraphPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<RequestErrorInfo | null>(null)
@@ -595,16 +608,19 @@ export default function GraphPage() {
                 </div>
               )}
 
-              {/* Metadata */}
-              {selectedNode.metadata && Object.keys(selectedNode.metadata).length > 0 && (
+              {/* Metadata — 过滤内部字段（源文件路径/溯源 ID 等），只展示对用户有意义的项 */}
+              {selectedNode.metadata && Object.entries(selectedNode.metadata)
+                .filter(([k]) => !METADATA_INTERNAL_KEYS.has(k)).length > 0 && (
                 <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border-subtle)' }}>
                   <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-dimmed)', marginBottom: 'var(--space-2)' }}>
                     元数据
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {Object.entries(selectedNode.metadata).slice(0, 8).map(([k, v]) => (
+                    {Object.entries(selectedNode.metadata)
+                      .filter(([k]) => !METADATA_INTERNAL_KEYS.has(k))
+                      .slice(0, 8).map(([k, v]) => (
                       <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>{k}</span>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dimmed)' }}>{METADATA_LABELS[k] ?? k}</span>
                         <span title={formatMetadataValue(v)} style={{
                           fontSize: 'var(--text-xs)', fontWeight: 500, color: 'var(--text-primary)',
                           maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right',

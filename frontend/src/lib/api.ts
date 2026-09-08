@@ -225,6 +225,8 @@ export interface StreamDoneEvent {
   final_answer?: string
   citations?: StreamCitation[]
   unresolved_refs?: string[]
+  /** 生成通道不可用（如未配置 API Key），final_answer 为降级提示而非真实回答 */
+  llm_unavailable?: boolean
 }
 
 export interface StreamErrorEvent {

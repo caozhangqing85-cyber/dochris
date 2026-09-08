@@ -78,6 +78,9 @@ class QueryResponse(BaseModel):
     warnings: list[str] = []
     """非致命降级信息（如向量检索不可用）"""
 
+    llm_unavailable: bool = False
+    """LLM 生成通道不可用（如未配置 API Key），answer 为降级提示而非真实回答"""
+
     timings: dict[str, float] = {}
     """阶段耗时（秒）：retrieval/rerank/first_token/generation/total"""
 

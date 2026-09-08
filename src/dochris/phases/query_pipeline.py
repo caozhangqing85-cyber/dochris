@@ -283,6 +283,8 @@ class QueryPipeline:
                     )
             else:
                 answer = _LLM_UNAVAILABLE_ANSWER
+                # 机器可读标志：前端据此把提示渲染成告警卡片而非普通回答
+                result["llm_unavailable"] = True
                 logger.warning("LLM provider 不可用，仅返回检索结果")
             if answer:
                 result["answer"] = answer
@@ -380,6 +382,7 @@ class QueryPipeline:
         )
 
         final_answer = ""
+        llm_unavailable = False
         if not has_context:
             final_answer = _NO_CONTEXT_ANSWER
             yield PipelineEvent("answer_delta", {"text": final_answer})
@@ -387,6 +390,7 @@ class QueryPipeline:
             provider = self._cb.provider_factory(logger)
             if provider is None or self._cb.generate_stream is None:
                 final_answer = _LLM_UNAVAILABLE_ANSWER
+                llm_unavailable = True
                 yield PipelineEvent("answer_delta", {"text": final_answer})
             else:
                 chunks: list[str] = []
@@ -427,6 +431,7 @@ class QueryPipeline:
                 "final_answer": final_answer,
                 "citations": citations,
                 "unresolved_refs": unresolved,
+                "llm_unavailable": llm_unavailable,
             },
         )
 

@@ -438,6 +438,13 @@ export default function CompilePage() {
           模拟运行
         </label>
         <button onClick={handleCompile} disabled={compiling || compileRunning || ingestedFiles.length === 0}
+          title={
+            compiling || compileRunning
+              ? '编译任务进行中，请等待完成或取消当前任务'
+              : ingestedFiles.length === 0
+                ? '当前没有待编译文件。上传新文件，或在文件管理页"重置失败"后再试'
+                : `开始编译 ${ingestedFiles.length} 个待编译文件`
+          }
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             padding: '8px 20px', borderRadius: '4px', fontSize: 'var(--text-sm)', fontWeight: 600,

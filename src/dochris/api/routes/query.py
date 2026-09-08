@@ -117,6 +117,7 @@ async def query_knowledge_base(
         ],
         unresolved_refs=result.get("unresolved_refs", []),
         warnings=result.get("warnings", []),
+        llm_unavailable=bool(result.get("llm_unavailable", False)),
         timings=result.get("timings", {}),
         trace_id=get_current_trace_id(),
     )
@@ -230,6 +231,7 @@ async def query_stream(
                         final_answer=event.data.get("final_answer"),
                         citations=event.data.get("citations"),
                         unresolved_refs=event.data.get("unresolved_refs"),
+                        llm_unavailable=bool(event.data.get("llm_unavailable", False)),
                     )
 
         except asyncio.CancelledError:

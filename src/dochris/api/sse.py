@@ -159,11 +159,13 @@ def sse_done_event(
     final_answer: str | None = None,
     citations: list[dict[str, Any]] | None = None,
     unresolved_refs: list[str] | None = None,
+    llm_unavailable: bool = False,
 ) -> str:
     """构建 done 事件。
 
     final_answer 是与非流式一致的后处理答案；前端应在收到 done 时用其
     替换增量渲染的文本，保证两种模式最终答案完全一致。
+    llm_unavailable 表示生成通道不可用，answer 为降级提示而非真实回答。
     """
     data: dict[str, Any] = {
         "v": SSE_EVENT_VERSION,
@@ -181,6 +183,8 @@ def sse_done_event(
         data["citations"] = citations
     if unresolved_refs is not None:
         data["unresolved_refs"] = unresolved_refs
+    if llm_unavailable:
+        data["llm_unavailable"] = True
     return sse_encode(QueryStreamEventName.DONE, data)
 
 
